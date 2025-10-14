@@ -28,6 +28,8 @@ function db(): PDO
         bootstrapSchema($pdo);
     }
 
+    ensureSchemaUpgrades($pdo);
+
     return $pdo;
 }
 
@@ -50,6 +52,7 @@ function bootstrapSchema(PDO $pdo): void
             phone_primary TEXT,
             phone_secondary TEXT,
             representative_name TEXT,
+            representative_document TEXT,
             representative_phone TEXT,
             emergency_contact TEXT,
             notes TEXT,
@@ -79,6 +82,8 @@ function bootstrapSchema(PDO $pdo): void
             antecedent_gastrointestinal INTEGER DEFAULT 0,
             antecedent_endocrine INTEGER DEFAULT 0,
             antecedent_renal INTEGER DEFAULT 0,
+            antecedent_ent INTEGER DEFAULT 0,
+            antecedent_hepatic INTEGER DEFAULT 0,
             antecedent_neurologic INTEGER DEFAULT 0,
             antecedent_allergy INTEGER DEFAULT 0,
             antecedent_neoplastic INTEGER DEFAULT 0,
@@ -86,6 +91,7 @@ function bootstrapSchema(PDO $pdo): void
             antecedent_viral INTEGER DEFAULT 0,
             antecedent_gynecologic INTEGER DEFAULT 0,
             antecedent_covid INTEGER DEFAULT 0,
+            physical_exam_bp TEXT,
             pain_level INTEGER,
             habits TEXT,
             risk_assessment TEXT,
@@ -99,6 +105,7 @@ function bootstrapSchema(PDO $pdo): void
             patient_id INTEGER NOT NULL,
             tooth_code TEXT NOT NULL,
             status TEXT,
+            surface_data TEXT,
             notes TEXT,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(patient_id, tooth_code),
@@ -143,6 +150,49 @@ function bootstrapSchema(PDO $pdo): void
     foreach ($schemaStatements as $sql) {
         $pdo->exec($sql);
     }
+}
+
+/**
+ * Applies non-destructive schema upgrades when new fields are introduced.
+ */
+function ensureSchemaUpgrades(PDO $pdo): void
+{
+    $patientColumns = tableColumns($pdo, 'patients');
+    if (!isset($patientColumns['representative_document'])) {
+        $pdo->exec('ALTER TABLE patients ADD COLUMN representative_document TEXT');
+    }
+
+    $profileColumns = tableColumns($pdo, 'clinical_profiles');
+    if (!isset($profileColumns['antecedent_ent'])) {
+        $pdo->exec('ALTER TABLE clinical_profiles ADD COLUMN antecedent_ent INTEGER DEFAULT 0');
+    }
+    if (!isset($profileColumns['antecedent_hepatic'])) {
+        $pdo->exec('ALTER TABLE clinical_profiles ADD COLUMN antecedent_hepatic INTEGER DEFAULT 0');
+    }
+    if (!isset($profileColumns['physical_exam_bp'])) {
+        $pdo->exec('ALTER TABLE clinical_profiles ADD COLUMN physical_exam_bp TEXT');
+    }
+
+    $odontogramColumns = tableColumns($pdo, 'odontogram_entries');
+    if (!isset($odontogramColumns['surface_data'])) {
+        $pdo->exec('ALTER TABLE odontogram_entries ADD COLUMN surface_data TEXT');
+    }
+}
+
+/**
+ * Returns the column metadata for the given table keyed by column name.
+ *
+ * @return array<string,array<string,mixed>>
+ */
+function tableColumns(PDO $pdo, string $table): array
+{
+    $stmt = $pdo->query('PRAGMA table_info(' . $table . ')');
+    $columns = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $column) {
+        $columns[$column['name']] = $column;
+    }
+
+    return $columns;
 }
 
 /**
@@ -237,4 +287,3 @@ function normalizeDate(?string $value): ?string
     }
     return date('Y-m-d', $timestamp);
 }
-

@@ -83,10 +83,11 @@ $renderToothCard = static function (string $code, array $surfaceLabels, bool $is
     ?>
     <div class="tooth-card<?= $isDeciduous ? ' tooth-card--deciduous' : '' ?>" data-tooth="<?= htmlspecialchars($code) ?>">
         <span class="tooth-card__code"><?= htmlspecialchars($code) ?></span>
-        <div class="tooth-grid" role="group" aria-label="Pieza <?= htmlspecialchars($code) ?>">
+        <div class="tooth-grid<?= $isDeciduous ? ' tooth-grid--deciduous' : ' tooth-grid--permanent' ?>" role="group" aria-label="Pieza <?= htmlspecialchars($code) ?>">
             <?php foreach ($surfaceLabels as $surface => $surfaceLabel): ?>
                 <button type="button" class="tooth-cell surface-<?= htmlspecialchars($surface) ?>" data-surface="<?= htmlspecialchars($surface) ?>" aria-label="<?= htmlspecialchars($surfaceLabel) ?>"></button>
             <?php endforeach; ?>
+            <span class="tooth-grid__overlay" aria-hidden="true"></span>
         </div>
     </div>
     <?php
@@ -107,6 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'extraoral_exam' => trim((string) post('extraoral_exam')) ?: null,
             'intraoral_exam' => trim((string) post('intraoral_exam')) ?: null,
             'periodontal_status' => trim((string) post('periodontal_status')) ?: null,
+            'physical_exam_bp' => trim((string) post('physical_exam_bp')) ?: null,
             'diagnosis' => trim((string) post('diagnosis')) ?: null,
             'treatment_plan' => trim((string) post('treatment_plan')) ?: null,
             'consent_signed' => postCheckbox('consent_signed'),
@@ -117,6 +119,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'antecedent_gastrointestinal' => postCheckbox('antecedent_gastrointestinal'),
             'antecedent_endocrine' => postCheckbox('antecedent_endocrine'),
             'antecedent_renal' => postCheckbox('antecedent_renal'),
+            'antecedent_ent' => postCheckbox('antecedent_ent'),
+            'antecedent_hepatic' => postCheckbox('antecedent_hepatic'),
             'antecedent_neurologic' => postCheckbox('antecedent_neurologic'),
             'antecedent_allergy' => postCheckbox('antecedent_allergy'),
             'antecedent_neoplastic' => postCheckbox('antecedent_neoplastic'),
@@ -356,6 +360,10 @@ $hasAlert = $alertText && trim((string) $alertText) !== '';
                     <dd><?= htmlspecialchars($patient['representative_name'] ?? '—') ?></dd>
                 </div>
                 <div class="flex justify-between gap-2">
+                    <dt class="font-medium text-slate-700">C.I. representante</dt>
+                    <dd class="text-right"><?= htmlspecialchars($patient['representative_document'] ?? '—') ?></dd>
+                </div>
+                <div class="flex justify-between gap-2">
                     <dt class="font-medium text-slate-700">Tel. representante</dt>
                     <dd class="text-right"><?= htmlspecialchars($patient['representative_phone'] ?? '—') ?></dd>
                 </div>
@@ -408,15 +416,17 @@ $hasAlert = $alertText && trim((string) $alertText) !== '';
             <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <?php
                 $antecedents = [
-                    'antecedent_cardiovascular' => 'Cardiovascular',
+                    'antecedent_ent' => 'Oído, nariz y garganta',
                     'antecedent_respiratory' => 'Respiratorio',
+                    'antecedent_allergy' => 'Alergia',
+                    'antecedent_cardiovascular' => 'Cardio vascular',
                     'antecedent_gastrointestinal' => 'Gastrointestinal',
                     'antecedent_endocrine' => 'Endocrino',
                     'antecedent_renal' => 'Renal',
+                    'antecedent_hepatic' => 'Hepático',
                     'antecedent_neurologic' => 'Neurológico',
-                    'antecedent_allergy' => 'Alergias',
                     'antecedent_neoplastic' => 'Neoplásico',
-                    'antecedent_hematologic' => 'Hematológico',
+                    'antecedent_hematologic' => 'Sanguíneo',
                     'antecedent_viral' => 'Virales',
                     'antecedent_gynecologic' => 'Ginecológicos',
                     'antecedent_covid' => 'COVID-19',
@@ -456,6 +466,10 @@ $hasAlert = $alertText && trim((string) $alertText) !== '';
                 <label class="flex flex-col gap-2 text-sm text-slate-600">
                     <span class="font-medium text-slate-700">Examen intraoral</span>
                     <textarea name="intraoral_exam" rows="2" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"><?= htmlspecialchars($profile['intraoral_exam'] ?? '') ?></textarea>
+                </label>
+                <label class="flex flex-col gap-2 text-sm text-slate-600">
+                    <span class="font-medium text-slate-700">PA (mmHg)</span>
+                    <input type="text" name="physical_exam_bp" value="<?= htmlspecialchars($profile['physical_exam_bp'] ?? '') ?>" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400" placeholder="Ej: 120/80">
                 </label>
                 <label class="flex flex-col gap-2 text-sm text-slate-600 md:col-span-2">
                     <span class="font-medium text-slate-700">Tejidos periodontales</span>

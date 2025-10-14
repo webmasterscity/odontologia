@@ -51,6 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'phone_primary' => trim((string) post('phone_primary')) ?: null,
         'phone_secondary' => trim((string) post('phone_secondary')) ?: null,
         'representative_name' => trim((string) post('representative_name')) ?: null,
+        'representative_document' => trim((string) post('representative_document')) ?: null,
         'representative_phone' => trim((string) post('representative_phone')) ?: null,
         'emergency_contact' => trim((string) post('emergency_contact')) ?: null,
         'notes' => trim((string) post('notes')) ?: null,
@@ -163,6 +164,10 @@ require __DIR__ . '/templates/header.php';
                 <label class="flex flex-col gap-2 text-sm text-slate-600">
                     <span class="font-medium text-slate-700">Representante (si aplica)</span>
                     <input type="text" name="representative_name" value="<?= htmlspecialchars($patient['representative_name'] ?? '') ?>" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
+                </label>
+                <label class="flex flex-col gap-2 text-sm text-slate-600">
+                    <span class="font-medium text-slate-700">Cédula del representante</span>
+                    <input type="text" name="representative_document" value="<?= htmlspecialchars($patient['representative_document'] ?? '') ?>" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
                 </label>
                 <label class="flex flex-col gap-2 text-sm text-slate-600">
                     <span class="font-medium text-slate-700">Teléfono del representante</span>

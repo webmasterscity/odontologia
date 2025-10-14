@@ -265,27 +265,54 @@
 }
 
 .tooth-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 38px);
-    grid-template-rows: repeat(3, 38px);
-    gap: 6px;
-    justify-content: center;
-    align-items: center;
     position: relative;
+    display: block;
+    width: var(--tooth-size, 88px);
+    aspect-ratio: 1 / 1;
+}
+
+.tooth-card--deciduous .tooth-grid {
+    --tooth-size: 78px;
+}
+
+.tooth-grid__overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-repeat: no-repeat;
+    background-size: 100% 100%;
+    background-position: center;
+    z-index: 0;
+    filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.35));
+}
+
+.tooth-grid--permanent {
+    --tooth-line-color: #7350b0;
+}
+
+.tooth-grid--permanent .tooth-grid__overlay {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' fill='none' stroke='%237350b0' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3.4' y='3.4' width='93.2' height='93.2' rx='8.2' stroke-width='3.2'/%3E%3Crect x='30' y='30' width='40' height='40' rx='3.4' stroke-width='2.4'/%3E%3Cpath d='M3.4 3.4L30 30M96.6 3.4L70 30M96.6 96.6L70 70M3.4 96.6L30 70' stroke-width='2.4'/%3E%3C/svg%3E");
+}
+
+.tooth-grid--deciduous {
+    --tooth-line-color: #7350b0;
+}
+
+.tooth-grid--deciduous .tooth-grid__overlay {
+    background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20100%20100%27%20fill%3D%27none%27%20stroke%3D%27%237350b0%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Ccircle%20cx%3D%2750%27%20cy%3D%2750%27%20r%3D%2747%27%20stroke-width%3D%273.2%27/%3E%3Ccircle%20cx%3D%2750%27%20cy%3D%2750%27%20r%3D%2722.5%27%20stroke-width%3D%272.4%27/%3E%3Cpath%20d%3D%27M50%203%20L50%2027.5M50%2072.5%20L50%2097M3%2050%20L27.5%2050M72.5%2050%20L97%2050%27%20stroke-width%3D%272.4%27/%3E%3C/svg%3E");
 }
 
 .tooth-cell {
-    width: 38px;
-    height: 38px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 12px;
-    border: 1px solid var(--odontogram-surface-border);
-    background: var(--odontogram-surface-bg);
-    position: relative;
+    position: absolute;
+    inset: 0;
+    border: none;
+    padding: 0;
+    background: transparent;
     cursor: pointer;
-    transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease, background 0.18s ease;
+    z-index: 1;
+    border-radius: 0;
+    transition: background 0.18s ease, box-shadow 0.18s ease;
+    clip-path: inset(0);
 }
 
 .tooth-cell::before,
@@ -296,29 +323,23 @@
 }
 
 .tooth-cell:hover {
-    border-color: rgba(58, 103, 241, 0.45);
-    box-shadow: 0 16px 28px -22px rgba(37, 80, 214, 0.42);
-    transform: translateY(-2px);
-    background: rgba(248, 250, 255, 0.95);
+    background: rgba(115, 80, 176, 0.08);
 }
 
 .tooth-cell.has-fill {
-    box-shadow: 0 20px 38px -28px rgba(15, 23, 42, 0.24);
+    box-shadow: 0 12px 32px -22px rgba(15, 23, 42, 0.28);
 }
 
 .tooth-cell.fill-blue {
-    background: linear-gradient(135deg, rgba(37, 99, 235, 0.18), rgba(59, 130, 246, 0.26));
-    border-color: rgba(37, 99, 235, 0.45);
+    background: rgba(59, 130, 246, 0.28);
 }
 
 .tooth-cell.fill-red {
-    background: linear-gradient(135deg, rgba(220, 38, 38, 0.18), rgba(248, 113, 113, 0.24));
-    border-color: rgba(220, 38, 38, 0.42);
+    background: rgba(248, 113, 113, 0.28);
 }
 
 .tooth-cell.has-mark {
-    border-color: var(--mark-color, rgba(58, 103, 241, 0.55));
-    box-shadow: 0 24px 42px -30px rgba(15, 23, 42, 0.28);
+    box-shadow: 0 14px 32px -24px rgba(15, 23, 42, 0.32);
 }
 
 .tooth-cell.color-blue {
@@ -330,20 +351,22 @@
 }
 
 .tooth-cell.mark-dot::after {
-    width: 12px;
-    height: 12px;
+    width: 16%;
+    height: 16%;
     border-radius: 999px;
     background: var(--mark-color);
     box-shadow: 0 4px 10px rgba(15, 23, 42, 0.28);
+    top: 42%;
+    left: 42%;
 }
 
 .tooth-cell.mark-x::before,
 .tooth-cell.mark-x::after {
-    width: 3px;
-    height: 22px;
+    width: 3%;
+    height: 76%;
     border-radius: 999px;
     background: var(--mark-color);
-    top: 8px;
+    top: 12%;
     left: 50%;
 }
 
@@ -356,41 +379,61 @@
 }
 
 .tooth-cell.mark-vertical::after {
-    width: 3px;
-    height: 24px;
+    width: 4%;
+    height: 82%;
     border-radius: 999px;
     background: var(--mark-color);
-    top: 7px;
+    top: 9%;
     left: 50%;
     transform: translateX(-50%);
 }
 
 .tooth-cell.mark-horizontal::after {
-    height: 3px;
-    width: 24px;
+    height: 4%;
+    width: 82%;
     border-radius: 999px;
     background: var(--mark-color);
-    left: 7px;
+    left: 9%;
     top: 50%;
     transform: translateY(-50%);
 }
 
-.surface-top {
-    grid-area: 1 / 2;
+.tooth-grid--permanent .surface-top {
+    clip-path: polygon(6% 6%, 94% 6%, 70% 30%, 30% 30%);
 }
 
-.surface-left {
-    grid-area: 2 / 1;
+.tooth-grid--permanent .surface-right {
+    clip-path: polygon(94% 6%, 94% 94%, 70% 70%, 70% 30%);
 }
 
-.surface-center {
-    grid-area: 2 / 2;
+.tooth-grid--permanent .surface-bottom {
+    clip-path: polygon(6% 94%, 94% 94%, 70% 70%, 30% 70%);
 }
 
-.surface-right {
-    grid-area: 2 / 3;
+.tooth-grid--permanent .surface-left {
+    clip-path: polygon(6% 6%, 30% 30%, 30% 70%, 6% 94%);
 }
 
-.surface-bottom {
-    grid-area: 3 / 2;
+.tooth-grid--permanent .surface-center {
+    clip-path: inset(30% 30% 30% 30%);
+}
+
+.tooth-grid--deciduous .surface-top {
+    clip-path: path('evenodd', 'M50 3 A47 47 0 0 1 97 50 L72.5 50 A22.5 22.5 0 0 0 50 27.5 A22.5 22.5 0 0 0 27.5 50 L3 50 A47 47 0 0 1 50 3 Z M50 27.5 A22.5 22.5 0 1 0 50 72.5 A22.5 22.5 0 1 0 50 27.5 Z');
+}
+
+.tooth-grid--deciduous .surface-right {
+    clip-path: path('evenodd', 'M97 50 A47 47 0 0 1 50 97 L50 72.5 A22.5 22.5 0 0 0 72.5 50 A22.5 22.5 0 0 0 50 27.5 L50 3 A47 47 0 0 1 97 50 Z M50 27.5 A22.5 22.5 0 1 0 50 72.5 A22.5 22.5 0 1 0 50 27.5 Z');
+}
+
+.tooth-grid--deciduous .surface-bottom {
+    clip-path: path('evenodd', 'M50 97 A47 47 0 0 1 3 50 L27.5 50 A22.5 22.5 0 0 0 50 72.5 A22.5 22.5 0 0 0 72.5 50 L97 50 A47 47 0 0 1 50 97 Z M50 27.5 A22.5 22.5 0 1 0 50 72.5 A22.5 22.5 0 1 0 50 27.5 Z');
+}
+
+.tooth-grid--deciduous .surface-left {
+    clip-path: path('evenodd', 'M3 50 A47 47 0 0 1 50 3 L50 27.5 A22.5 22.5 0 0 0 27.5 50 A22.5 22.5 0 0 0 50 72.5 L50 97 A47 47 0 0 1 3 50 Z M50 27.5 A22.5 22.5 0 1 0 50 72.5 A22.5 22.5 0 1 0 50 27.5 Z');
+}
+
+.tooth-grid--deciduous .surface-center {
+    clip-path: circle(27% at 50% 50%);
 }
