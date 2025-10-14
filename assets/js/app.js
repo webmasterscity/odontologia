@@ -42,116 +42,105 @@ function setupOdontogram() {
         return;
     }
 
-    const dataAttr = wrapper.getAttribute('data-odontogram') || '{}';
-    let records = {};
-    try {
-        records = JSON.parse(dataAttr);
-    } catch (err) {
-        records = {};
+    const colorButtons = Array.from(wrapper.querySelectorAll('.color-option'));
+    const markButtons = Array.from(wrapper.querySelectorAll('.mark-option'));
+    const cells = Array.from(wrapper.querySelectorAll('.tooth-cell'));
+
+    if (!colorButtons.length || !markButtons.length || !cells.length) {
+        return;
     }
 
-    const statusLabels = {
-        sin_registro: 'Sin registro',
-        sano: 'Sano',
-        caries: 'Caries',
-        restaurado: 'Restaurado',
-        obturacion: 'Obturación',
-        endodoncia: 'Endodoncia',
-        protesis: 'Prótesis fija/removible',
-        implante: 'Implante',
-        ausente: 'Ausente',
-        fractura: 'Fractura',
-        en_tratamiento: 'En tratamiento'
+    const markClasses = ['mark-dot', 'mark-x', 'mark-vertical', 'mark-horizontal'];
+    const colorClasses = ['color-blue', 'color-red'];
+    const fillClasses = ['fill-blue', 'fill-red'];
+
+    const setActiveButton = (buttons, activeButton) => {
+        buttons.forEach((button) => {
+            const isActive = Boolean(activeButton && button === activeButton);
+            button.classList.toggle('is-active', isActive);
+            button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        });
     };
 
-    const toothCodeInput = document.getElementById('tooth_code');
-    const toothLabelInput = document.getElementById('tooth_label');
-    const toothStatusSelect = document.getElementById('tooth_status');
-    const toothNoteField = document.getElementById('tooth_note');
+    let currentColorButton = colorButtons.find((button) => button.classList.contains('is-active')) || colorButtons[0];
+    let currentMarkButton = markButtons.find((button) => button.classList.contains('is-active')) || null;
 
-    const updateToothButton = (button) => {
-        const code = button.dataset.tooth;
-        const record = records[code];
-        const statusElement = button.querySelector('.status');
-        button.classList.remove('status-sano', 'status-caries', 'status-restaurado', 'status-obturacion', 'status-endodoncia', 'status-protesis', 'status-implante', 'status-ausente', 'status-fractura', 'status-en_tratamiento', 'status-sin_registro');
-        if (record && record.status) {
-            statusElement.textContent = statusLabels[record.status] || '';
-            button.classList.add(`status-${record.status}`);
-            button.title = record.notes ? record.notes : statusLabels[record.status];
-        } else {
-            statusElement.textContent = '—';
-            button.classList.add('status-sin_registro');
-            button.title = '';
-        }
-    };
+    let currentColor = currentColorButton?.dataset.color || 'blue';
+    let currentMark = currentMarkButton?.dataset.mark || '';
 
-    const buttons = [...wrapper.querySelectorAll('.tooth')];
-    buttons.forEach(updateToothButton);
+    wrapper.dataset.activeColor = currentColor;
 
-    let activeButton = null;
-
-    const selectTooth = (button) => {
-        if (!button) {
-            return;
-        }
-        if (activeButton) {
-            activeButton.classList.remove('active');
-        }
-        activeButton = button;
-        button.classList.add('active');
-        const code = button.dataset.tooth;
-        const record = records[code] || {};
-        toothCodeInput.value = code;
-        if (toothLabelInput) {
-            toothLabelInput.value = `Pieza ${code}`;
-        }
-        if (toothStatusSelect) {
-            toothStatusSelect.value = record.status || 'sin_registro';
-        }
-        if (toothNoteField) {
-            toothNoteField.value = record.notes || '';
-        }
-    };
-
-    buttons.forEach((button) => {
-        button.addEventListener('click', () => selectTooth(button));
+    colorButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+            if (button === currentColorButton) {
+                return;
+            }
+            currentColorButton = button;
+            currentColor = button.dataset.color || 'blue';
+            wrapper.dataset.activeColor = currentColor;
+            setActiveButton(colorButtons, button);
+        });
     });
 
-    // Selecciona la primera pieza disponible por defecto.
-    if (buttons.length) {
-        selectTooth(buttons[0]);
-    }
-
-    if (toothStatusSelect) {
-        toothStatusSelect.addEventListener('change', () => {
-            if (!activeButton) {
+    markButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+            if (button === currentMarkButton) {
+                currentMarkButton = null;
+                currentMark = '';
+                setActiveButton(markButtons, null);
+                wrapper.classList.remove('erase-mode');
                 return;
             }
-            const code = activeButton.dataset.tooth;
-            const status = toothStatusSelect.value;
-            if (!records[code]) {
-                records[code] = { status: status, notes: toothNoteField ? toothNoteField.value : '' };
-            } else {
-                records[code].status = status;
-            }
-            updateToothButton(activeButton);
+            currentMarkButton = button;
+            currentMark = button.dataset.mark || '';
+            setActiveButton(markButtons, button);
+            wrapper.classList.toggle('erase-mode', currentMark === 'erase');
         });
-    }
+    });
 
-    if (toothNoteField) {
-        toothNoteField.addEventListener('input', () => {
-            if (!activeButton) {
-                return;
-            }
-            const code = activeButton.dataset.tooth;
-            if (!records[code]) {
-                records[code] = { status: toothStatusSelect ? toothStatusSelect.value : 'sin_registro', notes: toothNoteField.value };
-            } else {
-                records[code].notes = toothNoteField.value;
-            }
-            activeButton.title = toothNoteField.value;
+    const applyMark = (cell, mark, color) => {
+        const previousColor = cell.dataset.color || '';
+        const targetColor = color || previousColor;
+
+        if (mark === 'erase') {
+            markClasses.forEach((cls) => cell.classList.remove(cls));
+            colorClasses.forEach((cls) => cell.classList.remove(cls));
+            fillClasses.forEach((cls) => cell.classList.remove(cls));
+            cell.classList.remove('has-mark', 'has-fill');
+            cell.dataset.mark = '';
+            cell.dataset.color = '';
+            return;
+        }
+
+        if (!targetColor) {
+            return;
+        }
+
+        markClasses.forEach((cls) => cell.classList.remove(cls));
+        colorClasses.forEach((cls) => cell.classList.remove(cls));
+        fillClasses.forEach((cls) => cell.classList.remove(cls));
+        cell.classList.remove('has-mark', 'has-fill');
+
+        cell.dataset.color = targetColor;
+        cell.classList.add(`fill-${targetColor}`);
+        cell.classList.add('has-fill');
+
+        if (!mark) {
+            cell.dataset.mark = '';
+            return;
+        }
+
+        cell.dataset.mark = mark;
+        cell.classList.add(`mark-${mark}`);
+        cell.classList.add(`color-${targetColor}`);
+        cell.classList.add('has-mark');
+    };
+
+    cells.forEach((cell) => {
+        cell.addEventListener('click', () => {
+            applyMark(cell, currentMark, currentColor);
         });
-    }
+    });
 }
 
 function setupFinancialCalculator() {

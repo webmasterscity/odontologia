@@ -48,6 +48,50 @@ $odontogramStatuses = [
     'en_tratamiento' => 'En tratamiento'
 ];
 
+$odontogramSurfaces = [
+    'top' => 'Superficie oclusal',
+    'left' => 'Superficie mesial',
+    'center' => 'Superficie central',
+    'right' => 'Superficie distal',
+    'bottom' => 'Superficie lingual'
+];
+
+$odontogramGroups = [
+    [
+        'label' => 'Maxilar superior',
+        'teeth' => ['18', '17', '16', '15', '14', '13', '12', '11', '21', '22', '23', '24', '25', '26', '27', '28'],
+        'is_deciduous' => false,
+    ],
+    [
+        'label' => 'Maxilar inferior',
+        'teeth' => ['48', '47', '46', '45', '44', '43', '42', '41', '31', '32', '33', '34', '35', '36', '37', '38'],
+        'is_deciduous' => false,
+    ],
+    [
+        'label' => 'Dentición temporal superior',
+        'teeth' => ['55', '54', '53', '52', '51', '61', '62', '63', '64', '65'],
+        'is_deciduous' => true,
+    ],
+    [
+        'label' => 'Dentición temporal inferior',
+        'teeth' => ['85', '84', '83', '82', '81', '71', '72', '73', '74', '75'],
+        'is_deciduous' => true,
+    ],
+];
+
+$renderToothCard = static function (string $code, array $surfaceLabels, bool $isDeciduous = false): void {
+    ?>
+    <div class="tooth-card<?= $isDeciduous ? ' tooth-card--deciduous' : '' ?>" data-tooth="<?= htmlspecialchars($code) ?>">
+        <span class="tooth-card__code"><?= htmlspecialchars($code) ?></span>
+        <div class="tooth-grid" role="group" aria-label="Pieza <?= htmlspecialchars($code) ?>">
+            <?php foreach ($surfaceLabels as $surface => $surfaceLabel): ?>
+                <button type="button" class="tooth-cell surface-<?= htmlspecialchars($surface) ?>" data-surface="<?= htmlspecialchars($surface) ?>" aria-label="<?= htmlspecialchars($surfaceLabel) ?>"></button>
+            <?php endforeach; ?>
+        </div>
+    </div>
+    <?php
+};
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = post('action');
 
@@ -475,73 +519,64 @@ $hasAlert = $alertText && trim((string) $alertText) !== '';
 </section>
 
 <section class="rounded-3xl bg-white/95 p-6 shadow-sm shadow-slate-200/60 ring-1 ring-slate-200/70 sm:p-8 space-y-6" id="odontograma">
-    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <h2 class="text-2xl font-semibold text-slate-900">Odontograma evolutivo</h2>
-        <p class="text-sm text-slate-500">Selecciona una pieza para visualizar su estado y dejar observaciones clínicas.</p>
-    </div>
-    <div class="odontogram-wrapper grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]" data-odontogram='<?= htmlspecialchars(json_encode($odontogramData), ENT_QUOTES) ?>'>
-        <div class="odontogram space-y-6">
-            <div class="arch rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4">
-                <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-600">Maxilar superior</h3>
-                <div class="teeth-row mt-4 grid grid-cols-4 gap-2 sm:grid-cols-8">
-                    <?php foreach (['18','17','16','15','14','13','12','11','21','22','23','24','25','26','27','28'] as $tooth): ?>
-                        <button class="tooth rounded-xl border border-slate-200 bg-white px-2 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-300" data-tooth="<?= $tooth ?>">
-                            <?= $tooth ?>
-                            <span class="status mt-1 block text-xs font-medium text-slate-500"></span>
-                        </button>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-            <div class="arch rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4">
-                <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-600">Maxilar inferior</h3>
-                <div class="teeth-row mt-4 grid grid-cols-4 gap-2 sm:grid-cols-8">
-                    <?php foreach (['48','47','46','45','44','43','42','41','31','32','33','34','35','36','37','38'] as $tooth): ?>
-                        <button class="tooth rounded-xl border border-slate-200 bg-white px-2 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-300" data-tooth="<?= $tooth ?>">
-                            <?= $tooth ?>
-                            <span class="status mt-1 block text-xs font-medium text-slate-500"></span>
-                        </button>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-            <div class="arch rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4">
-                <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-600">Dentición temporal</h3>
-                <div class="teeth-row mt-4 grid grid-cols-5 gap-2 sm:grid-cols-10">
-                    <?php foreach (['55','54','53','52','51','61','62','63','64','65','85','84','83','82','81','71','72','73','74','75'] as $tooth): ?>
-                        <button class="tooth tooth-small rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-300" data-tooth="<?= $tooth ?>">
-                            <?= $tooth ?>
-                            <span class="status mt-1 block text-[11px] font-medium text-slate-500"></span>
-                        </button>
-                    <?php endforeach; ?>
-                </div>
-            </div>
+    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div class="space-y-1">
+            <h2 class="text-2xl font-semibold text-slate-900">Odontograma evolutivo</h2>
+            <p class="text-sm text-slate-500">Selecciona un color y, si lo necesitas, un trazo para marcar los cuadrantes de cada pieza y reflejar la evolución clínica.</p>
         </div>
-        <form method="post" class="odontogram-form space-y-4 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
-            <input type="hidden" name="action" value="save_tooth">
-            <input type="hidden" name="tooth_code" id="tooth_code" required>
-            <label class="flex flex-col gap-2 text-sm text-slate-600">
-                <span class="font-medium text-slate-700">Pieza dental seleccionada</span>
-                <input type="text" id="tooth_label" readonly class="rounded-2xl border border-slate-200 bg-slate-100 px-4 py-2.5 text-slate-700 shadow-inner">
-            </label>
-            <label class="flex flex-col gap-2 text-sm text-slate-600">
-                <span class="font-medium text-slate-700">Estado</span>
-                <select name="status" id="tooth_status" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 focus:border-brand-400 focus:ring-brand-400">
-                    <?php foreach ($odontogramStatuses as $key => $label): ?>
-                        <option value="<?= htmlspecialchars($key) ?>"><?= htmlspecialchars($label) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </label>
-            <label class="flex flex-col gap-2 text-sm text-slate-600">
-                <span class="font-medium text-slate-700">Observaciones</span>
-                <textarea name="note" id="tooth_note" rows="4" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"></textarea>
-            </label>
-            <div class="flex justify-end">
-                <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-full bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-soft transition hover:-translate-y-0.5 hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500">
-                    Guardar pieza
+        <p class="text-xs text-slate-400 md:text-right">La persistencia en SQLite se incorporará en la siguiente etapa.</p>
+    </div>
+    <div class="odontogram-wrapper space-y-6" data-odontogram='<?= htmlspecialchars(json_encode($odontogramData), ENT_QUOTES) ?>'>
+        <div class="odontogram-toolbar flex flex-wrap items-center justify-between gap-6 rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm">
+            <div class="toolbar-group color-group flex items-center gap-3" role="radiogroup" aria-label="Seleccionar color">
+                <span class="toolbar-label text-xs font-semibold uppercase tracking-wide text-slate-500">Color</span>
+                <button type="button" class="tool-button color-option is-active" data-color="blue" aria-pressed="true">
+                    <span class="sr-only">Azul</span>
+                </button>
+                <button type="button" class="tool-button color-option" data-color="red" aria-pressed="false">
+                    <span class="sr-only">Rojo</span>
                 </button>
             </div>
-        </form>
+            <div class="toolbar-group mark-group flex flex-wrap items-center gap-3" role="radiogroup" aria-label="Seleccionar trazo opcional">
+                <span class="toolbar-label text-xs font-semibold uppercase tracking-wide text-slate-500">Trazo (opcional)</span>
+                <button type="button" class="tool-button mark-option" data-mark="dot" aria-pressed="false">
+                    <span class="tool-glyph" aria-hidden="true"></span>
+                    <span class="tool-name">Punto</span>
+                </button>
+                <button type="button" class="tool-button mark-option" data-mark="x" aria-pressed="false">
+                    <span class="tool-glyph" aria-hidden="true"></span>
+                    <span class="tool-name">Equis</span>
+                </button>
+                <button type="button" class="tool-button mark-option" data-mark="vertical" aria-pressed="false">
+                    <span class="tool-glyph" aria-hidden="true"></span>
+                    <span class="tool-name">Vertical</span>
+                </button>
+                <button type="button" class="tool-button mark-option" data-mark="horizontal" aria-pressed="false">
+                    <span class="tool-glyph" aria-hidden="true"></span>
+                    <span class="tool-name">Horizontal</span>
+                </button>
+                <button type="button" class="tool-button mark-option" data-mark="erase" aria-pressed="false">
+                    <span class="tool-glyph tool-glyph--erase" aria-hidden="true"></span>
+                    <span class="tool-name">Borrar</span>
+                </button>
+            </div>
+        </div>
+        <div class="odontogram-canvas space-y-10">
+            <?php foreach ($odontogramGroups as $group): ?>
+                <div class="odontogram-arch<?= $group['is_deciduous'] ? ' odontogram-arch--deciduous' : '' ?>">
+                    <div class="odontogram-arch__header">
+                        <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-600"><?= htmlspecialchars($group['label']) ?></h3>
+                    </div>
+                    <div class="odontogram-row">
+                        <?php foreach ($group['teeth'] as $tooth): ?>
+                            <?php $renderToothCard($tooth, $odontogramSurfaces, $group['is_deciduous']); ?>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
     </div>
-    <p class="text-xs text-slate-500">Los colores facilitan visualizar caries, restauraciones y ausencias. Mantén el odontograma actualizado en cada consulta.</p>
+    <p class="text-xs text-slate-500">Marca cada cuadrante con el color y figura seleccionados para documentar hallazgos, tratamientos o ausencias.</p>
 </section>
 
 <section class="rounded-3xl bg-white/95 p-6 shadow-sm shadow-slate-200/60 ring-1 ring-slate-200/70 sm:p-8 space-y-6" id="visitas">
