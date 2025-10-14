@@ -1,633 +1,90 @@
 :root {
-    --color-primary: #1b74d4;
-    --color-primary-dark: #1358a1;
-    --color-secondary: #6c7a89;
-    --color-danger: #c0392b;
-    --color-bg: #f5f6fa;
-    --color-border: #dfe4ea;
-    --color-text: #2f3640;
-    --color-muted: #7f8c8d;
-    --color-success: #27ae60;
-    font-size: 16px;
-    font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+    color-scheme: light;
 }
 
-html, body {
-    margin: 0;
-    padding: 0;
-    background-color: var(--color-bg);
-    color: var(--color-text);
+.odontogram-wrapper .tooth {
+    transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+    position: relative;
 }
 
-.site-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1.5rem 2rem;
-    background: #fff;
-    border-bottom: 1px solid var(--color-border);
-    position: sticky;
-    top: 0;
-    z-index: 10;
-}
-
-.site-header .brand {
-    display: flex;
-    gap: 1rem;
-    align-items: center;
-}
-
-.brand-logo {
-    font-size: 2.5rem;
-}
-
-.site-header h1 {
-    margin: 0;
-    font-size: 1.5rem;
-    font-weight: 600;
-}
-
-.subtitle {
-    margin: 0;
-    color: var(--color-muted);
-    font-size: 0.9rem;
-}
-
-.main-nav {
-    display: flex;
-    gap: 1rem;
-}
-
-.main-nav a {
-    text-decoration: none;
-    color: var(--color-text);
-    font-weight: 500;
-    padding: 0.5rem 0.75rem;
-    border-radius: 0.5rem;
-    transition: background 0.2s ease;
-}
-
-.main-nav a:hover,
-.main-nav a.active {
-    background-color: rgba(27, 116, 212, 0.12);
-    color: var(--color-primary);
-}
-
-.page {
-    padding: 2rem;
-    display: grid;
-    gap: 2rem;
-}
-
-.dashboard {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 1rem;
-}
-
-.stat-card {
-    background: #fff;
-    border-radius: 1rem;
-    padding: 1.5rem;
-    border: 1px solid var(--color-border);
-}
-
-.stat-card h2 {
-    font-size: 1rem;
-    margin: 0;
-    color: var(--color-muted);
-}
-
-.stat-card p {
-    font-size: 1.75rem;
-    font-weight: 600;
-    margin: 0.5rem 0 0;
-}
-
-.panel {
-    background: #fff;
-    border-radius: 1rem;
-    border: 1px solid var(--color-border);
-    padding: 1.5rem;
-}
-
-.panel-wide {
-    grid-column: 1 / -1;
-}
-
-.panel-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-}
-
-.panel-header h2 {
-    margin: 0;
-    font-size: 1.2rem;
-}
-
-.actions {
-    display: flex;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-}
-
-.inline-form {
-    display: flex;
-    gap: 0.5rem;
-}
-
-.inline-form input[type="search"] {
-    padding: 0.5rem 0.75rem;
-    border-radius: 0.75rem;
-    border: 1px solid var(--color-border);
-    min-width: 220px;
-}
-
-.button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.3rem;
-    padding: 0.55rem 1.1rem;
-    border-radius: 0.75rem;
-    border: none;
-    background: var(--color-secondary);
-    color: #fff;
-    text-decoration: none;
-    cursor: pointer;
-    font-weight: 500;
-    transition: background 0.2s ease;
-}
-
-.button:hover {
-    background: #5b6572;
-}
-
-.button.primary {
-    background: var(--color-primary);
-}
-
-.button.primary:hover {
-    background: var(--color-primary-dark);
-}
-
-.button.secondary {
-    background: #95a5a6;
-}
-
-.button.danger {
-    background: var(--color-danger);
-}
-
-.button.small {
-    padding: 0.3rem 0.6rem;
-    font-size: 0.85rem;
-}
-
-.alert {
-    border-radius: 0.75rem;
-    padding: 1rem 1.25rem;
-    border: 1px solid;
-}
-
-.alert.success {
-    background: rgba(39, 174, 96, 0.12);
-    border-color: rgba(39, 174, 96, 0.2);
-    color: #20623c;
-}
-
-.alert.error {
-    background: rgba(192, 57, 43, 0.12);
-    border-color: rgba(192, 57, 43, 0.2);
-    color: #962d22;
-}
-
-.alert ul {
-    margin: 0;
-    padding-left: 1.25rem;
-}
-
-.table-responsive {
-    overflow-x: auto;
-}
-
-.data-table {
-    width: 100%;
-    border-collapse: collapse;
-    min-width: 640px;
-}
-
-.data-table th,
-.data-table td {
-    padding: 0.75rem;
-    border-bottom: 1px solid var(--color-border);
-    text-align: left;
-    vertical-align: top;
-}
-
-.data-table th {
-    font-size: 0.9rem;
-    color: var(--color-muted);
+.odontogram-wrapper .tooth .status {
+    font-size: 0.65rem;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
-    letter-spacing: 0.03em;
 }
 
-.data-table tr:last-child td {
-    border-bottom: none;
+.odontogram-wrapper .tooth.active {
+    border-color: #3a67f1;
+    box-shadow: 0 0 0 3px rgba(58, 103, 241, 0.18);
 }
 
-.table-actions {
-    display: flex;
-    gap: 0.5rem;
+.odontogram-wrapper .tooth.status-sin_registro {
+    border-color: #e2e8f0;
+    background: rgba(241, 245, 249, 0.7);
+    color: #64748b;
 }
 
-.empty {
-    color: var(--color-muted);
-    font-style: italic;
+.odontogram-wrapper .tooth.status-sano {
+    border-color: #16a34a;
+    background: rgba(22, 163, 74, 0.12);
+    color: #166534;
 }
 
-.backup-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
+.odontogram-wrapper .tooth.status-caries {
+    border-color: #f97316;
+    background: rgba(249, 115, 22, 0.14);
+    color: #b45309;
 }
 
-.backup-actions form {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
+.odontogram-wrapper .tooth.status-restaurado,
+.odontogram-wrapper .tooth.status-obturacion {
+    border-color: #8b5cf6;
+    background: rgba(139, 92, 246, 0.15);
+    color: #6d28d9;
 }
 
-.file-input {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.75rem 1rem;
-    border: 1px dashed var(--color-border);
-    border-radius: 0.75rem;
-    cursor: pointer;
-    background: rgba(27, 116, 212, 0.05);
+.odontogram-wrapper .tooth.status-endodoncia {
+    border-color: #2563eb;
+    background: rgba(37, 99, 235, 0.14);
+    color: #1d4ed8;
 }
 
-.file-input input[type="file"] {
-    position: absolute;
-    opacity: 0;
-    inset: 0;
-    cursor: pointer;
+.odontogram-wrapper .tooth.status-protesis {
+    border-color: #0d9488;
+    background: rgba(13, 148, 136, 0.14);
+    color: #0f766e;
 }
 
-.help-text {
-    font-size: 0.85rem;
-    color: var(--color-muted);
-    margin-top: 0;
+.odontogram-wrapper .tooth.status-implante {
+    border-color: #0ea5e9;
+    background: rgba(14, 165, 233, 0.14);
+    color: #0284c7;
 }
 
-.site-footer {
-    padding: 1.5rem 2rem;
-    text-align: center;
-    font-size: 0.85rem;
-    color: var(--color-muted);
+.odontogram-wrapper .tooth.status-ausente {
+    border-color: #dc2626;
+    background: rgba(220, 38, 38, 0.14);
+    color: #b91c1c;
 }
 
-.form-grid {
-    display: grid;
-    gap: 1.5rem;
+.odontogram-wrapper .tooth.status-fractura {
+    border-color: #ea580c;
+    background: rgba(234, 88, 12, 0.15);
+    color: #c2410c;
 }
 
-fieldset {
-    border: 1px solid var(--color-border);
-    border-radius: 0.75rem;
-    padding: 1rem;
-    background: #fafbff;
+.odontogram-wrapper .tooth.status-en_tratamiento {
+    border-color: #3b82f6;
+    background: rgba(59, 130, 246, 0.15);
+    color: #1d4ed8;
 }
 
-legend {
-    padding: 0 0.5rem;
-    font-weight: 600;
-    color: var(--color-primary);
+.odontogram-form textarea {
+    min-height: 96px;
 }
 
-label {
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-    font-size: 0.95rem;
-}
-
-input[type="text"],
-input[type="email"],
-input[type="tel"],
-input[type="date"],
-input[type="number"],
-textarea,
-select {
-    border-radius: 0.6rem;
-    border: 1px solid var(--color-border);
-    padding: 0.55rem 0.75rem;
-    font: inherit;
-    background: #fff;
-    color: var(--color-text);
-}
-
-textarea {
-    resize: vertical;
-}
-
-.field-row {
-    display: grid;
-    gap: 1rem;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-}
-
-.form-actions {
-    display: flex;
-    gap: 0.75rem;
-    justify-content: flex-end;
-}
-
-.checkbox-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 0.5rem;
-    margin-bottom: 0.75rem;
-}
-
-.checkbox {
-    flex-direction: row;
-    align-items: center;
-    gap: 0.5rem;
-    font-weight: 500;
-}
-
-.checkbox input {
-    width: 1.1rem;
-    height: 1.1rem;
-}
-
-.summary-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 1rem;
-}
-
-.summary-list {
-    list-style: none;
-    padding: 0;
-    margin: 0.5rem 0 0;
-    display: grid;
-    gap: 0.35rem;
-    font-size: 0.95rem;
-}
-
-.tag {
-    display: inline-block;
-    margin-left: 0.5rem;
-    padding: 0.2rem 0.4rem;
-    border-radius: 0.5rem;
-    font-size: 0.75rem;
-    font-weight: 600;
-    background: rgba(192, 57, 43, 0.12);
-    color: var(--color-danger);
-}
-
-.tag-alert {
-    background: rgba(231, 76, 60, 0.15);
-}
-
-.text-warning {
-    color: var(--color-danger);
-    font-weight: 600;
-}
-
-.timeline {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    display: grid;
-    gap: 1rem;
-}
-
-.timeline li {
-    border-left: 3px solid var(--color-border);
-    padding-left: 1rem;
-    position: relative;
-}
-
-.timeline li::before {
-    content: '';
-    position: absolute;
-    left: -1.1rem;
-    top: 0.3rem;
-    width: 0.75rem;
-    height: 0.75rem;
-    border-radius: 50%;
-    background: var(--color-primary);
-}
-
-.timeline-date {
-    font-weight: 600;
-    display: inline-block;
-    margin-bottom: 0.35rem;
-}
-
-.timeline-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.timeline-body {
-    display: grid;
-    gap: 0.35rem;
-    font-size: 0.95rem;
-}
-
-.vitals {
-    color: var(--color-muted);
-    font-size: 0.85rem;
-}
-
-.next-appointment {
-    font-weight: 600;
-    color: var(--color-primary);
-}
-
-.two-columns {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 1.5rem;
-}
-
-.visit-form,
-.activity-form,
-.odontogram-form {
-    display: grid;
-    gap: 1rem;
-}
-
-.activity-table {
-    display: grid;
-    gap: 0.5rem;
-}
-
-.small {
-    font-size: 0.85rem;
-}
-
-.muted {
-    color: var(--color-muted);
-}
-
-.odontogram-wrapper {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 2rem;
-}
-
-.odontogram {
-    display: grid;
-    gap: 1.5rem;
-}
-
-.arch h3 {
-    margin: 0 0 0.5rem;
-    color: var(--color-muted);
-    font-size: 0.95rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-
-.teeth-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
-    gap: 0.4rem;
-}
-
-.tooth {
-    border: 1px solid var(--color-border);
-    border-radius: 0.75rem;
-    background: #fff;
-    padding: 0.6rem 0.4rem;
-    font-weight: 600;
-    text-align: center;
-    position: relative;
-    cursor: pointer;
-    transition: border 0.2s ease, transform 0.1s ease;
-}
-
-.tooth:hover,
-.tooth.active {
-    border-color: var(--color-primary);
-    transform: translateY(-2px);
-}
-
-.tooth-small {
-    font-size: 0.85rem;
-    padding: 0.5rem 0.3rem;
-}
-
-.tooth .status {
-    display: block;
-    margin-top: 0.25rem;
-    font-size: 0.7rem;
-    color: var(--color-muted);
-}
-
-.status-sano {
-    color: var(--color-success);
-}
-
-.status-sin_registro {
-    color: var(--color-muted);
-}
-
-.status-caries {
-    color: #d35400;
-}
-
-.status-restaurado,
-.status-obturacion {
-    color: #8e44ad;
-}
-
-.status-endodoncia {
-    color: #2980b9;
-}
-
-.status-protesis {
-    color: #16a085;
-}
-
-.status-implante {
-    color: #2c3e50;
-}
-
-.status-ausente {
-    color: var(--color-danger);
-}
-
-.status-fractura {
-    color: #d35400;
-}
-
-.status-en_tratamiento {
-    color: var(--color-primary);
-}
-
-.patient-summary h3 {
-    margin: 0;
-}
-
-.table-actions form {
-    display: inline;
-}
-
-.tag + .tag {
-    margin-left: 0.25rem;
-}
-
-@media (max-width: 960px) {
-    .site-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 1rem;
-    }
-
-    .page {
-        padding: 1.5rem;
-    }
-
-    .odontogram-wrapper {
-        grid-template-columns: 1fr;
-    }
-}
-
-@media (max-width: 600px) {
-    .inline-form {
-        width: 100%;
-    }
-
-    .inline-form input[type="search"] {
-        flex: 1;
-    }
-
-    .panel-header {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-
-    .form-actions {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .table-actions {
-        flex-direction: column;
-        align-items: stretch;
-    }
+.odontogram-form select,
+.odontogram-form input,
+.odontogram-form textarea {
+    appearance: none;
 }

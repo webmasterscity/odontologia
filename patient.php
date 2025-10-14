@@ -232,8 +232,8 @@ require __DIR__ . '/templates/header.php';
 ?>
 
 <?php if ($messages): ?>
-    <div class="alert success">
-        <ul>
+    <div class="rounded-xl border border-emerald-200 bg-emerald-50/80 px-5 py-4 text-sm text-emerald-900 shadow-sm shadow-emerald-100/60">
+        <ul class="list-disc space-y-1 pl-5">
             <?php foreach ($messages as $message): ?>
                 <li><?= htmlspecialchars($message) ?></li>
             <?php endforeach; ?>
@@ -242,8 +242,8 @@ require __DIR__ . '/templates/header.php';
 <?php endif; ?>
 
 <?php if ($errors): ?>
-    <div class="alert error">
-        <ul>
+    <div class="rounded-xl border border-rose-200 bg-rose-50/90 px-5 py-4 text-sm text-rose-900 shadow-sm shadow-rose-200/60">
+        <ul class="list-disc space-y-1 pl-5">
             <?php foreach ($errors as $error): ?>
                 <li><?= htmlspecialchars($error) ?></li>
             <?php endforeach; ?>
@@ -251,68 +251,117 @@ require __DIR__ . '/templates/header.php';
     </div>
 <?php endif; ?>
 
-<section class="panel panel-wide patient-summary">
-    <div class="panel-header">
-        <h2>Datos del paciente</h2>
+<?php
+$alertText = $profile['medical_alerts'] ?? $patient['notes'] ?? null;
+$hasAlert = $alertText && trim((string) $alertText) !== '';
+?>
+<section class="rounded-3xl bg-white/95 p-6 shadow-sm shadow-slate-200/60 ring-1 ring-slate-200/70 sm:p-8 space-y-6">
+    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-            <a class="button small secondary" href="patient_form.php?id=<?= $patientId ?>">Editar datos</a>
-            <a class="button small" href="index.php">Volver al listado</a>
+            <h2 class="text-2xl font-semibold text-slate-900">Datos del paciente</h2>
+            <p class="text-sm text-slate-500">Resumen actualizado de <?= htmlspecialchars($patient['full_name']) ?>.</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <a class="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 transition hover:border-brand-200 hover:text-brand-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500" href="patient_form.php?id=<?= $patientId ?>">
+                Editar datos
+            </a>
+            <a class="inline-flex items-center justify-center gap-2 rounded-full bg-brand-600 px-4 py-2 text-xs font-semibold text-white shadow-soft transition hover:-translate-y-0.5 hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500" href="index.php">
+                Volver al listado
+            </a>
         </div>
     </div>
-    <div class="summary-grid">
-        <div>
-            <h3><?= htmlspecialchars($patient['full_name']) ?></h3>
-            <ul class="summary-list">
-                <li><strong>Cédula:</strong> <?= htmlspecialchars($patient['document_id'] ?? '—') ?></li>
-                <li><strong>Edad:</strong> <?= $patient['age'] ? (int) $patient['age'] . ' años' : '—' ?></li>
-                <li><strong>Género:</strong> <?= htmlspecialchars($patient['gender'] ?? '—') ?></li>
-                <li><strong>Dirección:</strong> <?= htmlspecialchars($patient['address'] ?? '—') ?></li>
-            </ul>
+    <div class="grid gap-6 lg:grid-cols-3">
+        <div class="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-5 shadow-inner">
+            <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-600">Información general</h3>
+            <dl class="mt-3 space-y-2 text-sm text-slate-600">
+                <div class="flex justify-between gap-2">
+                    <dt class="font-medium text-slate-700">Cédula</dt>
+                    <dd class="text-right"><?= htmlspecialchars($patient['document_id'] ?? '—') ?></dd>
+                </div>
+                <div class="flex justify-between gap-2">
+                    <dt class="font-medium text-slate-700">Edad</dt>
+                    <dd class="text-right"><?= $patient['age'] ? (int) $patient['age'] . ' años' : '—' ?></dd>
+                </div>
+                <div class="flex justify-between gap-2">
+                    <dt class="font-medium text-slate-700">Género</dt>
+                    <dd class="text-right"><?= htmlspecialchars($patient['gender'] ?? '—') ?></dd>
+                </div>
+                <div class="space-y-1">
+                    <dt class="font-medium text-slate-700">Dirección</dt>
+                    <dd><?= nl2br(htmlspecialchars($patient['address'] ?? '—')) ?></dd>
+                </div>
+            </dl>
         </div>
-        <div>
-            <h3>Contacto</h3>
-            <ul class="summary-list">
-                <li><strong>Correo:</strong> <?= htmlspecialchars($patient['email'] ?? '—') ?></li>
-                <li><strong>Teléfono principal:</strong> <?= htmlspecialchars($patient['phone_primary'] ?? '—') ?></li>
-                <li><strong>Teléfono alterno:</strong> <?= htmlspecialchars($patient['phone_secondary'] ?? '—') ?></li>
-                <li><strong>Representante:</strong> <?= htmlspecialchars($patient['representative_name'] ?? '—') ?></li>
-                <li><strong>Tel. representante:</strong> <?= htmlspecialchars($patient['representative_phone'] ?? '—') ?></li>
-                <li><strong>Contacto emergencia:</strong> <?= htmlspecialchars($patient['emergency_contact'] ?? '—') ?></li>
-            </ul>
+        <div class="rounded-2xl border border-slate-200/80 bg-white p-5">
+            <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-600">Contacto</h3>
+            <dl class="mt-3 space-y-2 text-sm text-slate-600">
+                <div class="flex justify-between gap-2">
+                    <dt class="font-medium text-slate-700">Correo</dt>
+                    <dd class="text-right break-words"><?= htmlspecialchars($patient['email'] ?? '—') ?></dd>
+                </div>
+                <div class="flex justify-between gap-2">
+                    <dt class="font-medium text-slate-700">Tel. principal</dt>
+                    <dd class="text-right"><?= htmlspecialchars($patient['phone_primary'] ?? '—') ?></dd>
+                </div>
+                <div class="flex justify-between gap-2">
+                    <dt class="font-medium text-slate-700">Tel. alterno</dt>
+                    <dd class="text-right"><?= htmlspecialchars($patient['phone_secondary'] ?? '—') ?></dd>
+                </div>
+                <div class="space-y-1">
+                    <dt class="font-medium text-slate-700">Representante</dt>
+                    <dd><?= htmlspecialchars($patient['representative_name'] ?? '—') ?></dd>
+                </div>
+                <div class="flex justify-between gap-2">
+                    <dt class="font-medium text-slate-700">Tel. representante</dt>
+                    <dd class="text-right"><?= htmlspecialchars($patient['representative_phone'] ?? '—') ?></dd>
+                </div>
+                <div class="space-y-1">
+                    <dt class="font-medium text-slate-700">Contacto emergencia</dt>
+                    <dd><?= htmlspecialchars($patient['emergency_contact'] ?? '—') ?></dd>
+                </div>
+            </dl>
         </div>
-        <div>
-            <h3>Alertas</h3>
-            <p><?= nl2br(htmlspecialchars($profile['medical_alerts'] ?? $patient['notes'] ?? 'Sin alertas registradas.')) ?></p>
-            <p><strong>Saldo pendiente:</strong> Bs <?= number_format(max($totalBalance, 0), 2, ',', '.') ?></p>
+        <div class="rounded-2xl border <?= $hasAlert ? 'border-amber-200/70 bg-amber-50/80' : 'border-emerald-200/70 bg-emerald-50/80' ?> p-5">
+            <h3 class="text-xs font-semibold uppercase tracking-wide <?= $hasAlert ? 'text-amber-700' : 'text-emerald-700' ?>">Alertas y saldo</h3>
+            <div class="mt-3 space-y-3 text-sm <?= $hasAlert ? 'text-amber-700' : 'text-emerald-700' ?>">
+                <p><?= $hasAlert ? nl2br(htmlspecialchars((string) $alertText)) : 'Sin alertas registradas.' ?></p>
+                <div class="inline-flex items-center gap-2 rounded-full bg-white/80 px-4 py-2 text-sm font-semibold <?= $hasAlert ? 'text-amber-700' : 'text-emerald-700' ?>">
+                    Saldo pendiente: Bs <?= number_format(max($totalBalance, 0), 2, ',', '.') ?>
+                </div>
+            </div>
         </div>
     </div>
 </section>
 
-<section class="panel panel-wide" id="historia">
-    <div class="panel-header">
-        <h2>Historia clínica</h2>
+<section class="rounded-3xl bg-white/95 p-6 shadow-sm shadow-slate-200/60 ring-1 ring-slate-200/70 sm:p-8 space-y-6" id="historia">
+    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <h2 class="text-2xl font-semibold text-slate-900">Historia clínica</h2>
+        <p class="text-sm text-slate-500">Actualiza los antecedentes y hallazgos para mantener un seguimiento integral.</p>
     </div>
-    <form method="post" class="form-grid">
+    <form method="post" class="space-y-6">
         <input type="hidden" name="action" value="update_profile">
-        <fieldset>
-            <legend>Motivo de consulta</legend>
-            <label>
-                Motivo principal
-                <textarea name="consultation_reason" rows="2"><?= htmlspecialchars($profile['consultation_reason'] ?? '') ?></textarea>
-            </label>
-            <label>
-                Enfermedad actual / evolución
-                <textarea name="current_condition" rows="3"><?= htmlspecialchars($profile['current_condition'] ?? '') ?></textarea>
-            </label>
-            <label>
-                Alertas clínicas (alergias, riesgos)
-                <textarea name="medical_alerts" rows="2"><?= htmlspecialchars($profile['medical_alerts'] ?? '') ?></textarea>
-            </label>
+
+        <fieldset class="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4 sm:p-6">
+            <legend class="px-3 text-xs font-semibold uppercase tracking-wide text-brand-700">Motivo de consulta</legend>
+            <div class="mt-4 grid gap-4 md:grid-cols-2">
+                <label class="flex flex-col gap-2 text-sm text-slate-600 md:col-span-2">
+                    <span class="font-medium text-slate-700">Motivo principal</span>
+                    <textarea name="consultation_reason" rows="2" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"><?= htmlspecialchars($profile['consultation_reason'] ?? '') ?></textarea>
+                </label>
+                <label class="flex flex-col gap-2 text-sm text-slate-600">
+                    <span class="font-medium text-slate-700">Enfermedad actual / evolución</span>
+                    <textarea name="current_condition" rows="3" class="h-28 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"><?= htmlspecialchars($profile['current_condition'] ?? '') ?></textarea>
+                </label>
+                <label class="flex flex-col gap-2 text-sm text-slate-600">
+                    <span class="font-medium text-slate-700">Alertas clínicas (alergias, riesgos)</span>
+                    <textarea name="medical_alerts" rows="3" class="h-28 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"><?= htmlspecialchars($profile['medical_alerts'] ?? '') ?></textarea>
+                </label>
+            </div>
         </fieldset>
 
-        <fieldset>
-            <legend>Antecedentes personales</legend>
-            <div class="checkbox-grid">
+        <fieldset class="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-6">
+            <legend class="px-3 text-xs font-semibold uppercase tracking-wide text-brand-700">Antecedentes personales</legend>
+            <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <?php
                 $antecedents = [
                     'antecedent_cardiovascular' => 'Cardiovascular',
@@ -331,247 +380,279 @@ require __DIR__ . '/templates/header.php';
                 foreach ($antecedents as $field => $label):
                     $checked = !empty($profile[$field]) ? 'checked' : '';
                     ?>
-                    <label class="checkbox">
-                        <input type="checkbox" name="<?= $field ?>" <?= $checked ?>>
+                    <label class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:border-brand-200">
+                        <input type="checkbox" name="<?= $field ?>" <?= $checked ?> class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
                         <span><?= htmlspecialchars($label) ?></span>
                     </label>
                 <?php endforeach; ?>
             </div>
-            <label>
-                Hospitalizaciones / procedimientos
-                <textarea name="hospitalizations" rows="2"><?= htmlspecialchars($profile['hospitalizations'] ?? '') ?></textarea>
-            </label>
-            <label>
-                Medicación actual
-                <textarea name="medications" rows="2"><?= htmlspecialchars($profile['medications'] ?? '') ?></textarea>
-            </label>
-            <label>
-                Antecedentes familiares
-                <textarea name="family_history" rows="2"><?= htmlspecialchars($profile['family_history'] ?? '') ?></textarea>
-            </label>
-        </fieldset>
-
-        <fieldset>
-            <legend>Examen clínico</legend>
-            <label>
-                Examen extraoral
-                <textarea name="extraoral_exam" rows="2"><?= htmlspecialchars($profile['extraoral_exam'] ?? '') ?></textarea>
-            </label>
-            <label>
-                Examen intraoral
-                <textarea name="intraoral_exam" rows="2"><?= htmlspecialchars($profile['intraoral_exam'] ?? '') ?></textarea>
-            </label>
-            <label>
-                Tejidos periodontales
-                <textarea name="periodontal_status" rows="2"><?= htmlspecialchars($profile['periodontal_status'] ?? '') ?></textarea>
-            </label>
-            <div class="field-row">
-                <label>
-                    Dolor (0-10)
-                    <input type="number" name="pain_level" min="0" max="10" value="<?= htmlspecialchars((string) ($profile['pain_level'] ?? '')) ?>">
+            <div class="mt-4 grid gap-4 md:grid-cols-2">
+                <label class="flex flex-col gap-2 text-sm text-slate-600">
+                    <span class="font-medium text-slate-700">Hospitalizaciones / procedimientos</span>
+                    <textarea name="hospitalizations" rows="2" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"><?= htmlspecialchars($profile['hospitalizations'] ?? '') ?></textarea>
                 </label>
-                <label>
-                    Hábitos (bruxismo, tabaquismo...)
-                    <input type="text" name="habits" value="<?= htmlspecialchars($profile['habits'] ?? '') ?>">
+                <label class="flex flex-col gap-2 text-sm text-slate-600">
+                    <span class="font-medium text-slate-700">Medicación actual</span>
+                    <textarea name="medications" rows="2" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"><?= htmlspecialchars($profile['medications'] ?? '') ?></textarea>
                 </label>
-                <label>
-                    Evaluación de riesgo
-                    <input type="text" name="risk_assessment" value="<?= htmlspecialchars($profile['risk_assessment'] ?? '') ?>">
+                <label class="flex flex-col gap-2 text-sm text-slate-600 md:col-span-2">
+                    <span class="font-medium text-slate-700">Antecedentes familiares</span>
+                    <textarea name="family_history" rows="2" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"><?= htmlspecialchars($profile['family_history'] ?? '') ?></textarea>
                 </label>
             </div>
         </fieldset>
 
-        <fieldset>
-            <legend>Diagnóstico y plan</legend>
-            <label>
-                Diagnóstico
-                <textarea name="diagnosis" rows="2"><?= htmlspecialchars($profile['diagnosis'] ?? '') ?></textarea>
-            </label>
-            <label>
-                Plan de tratamiento
-                <textarea name="treatment_plan" rows="3"><?= htmlspecialchars($profile['treatment_plan'] ?? '') ?></textarea>
-            </label>
+        <fieldset class="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4 sm:p-6">
+            <legend class="px-3 text-xs font-semibold uppercase tracking-wide text-brand-700">Examen clínico</legend>
+            <div class="mt-4 grid gap-4 md:grid-cols-2">
+                <label class="flex flex-col gap-2 text-sm text-slate-600">
+                    <span class="font-medium text-slate-700">Examen extraoral</span>
+                    <textarea name="extraoral_exam" rows="2" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"><?= htmlspecialchars($profile['extraoral_exam'] ?? '') ?></textarea>
+                </label>
+                <label class="flex flex-col gap-2 text-sm text-slate-600">
+                    <span class="font-medium text-slate-700">Examen intraoral</span>
+                    <textarea name="intraoral_exam" rows="2" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"><?= htmlspecialchars($profile['intraoral_exam'] ?? '') ?></textarea>
+                </label>
+                <label class="flex flex-col gap-2 text-sm text-slate-600 md:col-span-2">
+                    <span class="font-medium text-slate-700">Tejidos periodontales</span>
+                    <textarea name="periodontal_status" rows="2" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"><?= htmlspecialchars($profile['periodontal_status'] ?? '') ?></textarea>
+                </label>
+            </div>
+            <div class="mt-4 grid gap-4 md:grid-cols-3">
+                <label class="flex flex-col gap-2 text-sm text-slate-600">
+                    <span class="font-medium text-slate-700">Dolor (0-10)</span>
+                    <input type="number" name="pain_level" min="0" max="10" value="<?= htmlspecialchars((string) ($profile['pain_level'] ?? '')) ?>" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
+                </label>
+                <label class="flex flex-col gap-2 text-sm text-slate-600">
+                    <span class="font-medium text-slate-700">Hábitos (bruxismo, tabaquismo...)</span>
+                    <input type="text" name="habits" value="<?= htmlspecialchars($profile['habits'] ?? '') ?>" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
+                </label>
+                <label class="flex flex-col gap-2 text-sm text-slate-600">
+                    <span class="font-medium text-slate-700">Evaluación de riesgo</span>
+                    <input type="text" name="risk_assessment" value="<?= htmlspecialchars($profile['risk_assessment'] ?? '') ?>" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
+                </label>
+            </div>
         </fieldset>
 
-        <fieldset>
-            <legend>Consentimiento informado</legend>
-            <div class="field-row">
-                <label class="checkbox">
-                    <input type="checkbox" name="consent_signed" <?= !empty($profile['consent_signed']) ? 'checked' : '' ?>>
+        <fieldset class="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-6">
+            <legend class="px-3 text-xs font-semibold uppercase tracking-wide text-brand-700">Diagnóstico y plan</legend>
+            <div class="mt-4 grid gap-4 md:grid-cols-2">
+                <label class="flex flex-col gap-2 text-sm text-slate-600">
+                    <span class="font-medium text-slate-700">Diagnóstico</span>
+                    <textarea name="diagnosis" rows="2" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"><?= htmlspecialchars($profile['diagnosis'] ?? '') ?></textarea>
+                </label>
+                <label class="flex flex-col gap-2 text-sm text-slate-600">
+                    <span class="font-medium text-slate-700">Plan de tratamiento</span>
+                    <textarea name="treatment_plan" rows="3" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"><?= htmlspecialchars($profile['treatment_plan'] ?? '') ?></textarea>
+                </label>
+            </div>
+        </fieldset>
+
+        <fieldset class="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4 sm:p-6">
+            <legend class="px-3 text-xs font-semibold uppercase tracking-wide text-brand-700">Consentimiento informado</legend>
+            <div class="mt-4 grid gap-4 md:grid-cols-[auto_minmax(0,1fr)]">
+                <label class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:border-brand-200">
+                    <input type="checkbox" name="consent_signed" <?= !empty($profile['consent_signed']) ? 'checked' : '' ?> class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
                     <span>Consentimiento firmado</span>
                 </label>
-                <label>
-                    Fecha de firma
-                    <input type="date" name="consent_signed_at" value="<?= htmlspecialchars($profile['consent_signed_at'] ?? '') ?>">
+                <label class="flex flex-col gap-2 text-sm text-slate-600">
+                    <span class="font-medium text-slate-700">Fecha de firma</span>
+                    <input type="date" name="consent_signed_at" value="<?= htmlspecialchars($profile['consent_signed_at'] ?? '') ?>" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
                 </label>
             </div>
-            <label>
-                Observaciones / condiciones especiales
-                <textarea name="consent_notes" rows="2"><?= htmlspecialchars($profile['consent_notes'] ?? '') ?></textarea>
+            <label class="mt-4 flex flex-col gap-2 text-sm text-slate-600">
+                <span class="font-medium text-slate-700">Observaciones / condiciones especiales</span>
+                <textarea name="consent_notes" rows="2" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"><?= htmlspecialchars($profile['consent_notes'] ?? '') ?></textarea>
             </label>
         </fieldset>
 
-        <div class="form-actions">
-            <button type="submit" class="button primary">Guardar historia clínica</button>
+        <div class="flex justify-end">
+            <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-full bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-soft transition hover:-translate-y-0.5 hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500">
+                Guardar historia clínica
+            </button>
         </div>
     </form>
 </section>
 
-<section class="panel panel-wide" id="odontograma">
-    <div class="panel-header">
-        <h2>Odontograma evolutivo</h2>
+<section class="rounded-3xl bg-white/95 p-6 shadow-sm shadow-slate-200/60 ring-1 ring-slate-200/70 sm:p-8 space-y-6" id="odontograma">
+    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <h2 class="text-2xl font-semibold text-slate-900">Odontograma evolutivo</h2>
+        <p class="text-sm text-slate-500">Selecciona una pieza para visualizar su estado y dejar observaciones clínicas.</p>
     </div>
-    <div class="odontogram-wrapper" data-odontogram='<?= htmlspecialchars(json_encode($odontogramData), ENT_QUOTES) ?>'>
-        <div class="odontogram">
-            <div class="arch">
-                <h3>Maxilar superior</h3>
-                <div class="teeth-row">
+    <div class="odontogram-wrapper grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]" data-odontogram='<?= htmlspecialchars(json_encode($odontogramData), ENT_QUOTES) ?>'>
+        <div class="odontogram space-y-6">
+            <div class="arch rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4">
+                <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-600">Maxilar superior</h3>
+                <div class="teeth-row mt-4 grid grid-cols-4 gap-2 sm:grid-cols-8">
                     <?php foreach (['18','17','16','15','14','13','12','11','21','22','23','24','25','26','27','28'] as $tooth): ?>
-                        <button class="tooth" data-tooth="<?= $tooth ?>">
+                        <button class="tooth rounded-xl border border-slate-200 bg-white px-2 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-300" data-tooth="<?= $tooth ?>">
                             <?= $tooth ?>
-                            <span class="status"></span>
+                            <span class="status mt-1 block text-xs font-medium text-slate-500"></span>
                         </button>
                     <?php endforeach; ?>
                 </div>
             </div>
-            <div class="arch">
-                <h3>Maxilar inferior</h3>
-                <div class="teeth-row">
+            <div class="arch rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4">
+                <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-600">Maxilar inferior</h3>
+                <div class="teeth-row mt-4 grid grid-cols-4 gap-2 sm:grid-cols-8">
                     <?php foreach (['48','47','46','45','44','43','42','41','31','32','33','34','35','36','37','38'] as $tooth): ?>
-                        <button class="tooth" data-tooth="<?= $tooth ?>">
+                        <button class="tooth rounded-xl border border-slate-200 bg-white px-2 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-300" data-tooth="<?= $tooth ?>">
                             <?= $tooth ?>
-                            <span class="status"></span>
+                            <span class="status mt-1 block text-xs font-medium text-slate-500"></span>
                         </button>
                     <?php endforeach; ?>
                 </div>
             </div>
-            <div class="arch">
-                <h3>Dentición temporal</h3>
-                <div class="teeth-row">
+            <div class="arch rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4">
+                <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-600">Dentición temporal</h3>
+                <div class="teeth-row mt-4 grid grid-cols-5 gap-2 sm:grid-cols-10">
                     <?php foreach (['55','54','53','52','51','61','62','63','64','65','85','84','83','82','81','71','72','73','74','75'] as $tooth): ?>
-                        <button class="tooth tooth-small" data-tooth="<?= $tooth ?>">
+                        <button class="tooth tooth-small rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-300" data-tooth="<?= $tooth ?>">
                             <?= $tooth ?>
-                            <span class="status"></span>
+                            <span class="status mt-1 block text-[11px] font-medium text-slate-500"></span>
                         </button>
                     <?php endforeach; ?>
                 </div>
             </div>
         </div>
-        <form method="post" class="odontogram-form">
+        <form method="post" class="odontogram-form space-y-4 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
             <input type="hidden" name="action" value="save_tooth">
             <input type="hidden" name="tooth_code" id="tooth_code" required>
-            <label>
-                Pieza dental seleccionada
-                <input type="text" id="tooth_label" readonly>
+            <label class="flex flex-col gap-2 text-sm text-slate-600">
+                <span class="font-medium text-slate-700">Pieza dental seleccionada</span>
+                <input type="text" id="tooth_label" readonly class="rounded-2xl border border-slate-200 bg-slate-100 px-4 py-2.5 text-slate-700 shadow-inner">
             </label>
-            <label>
-                Estado
-                <select name="status" id="tooth_status">
+            <label class="flex flex-col gap-2 text-sm text-slate-600">
+                <span class="font-medium text-slate-700">Estado</span>
+                <select name="status" id="tooth_status" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 focus:border-brand-400 focus:ring-brand-400">
                     <?php foreach ($odontogramStatuses as $key => $label): ?>
                         <option value="<?= htmlspecialchars($key) ?>"><?= htmlspecialchars($label) ?></option>
                     <?php endforeach; ?>
                 </select>
             </label>
-            <label>
-                Observaciones
-                <textarea name="note" id="tooth_note" rows="3"></textarea>
+            <label class="flex flex-col gap-2 text-sm text-slate-600">
+                <span class="font-medium text-slate-700">Observaciones</span>
+                <textarea name="note" id="tooth_note" rows="4" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"></textarea>
             </label>
-            <div class="form-actions">
-                <button type="submit" class="button primary">Guardar pieza</button>
+            <div class="flex justify-end">
+                <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-full bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-soft transition hover:-translate-y-0.5 hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500">
+                    Guardar pieza
+                </button>
             </div>
         </form>
     </div>
-    <p class="help-text">Selecciona una pieza para ver y actualizar su estado. Los colores facilitan visualizar caries, restauraciones y ausencias.</p>
+    <p class="text-xs text-slate-500">Los colores facilitan visualizar caries, restauraciones y ausencias. Mantén el odontograma actualizado en cada consulta.</p>
 </section>
 
-<section class="panel panel-wide" id="visitas">
-    <div class="panel-header">
-        <h2>Evolución por visita</h2>
+<section class="rounded-3xl bg-white/95 p-6 shadow-sm shadow-slate-200/60 ring-1 ring-slate-200/70 sm:p-8 space-y-6" id="visitas">
+    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <h2 class="text-2xl font-semibold text-slate-900">Evolución por visita</h2>
+        <p class="text-sm text-slate-500">Registra consultas con formato SOAP y monitorea próximos seguimientos.</p>
     </div>
-    <div class="two-columns">
-        <form method="post" class="visit-form">
+    <div class="grid gap-6 lg:grid-cols-[minmax(0,420px)_1fr]">
+        <form method="post" class="space-y-4 rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4 shadow-inner">
             <input type="hidden" name="action" value="create_visit">
-            <label>
-                Fecha de la consulta *
-                <input type="date" name="visit_date" required>
+            <label class="flex flex-col gap-2 text-sm text-slate-600">
+                <span class="font-medium text-slate-700">Fecha de la consulta *</span>
+                <input type="date" name="visit_date" required class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
             </label>
-            <label>
-                Motivo / síntomas (S)
-                <textarea name="subjective_notes" rows="2"></textarea>
+            <label class="flex flex-col gap-2 text-sm text-slate-600">
+                <span class="font-medium text-slate-700">Motivo / síntomas (S)</span>
+                <textarea name="subjective_notes" rows="2" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"></textarea>
             </label>
-            <label>
-                Hallazgos clínicos (O)
-                <textarea name="objective_notes" rows="2"></textarea>
+            <label class="flex flex-col gap-2 text-sm text-slate-600">
+                <span class="font-medium text-slate-700">Hallazgos clínicos (O)</span>
+                <textarea name="objective_notes" rows="2" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"></textarea>
             </label>
-            <label>
-                Evaluación / diagnósticos (A)
-                <textarea name="assessment" rows="2"></textarea>
+            <label class="flex flex-col gap-2 text-sm text-slate-600">
+                <span class="font-medium text-slate-700">Evaluación / diagnósticos (A)</span>
+                <textarea name="assessment" rows="2" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"></textarea>
             </label>
-            <label>
-                Plan inmediato / recomendaciones (P)
-                <textarea name="plan" rows="2"></textarea>
+            <label class="flex flex-col gap-2 text-sm text-slate-600">
+                <span class="font-medium text-slate-700">Plan inmediato / recomendaciones (P)</span>
+                <textarea name="plan" rows="2" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"></textarea>
             </label>
-            <div class="field-row">
-                <label>TA / PA
-                    <input type="text" name="vitals_bp" placeholder="Ej: 120/80">
+            <div class="grid gap-3 sm:grid-cols-2">
+                <label class="flex flex-col gap-2 text-sm text-slate-600">
+                    <span class="font-medium text-slate-700">TA / PA</span>
+                    <input type="text" name="vitals_bp" placeholder="Ej: 120/80" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
                 </label>
-                <label>FC
-                    <input type="text" name="vitals_hr" placeholder="lat/min">
+                <label class="flex flex-col gap-2 text-sm text-slate-600">
+                    <span class="font-medium text-slate-700">FC</span>
+                    <input type="text" name="vitals_hr" placeholder="lat/min" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
                 </label>
-                <label>Temp
-                    <input type="text" name="vitals_temp" placeholder="°C">
+                <label class="flex flex-col gap-2 text-sm text-slate-600">
+                    <span class="font-medium text-slate-700">Temp</span>
+                    <input type="text" name="vitals_temp" placeholder="°C" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
                 </label>
-                <label>SpO₂
-                    <input type="text" name="vitals_oxygen" placeholder="%">
+                <label class="flex flex-col gap-2 text-sm text-slate-600">
+                    <span class="font-medium text-slate-700">SpO₂</span>
+                    <input type="text" name="vitals_oxygen" placeholder="%" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
                 </label>
             </div>
-            <label>
-                Próxima cita
-                <input type="date" name="next_appointment">
+            <label class="flex flex-col gap-2 text-sm text-slate-600">
+                <span class="font-medium text-slate-700">Próxima cita</span>
+                <input type="date" name="next_appointment" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
             </label>
-            <div class="form-actions">
-                <button type="submit" class="button primary">Registrar visita</button>
+            <div class="flex justify-end">
+                <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-full bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-soft transition hover:-translate-y-0.5 hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500">
+                    Registrar visita
+                </button>
             </div>
         </form>
 
-        <div class="visit-timeline">
+        <div class="space-y-4 rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-6 shadow-sm">
             <?php if (!$visits): ?>
-                <p class="empty">Aún no hay visitas registradas.</p>
+                <p class="text-sm text-slate-500">Aún no hay visitas registradas.</p>
             <?php else: ?>
-                <ul class="timeline">
+                <ul class="space-y-4">
                     <?php foreach ($visits as $visit): ?>
-                        <li>
-                            <div class="timeline-head">
-                                <span class="timeline-date"><?= date('d/m/Y', strtotime($visit['visit_date'])) ?></span>
-                                <form method="post" onsubmit="return confirm('¿Eliminar esta consulta?');">
+                        <li class="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4">
+                            <div class="flex flex-wrap items-center justify-between gap-3">
+                                <div>
+                                    <p class="text-sm font-semibold text-slate-900"><?= date('d/m/Y', strtotime($visit['visit_date'])) ?></p>
+                                    <?php if ($visit['next_appointment']): ?>
+                                        <p class="text-xs font-medium text-brand-600">Próxima cita: <?= date('d/m/Y', strtotime($visit['next_appointment'])) ?></p>
+                                    <?php endif; ?>
+                                </div>
+                                <form method="post" class="inline-flex" onsubmit="return confirm('¿Eliminar esta consulta?');">
                                     <input type="hidden" name="action" value="delete_visit">
                                     <input type="hidden" name="visit_id" value="<?= (int) $visit['id'] ?>">
-                                    <button type="submit" class="button small danger">Eliminar</button>
+                                    <button type="submit" class="inline-flex items-center rounded-full border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500">
+                                        Eliminar
+                                    </button>
                                 </form>
                             </div>
-                            <div class="timeline-body">
+                            <div class="mt-3 space-y-2 text-sm text-slate-600">
                                 <?php if ($visit['subjective_notes']): ?>
-                                    <p><strong>S:</strong> <?= nl2br(htmlspecialchars($visit['subjective_notes'])) ?></p>
+                                    <p><span class="font-semibold text-slate-700">S:</span> <?= nl2br(htmlspecialchars($visit['subjective_notes'])) ?></p>
                                 <?php endif; ?>
                                 <?php if ($visit['objective_notes']): ?>
-                                    <p><strong>O:</strong> <?= nl2br(htmlspecialchars($visit['objective_notes'])) ?></p>
+                                    <p><span class="font-semibold text-slate-700">O:</span> <?= nl2br(htmlspecialchars($visit['objective_notes'])) ?></p>
                                 <?php endif; ?>
                                 <?php if ($visit['assessment']): ?>
-                                    <p><strong>A:</strong> <?= nl2br(htmlspecialchars($visit['assessment'])) ?></p>
+                                    <p><span class="font-semibold text-slate-700">A:</span> <?= nl2br(htmlspecialchars($visit['assessment'])) ?></p>
                                 <?php endif; ?>
                                 <?php if ($visit['plan']): ?>
-                                    <p><strong>P:</strong> <?= nl2br(htmlspecialchars($visit['plan'])) ?></p>
+                                    <p><span class="font-semibold text-slate-700">P:</span> <?= nl2br(htmlspecialchars($visit['plan'])) ?></p>
                                 <?php endif; ?>
-                                <?php if ($visit['vitals_bp'] || $visit['vitals_hr'] || $visit['vitals_temp'] || $visit['vitals_oxygen']): ?>
-                                    <p class="vitals">
-                                        <?php if ($visit['vitals_bp']): ?>TA: <?= htmlspecialchars($visit['vitals_bp']) ?><?php endif; ?>
-                                        <?php if ($visit['vitals_hr']): ?> · FC: <?= htmlspecialchars($visit['vitals_hr']) ?><?php endif; ?>
-                                        <?php if ($visit['vitals_temp']): ?> · Temp: <?= htmlspecialchars($visit['vitals_temp']) ?><?php endif; ?>
-                                        <?php if ($visit['vitals_oxygen']): ?> · SpO₂: <?= htmlspecialchars($visit['vitals_oxygen']) ?><?php endif; ?>
-                                    </p>
-                                <?php endif; ?>
-                                <?php if ($visit['next_appointment']): ?>
-                                    <p class="next-appointment">Próxima cita: <?= date('d/m/Y', strtotime($visit['next_appointment'])) ?></p>
+                                <?php
+                                $vitalTokens = [];
+                                if (!empty($visit['vitals_bp'])) {
+                                    $vitalTokens[] = 'TA: ' . htmlspecialchars($visit['vitals_bp']);
+                                }
+                                if (!empty($visit['vitals_hr'])) {
+                                    $vitalTokens[] = 'FC: ' . htmlspecialchars($visit['vitals_hr']);
+                                }
+                                if (!empty($visit['vitals_temp'])) {
+                                    $vitalTokens[] = 'Temp: ' . htmlspecialchars($visit['vitals_temp']);
+                                }
+                                if (!empty($visit['vitals_oxygen'])) {
+                                    $vitalTokens[] = 'SpO₂: ' . htmlspecialchars($visit['vitals_oxygen']);
+                                }
+                                ?>
+                                <?php if ($vitalTokens): ?>
+                                    <p class="text-xs font-medium text-slate-500"><?= implode(' · ', $vitalTokens) ?></p>
                                 <?php endif; ?>
                             </div>
                         </li>
@@ -582,89 +663,92 @@ require __DIR__ . '/templates/header.php';
     </div>
 </section>
 
-<section class="panel panel-wide" id="actividades">
-    <div class="panel-header">
-        <h2>Actividades realizadas y control de pagos</h2>
+<section class="rounded-3xl bg-white/95 p-6 shadow-sm shadow-slate-200/60 ring-1 ring-slate-200/70 sm:p-8 space-y-6" id="actividades">
+    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <h2 class="text-2xl font-semibold text-slate-900">Actividades realizadas y control de pagos</h2>
+        <p class="text-sm text-slate-500">Registra procedimientos, cobros y abonos asociados al tratamiento.</p>
     </div>
-    <div class="two-columns">
-        <form method="post" class="activity-form">
+    <div class="grid gap-6 lg:grid-cols-[minmax(0,420px)_1fr]">
+        <form method="post" class="space-y-4 rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4 shadow-inner">
             <input type="hidden" name="action" value="create_activity">
-            <label>
-                Fecha *
-                <input type="date" name="activity_date" required>
+            <label class="flex flex-col gap-2 text-sm text-slate-600">
+                <span class="font-medium text-slate-700">Fecha *</span>
+                <input type="date" name="activity_date" required class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
             </label>
-            <label>
-                Descripción *
-                <textarea name="description" rows="2" required></textarea>
+            <label class="flex flex-col gap-2 text-sm text-slate-600">
+                <span class="font-medium text-slate-700">Descripción *</span>
+                <textarea name="description" rows="2" required class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"></textarea>
             </label>
-            <label>
-                Visita asociada
-                <select name="related_visit">
+            <label class="flex flex-col gap-2 text-sm text-slate-600">
+                <span class="font-medium text-slate-700">Visita asociada</span>
+                <select name="related_visit" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 focus:border-brand-400 focus:ring-brand-400">
                     <option value="">(Opcional)</option>
                     <?php foreach ($visits as $visit): ?>
-                        <option value="<?= (int) $visit['id'] ?>">
-                            <?= date('d/m/Y', strtotime($visit['visit_date'])) ?>
-                        </option>
+                        <option value="<?= (int) $visit['id'] ?>"><?= date('d/m/Y', strtotime($visit['visit_date'])) ?></option>
                     <?php endforeach; ?>
                 </select>
             </label>
-            <div class="field-row">
-                <label>
-                    Honorarios (Bs)
-                    <input type="number" step="0.01" name="fee" value="0">
+            <div class="grid gap-3 sm:grid-cols-3">
+                <label class="flex flex-col gap-2 text-sm text-slate-600">
+                    <span class="font-medium text-slate-700">Honorarios (Bs)</span>
+                    <input type="number" step="0.01" name="fee" value="0" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
                 </label>
-                <label>
-                    Abono (Bs)
-                    <input type="number" step="0.01" name="payment" value="0">
+                <label class="flex flex-col gap-2 text-sm text-slate-600">
+                    <span class="font-medium text-slate-700">Abono (Bs)</span>
+                    <input type="number" step="0.01" name="payment" value="0" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
                 </label>
-                <label>
-                    Resta (Bs)
-                    <input type="number" step="0.01" name="balance" value="0">
+                <label class="flex flex-col gap-2 text-sm text-slate-600">
+                    <span class="font-medium text-slate-700">Resta (Bs)</span>
+                    <input type="number" step="0.01" name="balance" value="0" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
                 </label>
             </div>
-            <label>
-                Notas
-                <textarea name="activity_notes" rows="2"></textarea>
+            <label class="flex flex-col gap-2 text-sm text-slate-600">
+                <span class="font-medium text-slate-700">Notas</span>
+                <textarea name="activity_notes" rows="2" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"></textarea>
             </label>
-            <div class="form-actions">
-                <button type="submit" class="button primary">Agregar actividad</button>
+            <div class="flex justify-end">
+                <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-full bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-soft transition hover:-translate-y-0.5 hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500">
+                    Agregar actividad
+                </button>
             </div>
         </form>
 
-        <div class="activity-table">
+        <div class="space-y-4 rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-6 shadow-sm">
             <?php if (!$activities): ?>
-                <p class="empty">No hay actividades registradas.</p>
+                <p class="text-sm text-slate-500">No hay actividades registradas.</p>
             <?php else: ?>
-                <div class="table-responsive">
-                    <table class="data-table">
-                        <thead>
+                <div class="overflow-hidden rounded-2xl border border-slate-200/70 shadow-sm">
+                    <table class="min-w-full divide-y divide-slate-200 text-sm">
+                        <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                             <tr>
-                                <th>Fecha</th>
-                                <th>Descripción</th>
-                                <th>Honorarios</th>
-                                <th>Abono</th>
-                                <th>Resta</th>
-                                <th></th>
+                                <th class="px-4 py-3 text-left font-semibold">Fecha</th>
+                                <th class="px-4 py-3 text-left font-semibold">Descripción</th>
+                                <th class="px-4 py-3 text-right font-semibold">Honorarios</th>
+                                <th class="px-4 py-3 text-right font-semibold">Abono</th>
+                                <th class="px-4 py-3 text-right font-semibold">Resta</th>
+                                <th class="px-4 py-3 text-right font-semibold">Acciones</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody class="divide-y divide-slate-100 bg-white">
                             <?php foreach ($activities as $activity): ?>
-                                <tr>
-                                    <td><?= date('d/m/Y', strtotime($activity['activity_date'])) ?></td>
-                                    <td>
+                                <tr class="hover:bg-slate-50/80">
+                                    <td class="px-4 py-4 text-sm text-slate-600"><?= date('d/m/Y', strtotime($activity['activity_date'])) ?></td>
+                                    <td class="px-4 py-4 text-sm text-slate-700">
                                         <?= nl2br(htmlspecialchars($activity['description'])) ?>
                                         <?php if ($activity['notes']): ?>
-                                            <p class="small muted"><?= nl2br(htmlspecialchars($activity['notes'])) ?></p>
+                                            <p class="mt-2 text-xs text-slate-500"><?= nl2br(htmlspecialchars($activity['notes'])) ?></p>
                                         <?php endif; ?>
                                     </td>
-                                    <td><?= number_format((float) $activity['fee'], 2, ',', '.') ?></td>
-                                    <td><?= number_format((float) $activity['payment'], 2, ',', '.') ?></td>
-                                    <td><?= number_format((float) $activity['balance'], 2, ',', '.') ?></td>
-                                    <td class="table-actions">
-                                        <form method="post" onsubmit="return confirm('¿Eliminar esta actividad?');">
+                                    <td class="px-4 py-4 text-right text-sm font-semibold text-slate-700"><?= number_format((float) $activity['fee'], 2, ',', '.') ?></td>
+                                    <td class="px-4 py-4 text-right text-sm font-semibold text-emerald-600"><?= number_format((float) $activity['payment'], 2, ',', '.') ?></td>
+                                    <td class="px-4 py-4 text-right text-sm font-semibold text-amber-600"><?= number_format((float) $activity['balance'], 2, ',', '.') ?></td>
+                                    <td class="px-4 py-4 text-right">
+                                        <form method="post" class="inline-flex" onsubmit="return confirm('¿Eliminar esta actividad?');">
                                             <input type="hidden" name="action" value="delete_activity">
                                             <input type="hidden" name="activity_id" value="<?= (int) $activity['id'] ?>">
-                                            <button class="button small danger" type="submit">Eliminar</button>
+                                            <button class="inline-flex items-center rounded-full border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500" type="submit">
+                                                Eliminar
+                                            </button>
                                         </form>
                                     </td>
                                 </tr>
