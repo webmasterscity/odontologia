@@ -37,22 +37,106 @@ function setupAgeCalculator() {
 }
 
 function setupOdontogram() {
-    const wrapper = document.querySelector('.odontogram-wrapper');
-    if (!wrapper) {
+    const form = document.querySelector('[data-odontogram-form]');
+    if (!form) {
         return;
     }
 
-    const colorButtons = Array.from(wrapper.querySelectorAll('.color-option'));
-    const markButtons = Array.from(wrapper.querySelectorAll('.mark-option'));
-    const cells = Array.from(wrapper.querySelectorAll('.tooth-cell'));
+    const payloadInput = form.querySelector('input[name="odontogram_payload"]');
+    let state = {
+        odontodiagrama: {},
+        evolucion: {},
+    };
+    if (payloadInput && payloadInput.value) {
+        try {
+            const parsed = JSON.parse(payloadInput.value);
+            if (parsed && typeof parsed === 'object') {
+                state = {
+                    odontodiagrama: parsed.odontodiagrama && typeof parsed.odontodiagrama === 'object' ? parsed.odontodiagrama : {},
+                    evolucion: parsed.evolucion && typeof parsed.evolucion === 'object' ? parsed.evolucion : {},
+                };
+            }
+        } catch (error) {
+            console.warn('No se pudo interpretar el odontograma guardado:', error);
+        }
+    }
 
-    if (!colorButtons.length || !markButtons.length || !cells.length) {
+    const wrappers = Array.from(form.querySelectorAll('.odontogram-wrapper'));
+    if (!wrappers.length) {
         return;
     }
 
+    const allowedColors = ['blue', 'red'];
+    const allowedMarks = ['', 'dot', 'x', 'vertical', 'horizontal'];
     const markClasses = ['mark-dot', 'mark-x', 'mark-vertical', 'mark-horizontal'];
     const colorClasses = ['color-blue', 'color-red'];
     const fillClasses = ['fill-blue', 'fill-red'];
+
+    const clearCell = (cell) => {
+        markClasses.forEach((cls) => cell.classList.remove(cls));
+        colorClasses.forEach((cls) => cell.classList.remove(cls));
+        fillClasses.forEach((cls) => cell.classList.remove(cls));
+        cell.classList.remove('has-mark', 'has-fill');
+        cell.dataset.mark = '';
+        cell.dataset.color = '';
+    };
+
+    const applyStateToCell = (cell, cellState) => {
+        clearCell(cell);
+        if (!cellState || !cellState.color || !allowedColors.includes(cellState.color)) {
+            return;
+        }
+
+        cell.dataset.color = cellState.color;
+        cell.classList.add(`fill-${cellState.color}`);
+        cell.classList.add('has-fill');
+
+        if (cellState.mark && allowedMarks.includes(cellState.mark)) {
+            cell.dataset.mark = cellState.mark;
+            cell.classList.add(`mark-${cellState.mark}`);
+            cell.classList.add(`color-${cellState.color}`);
+            cell.classList.add('has-mark');
+        }
+    };
+
+    const getToothEntry = (diagram, tooth) => {
+        if (!state[diagram]) {
+            state[diagram] = {};
+        }
+        if (!state[diagram][tooth]) {
+            state[diagram][tooth] = { surfaces: {} };
+        } else if (!state[diagram][tooth].surfaces) {
+            state[diagram][tooth].surfaces = {};
+        }
+        return state[diagram][tooth];
+    };
+
+    const getCellState = (diagram, tooth, surface) => {
+        const diagramData = state[diagram];
+        if (!diagramData || !diagramData[tooth] || !diagramData[tooth].surfaces) {
+            return null;
+        }
+        return diagramData[tooth].surfaces[surface] || null;
+    };
+
+    const setCellState = (diagram, tooth, surface, cellState) => {
+        const entry = getToothEntry(diagram, tooth);
+        if (cellState) {
+            entry.surfaces[surface] = {
+                color: cellState.color,
+                mark: cellState.mark || '',
+            };
+        } else {
+            delete entry.surfaces[surface];
+        }
+
+        const remainingSurfaces = Object.keys(entry.surfaces);
+        if (!remainingSurfaces.length && !entry.status && !entry.notes) {
+            delete state[diagram][tooth];
+        } else {
+            state[diagram][tooth] = entry;
+        }
+    };
 
     const setActiveButton = (buttons, activeButton) => {
         buttons.forEach((button) => {
@@ -62,84 +146,95 @@ function setupOdontogram() {
         });
     };
 
-    let currentColorButton = colorButtons.find((button) => button.classList.contains('is-active')) || colorButtons[0];
-    let currentMarkButton = markButtons.find((button) => button.classList.contains('is-active')) || null;
+    wrappers.forEach((wrapper) => {
+        const diagram = wrapper.dataset.diagram || 'odontodiagrama';
+        if (!state[diagram]) {
+            state[diagram] = {};
+        }
 
-    let currentColor = currentColorButton?.dataset.color || 'blue';
-    let currentMark = currentMarkButton?.dataset.mark || '';
+        const colorButtons = Array.from(wrapper.querySelectorAll('.color-option'));
+        const markButtons = Array.from(wrapper.querySelectorAll('.mark-option'));
+        const cells = Array.from(wrapper.querySelectorAll('.tooth-cell'));
 
-    wrapper.dataset.activeColor = currentColor;
+        if (!colorButtons.length || !markButtons.length || !cells.length) {
+            return;
+        }
 
-    colorButtons.forEach((button) => {
-        button.addEventListener('click', () => {
-            if (button === currentColorButton) {
-                return;
+        let currentColorButton = colorButtons.find((button) => button.classList.contains('is-active')) || colorButtons[0];
+        let currentMarkButton = markButtons.find((button) => button.classList.contains('is-active')) || null;
+
+        let currentColor = currentColorButton?.dataset.color || 'blue';
+        let currentMark = currentMarkButton?.dataset.mark || '';
+
+        wrapper.dataset.activeColor = currentColor;
+
+        colorButtons.forEach((button) => {
+            button.addEventListener('click', () => {
+                if (button === currentColorButton) {
+                    return;
+                }
+                currentColorButton = button;
+                currentColor = allowedColors.includes(button.dataset.color || '') ? button.dataset.color || 'blue' : 'blue';
+                wrapper.dataset.activeColor = currentColor;
+                setActiveButton(colorButtons, button);
+            });
+        });
+
+        markButtons.forEach((button) => {
+            button.addEventListener('click', () => {
+                if (button === currentMarkButton) {
+                    currentMarkButton = null;
+                    currentMark = '';
+                    setActiveButton(markButtons, null);
+                    wrapper.classList.remove('erase-mode');
+                    return;
+                }
+                currentMarkButton = button;
+                currentMark = button.dataset.mark || '';
+                setActiveButton(markButtons, button);
+                wrapper.classList.toggle('erase-mode', currentMark === 'erase');
+            });
+        });
+
+        cells.forEach((cell) => {
+            const toothCard = cell.closest('.tooth-card');
+            const toothCode = toothCard?.dataset.tooth || '';
+            const surface = cell.dataset.surface || '';
+
+            if (toothCode && surface) {
+                const storedState = getCellState(diagram, toothCode, surface);
+                if (storedState) {
+                    applyStateToCell(cell, storedState);
+                }
             }
-            currentColorButton = button;
-            currentColor = button.dataset.color || 'blue';
-            wrapper.dataset.activeColor = currentColor;
-            setActiveButton(colorButtons, button);
+
+            cell.addEventListener('click', () => {
+                if (!toothCode || !surface) {
+                    return;
+                }
+
+                if (currentMark === 'erase') {
+                    setCellState(diagram, toothCode, surface, null);
+                    applyStateToCell(cell, null);
+                    form.dataset.odontogramDirty = 'true';
+                    return;
+                }
+
+                const colorToApply = allowedColors.includes(currentColor) ? currentColor : 'blue';
+                const markToApply = allowedMarks.includes(currentMark) ? currentMark : '';
+
+                setCellState(diagram, toothCode, surface, { color: colorToApply, mark: markToApply });
+                applyStateToCell(cell, { color: colorToApply, mark: markToApply });
+                form.dataset.odontogramDirty = 'true';
+            });
         });
     });
 
-    markButtons.forEach((button) => {
-        button.addEventListener('click', () => {
-            if (button === currentMarkButton) {
-                currentMarkButton = null;
-                currentMark = '';
-                setActiveButton(markButtons, null);
-                wrapper.classList.remove('erase-mode');
-                return;
-            }
-            currentMarkButton = button;
-            currentMark = button.dataset.mark || '';
-            setActiveButton(markButtons, button);
-            wrapper.classList.toggle('erase-mode', currentMark === 'erase');
-        });
-    });
-
-    const applyMark = (cell, mark, color) => {
-        const previousColor = cell.dataset.color || '';
-        const targetColor = color || previousColor;
-
-        if (mark === 'erase') {
-            markClasses.forEach((cls) => cell.classList.remove(cls));
-            colorClasses.forEach((cls) => cell.classList.remove(cls));
-            fillClasses.forEach((cls) => cell.classList.remove(cls));
-            cell.classList.remove('has-mark', 'has-fill');
-            cell.dataset.mark = '';
-            cell.dataset.color = '';
+    form.addEventListener('submit', () => {
+        if (!payloadInput) {
             return;
         }
-
-        if (!targetColor) {
-            return;
-        }
-
-        markClasses.forEach((cls) => cell.classList.remove(cls));
-        colorClasses.forEach((cls) => cell.classList.remove(cls));
-        fillClasses.forEach((cls) => cell.classList.remove(cls));
-        cell.classList.remove('has-mark', 'has-fill');
-
-        cell.dataset.color = targetColor;
-        cell.classList.add(`fill-${targetColor}`);
-        cell.classList.add('has-fill');
-
-        if (!mark) {
-            cell.dataset.mark = '';
-            return;
-        }
-
-        cell.dataset.mark = mark;
-        cell.classList.add(`mark-${mark}`);
-        cell.classList.add(`color-${targetColor}`);
-        cell.classList.add('has-mark');
-    };
-
-    cells.forEach((cell) => {
-        cell.addEventListener('click', () => {
-            applyMark(cell, currentMark, currentColor);
-        });
+        payloadInput.value = JSON.stringify(state);
     });
 }
 

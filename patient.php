@@ -93,6 +93,65 @@ $renderToothCard = static function (string $code, array $surfaceLabels, bool $is
     <?php
 };
 
+$renderOdontogramSection = static function (string $diagramKey, string $title, string $summary) use ($renderToothCard, $odontogramGroups, $odontogramSurfaces): void {
+    ?>
+    <fieldset class="space-y-6 rounded-2xl border border-slate-200/80 bg-white/90 p-4 sm:p-6 shadow-sm" data-odontogram-section="<?= htmlspecialchars($diagramKey) ?>">
+        <legend class="px-3 text-xs font-semibold uppercase tracking-wide text-brand-700"><?= htmlspecialchars($title) ?></legend>
+        <p class="text-sm text-slate-500"><?= htmlspecialchars($summary) ?></p>
+        <div class="odontogram-wrapper space-y-6" data-diagram="<?= htmlspecialchars($diagramKey) ?>">
+            <div class="odontogram-toolbar flex flex-wrap items-center justify-between gap-6 rounded-2xl border border-slate-200/80 bg-white/95 p-4 shadow-sm">
+                <div class="toolbar-group color-group flex items-center gap-3" role="radiogroup" aria-label="Seleccionar color">
+                    <span class="toolbar-label text-xs font-semibold uppercase tracking-wide text-slate-500">Color</span>
+                    <button type="button" class="tool-button color-option is-active" data-color="blue" aria-pressed="true">
+                        <span class="sr-only">Azul</span>
+                    </button>
+                    <button type="button" class="tool-button color-option" data-color="red" aria-pressed="false">
+                        <span class="sr-only">Rojo</span>
+                    </button>
+                </div>
+                <div class="toolbar-group mark-group flex flex-wrap items-center gap-3" role="radiogroup" aria-label="Seleccionar trazo opcional">
+                    <span class="toolbar-label text-xs font-semibold uppercase tracking-wide text-slate-500">Trazo (opcional)</span>
+                    <button type="button" class="tool-button mark-option" data-mark="dot" aria-pressed="false">
+                        <span class="tool-glyph" aria-hidden="true"></span>
+                        <span class="tool-name">Punto</span>
+                    </button>
+                    <button type="button" class="tool-button mark-option" data-mark="x" aria-pressed="false">
+                        <span class="tool-glyph" aria-hidden="true"></span>
+                        <span class="tool-name">Equis</span>
+                    </button>
+                    <button type="button" class="tool-button mark-option" data-mark="vertical" aria-pressed="false">
+                        <span class="tool-glyph" aria-hidden="true"></span>
+                        <span class="tool-name">Vertical</span>
+                    </button>
+                    <button type="button" class="tool-button mark-option" data-mark="horizontal" aria-pressed="false">
+                        <span class="tool-glyph" aria-hidden="true"></span>
+                        <span class="tool-name">Horizontal</span>
+                    </button>
+                    <button type="button" class="tool-button mark-option" data-mark="erase" aria-pressed="false">
+                        <span class="tool-glyph tool-glyph--erase" aria-hidden="true"></span>
+                        <span class="tool-name">Borrar</span>
+                    </button>
+                </div>
+            </div>
+            <div class="odontogram-canvas space-y-10">
+                <?php foreach ($odontogramGroups as $group): ?>
+                    <div class="odontogram-arch<?= $group['is_deciduous'] ? ' odontogram-arch--deciduous' : '' ?>">
+                        <div class="odontogram-arch__header">
+                            <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-600"><?= htmlspecialchars($group['label']) ?></h3>
+                        </div>
+                        <div class="odontogram-row">
+                            <?php foreach ($group['teeth'] as $tooth): ?>
+                                <?php $renderToothCard($tooth, $odontogramSurfaces, $group['is_deciduous']); ?>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    </fieldset>
+    <?php
+};
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = post('action');
 
@@ -157,6 +216,90 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         header('Location: patient.php?id=' . $patientId . '#historia');
         exit;
+    }
+
+    if ($action === 'save_odontogram') {
+        $rawPayload = (string) post('odontogram_payload', '');
+        $decodedPayload = json_decode($rawPayload, true);
+        if (!is_array($decodedPayload)) {
+            $errors[] = 'El formato del odontograma no es válido.';
+        } else {
+            $diagramKeys = ['odontodiagrama', 'evolucion'];
+            $normalized = [];
+            foreach ($diagramKeys as $diagramKey) {
+                if (empty($decodedPayload[$diagramKey]) || !is_array($decodedPayload[$diagramKey])) {
+                    continue;
+                }
+                foreach ($decodedPayload[$diagramKey] as $toothCode => $toothPayload) {
+                    if (!in_array($toothCode, $validToothCodes, true) || !is_array($toothPayload)) {
+                        continue;
+                    }
+                    $surfaces = $toothPayload['surfaces'] ?? [];
+                    if (is_array($surfaces)) {
+                        foreach ($surfaces as $surfaceKey => $surfaceData) {
+                            if (!array_key_exists($surfaceKey, $odontogramSurfaces) || !is_array($surfaceData)) {
+                                continue;
+                            }
+                            $color = $surfaceData['color'] ?? '';
+                            if (!in_array($color, ['blue', 'red'], true)) {
+                                continue;
+                            }
+                            $mark = $surfaceData['mark'] ?? '';
+                            if ($mark !== '' && !in_array($mark, ['dot', 'x', 'vertical', 'horizontal'], true)) {
+                                $mark = '';
+                            }
+                            $normalized[$toothCode][$diagramKey]['surfaces'][$surfaceKey] = [
+                                'color' => $color,
+                                'mark' => $mark,
+                            ];
+                        }
+                    }
+                    if (isset($toothPayload['status']) && array_key_exists($toothPayload['status'], $odontogramStatuses)) {
+                        $normalized[$toothCode]['status'] = $toothPayload['status'];
+                    }
+                    if (isset($toothPayload['notes']) && is_string($toothPayload['notes'])) {
+                        $note = trim($toothPayload['notes']);
+                        $normalized[$toothCode]['notes'] = $note !== '' ? $note : null;
+                    }
+                }
+            }
+
+            try {
+                $pdo->beginTransaction();
+                $pdo->prepare('DELETE FROM odontogram_entries WHERE patient_id = :patient_id')
+                    ->execute([':patient_id' => $patientId]);
+
+                foreach ($normalized as $toothCode => $diagramData) {
+                    $surfacesPayload = [
+                        'odontodiagrama' => $diagramData['odontodiagrama']['surfaces'] ?? [],
+                        'evolucion' => $diagramData['evolucion']['surfaces'] ?? [],
+                    ];
+
+                    if (empty($surfacesPayload['odontodiagrama']) && empty($surfacesPayload['evolucion'])) {
+                        continue;
+                    }
+
+                    $surfaceJson = json_encode($surfacesPayload, JSON_UNESCAPED_UNICODE);
+                    if ($surfaceJson === false) {
+                        continue;
+                    }
+
+                    upsertOdontogramEntry($pdo, $patientId, $toothCode, [
+                        'status' => $diagramData['status'] ?? 'sin_registro',
+                        'surface_data' => $surfaceJson,
+                        'notes' => $diagramData['notes'] ?? null,
+                    ]);
+                }
+
+                $pdo->commit();
+                $messages[] = 'Odontograma guardado correctamente.';
+                header('Location: patient.php?id=' . $patientId . '#odontograma');
+                exit;
+            } catch (Throwable $e) {
+                $pdo->rollBack();
+                $errors[] = 'No se pudo guardar el odontograma. Inténtalo nuevamente.';
+            }
+        }
     }
 
     if ($action === 'save_tooth') {
@@ -258,11 +401,34 @@ $profileStmt = $pdo->prepare('SELECT * FROM clinical_profiles WHERE patient_id =
 $profileStmt->execute([':id' => $patientId]);
 $profile = $profileStmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
-$odontogramStmt = $pdo->prepare('SELECT tooth_code, status, notes FROM odontogram_entries WHERE patient_id = :id');
+$odontogramStmt = $pdo->prepare('SELECT tooth_code, status, notes, surface_data FROM odontogram_entries WHERE patient_id = :id');
 $odontogramStmt->execute([':id' => $patientId]);
-$odontogramData = [];
+$odontogramPayload = [
+    'odontodiagrama' => [],
+    'evolucion' => [],
+];
 foreach ($odontogramStmt->fetchAll(PDO::FETCH_ASSOC) as $entry) {
-    $odontogramData[$entry['tooth_code']] = $entry;
+    $decodedSurfaces = [];
+    if (!empty($entry['surface_data'])) {
+        $decoded = json_decode($entry['surface_data'], true);
+        if (is_array($decoded)) {
+            $decodedSurfaces = $decoded;
+        }
+    }
+    foreach (['odontodiagrama', 'evolucion'] as $diagramKey) {
+        if (empty($decodedSurfaces[$diagramKey]) || !is_array($decodedSurfaces[$diagramKey])) {
+            continue;
+        }
+        $odontogramPayload[$diagramKey][$entry['tooth_code']] = [
+            'surfaces' => $decodedSurfaces[$diagramKey],
+            'status' => $entry['status'],
+            'notes' => $entry['notes'],
+        ];
+    }
+}
+$odontogramInitialJson = json_encode($odontogramPayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+if ($odontogramInitialJson === false) {
+    $odontogramInitialJson = '{"odontodiagrama":{},"evolucion":{}}';
 }
 
 $visitsStmt = $pdo->prepare('SELECT * FROM visits WHERE patient_id = :id ORDER BY date(visit_date) DESC, id DESC');
@@ -383,6 +549,37 @@ $hasAlert = $alertText && trim((string) $alertText) !== '';
             </div>
         </div>
     </div>
+</section>
+
+<section class="rounded-3xl bg-white/95 p-6 shadow-sm shadow-slate-200/60 ring-1 ring-slate-200/70 sm:p-8 space-y-6" id="odontograma">
+    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div class="space-y-1">
+            <h2 class="text-2xl font-semibold text-slate-900">Odontograma</h2>
+            <p class="text-sm text-slate-500">Registra el odontodiagrama inicial y su evolución clínica pieza por pieza.</p>
+        </div>
+        <p class="text-xs text-slate-400 md:text-right">Los cambios se almacenan en la base de datos cuando presionas “Guardar odontograma”.</p>
+    </div>
+    <form method="post" class="space-y-6" data-odontogram-form>
+        <input type="hidden" name="action" value="save_odontogram">
+        <input type="hidden" name="odontogram_payload" value="<?= htmlspecialchars($odontogramInitialJson, ENT_QUOTES) ?>">
+        <?php
+            $renderOdontogramSection(
+                'odontodiagrama',
+                'Odontodiagrama',
+                'Dibuja hallazgos iniciales según el examen físico y radiográfico.'
+            );
+            $renderOdontogramSection(
+                'evolucion',
+                'Evolución',
+                'Actualiza los cambios observados durante el seguimiento del tratamiento.'
+            );
+        ?>
+        <div class="flex justify-end">
+            <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-full bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-soft transition hover:-translate-y-0.5 hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500">
+                Guardar odontograma
+            </button>
+        </div>
+    </form>
 </section>
 
 <section class="rounded-3xl bg-white/95 p-6 shadow-sm shadow-slate-200/60 ring-1 ring-slate-200/70 sm:p-8 space-y-6" id="historia">

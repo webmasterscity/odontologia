@@ -242,10 +242,11 @@ function insertRow(PDO $pdo, string $table, array $data): int
  */
 function upsertOdontogramEntry(PDO $pdo, int $patientId, string $toothCode, array $data): void
 {
-    $sql = 'INSERT INTO odontogram_entries (patient_id, tooth_code, status, notes)
-            VALUES (:patient_id, :tooth_code, :status, :notes)
+    $sql = 'INSERT INTO odontogram_entries (patient_id, tooth_code, status, surface_data, notes)
+            VALUES (:patient_id, :tooth_code, :status, :surface_data, :notes)
             ON CONFLICT(patient_id, tooth_code)
             DO UPDATE SET status = excluded.status,
+                          surface_data = COALESCE(excluded.surface_data, odontogram_entries.surface_data),
                           notes = excluded.notes,
                           updated_at = CURRENT_TIMESTAMP';
     $stmt = $pdo->prepare($sql);
@@ -253,6 +254,7 @@ function upsertOdontogramEntry(PDO $pdo, int $patientId, string $toothCode, arra
         ':patient_id' => $patientId,
         ':tooth_code' => $toothCode,
         ':status' => $data['status'] ?? null,
+        ':surface_data' => $data['surface_data'] ?? null,
         ':notes' => $data['notes'] ?? null,
     ]);
 }
