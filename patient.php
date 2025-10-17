@@ -178,8 +178,8 @@ $renderToothCard = static function (
                     <g class="tooth-grid__overlay" id="<?= htmlspecialchars($clipId . '-overlay') ?>" aria-hidden="true">
                         <circle cx="50" cy="50" r="47" fill="none"></circle>
                         <circle cx="50" cy="50" r="22.5" fill="none"></circle>
-                        <path d="M50 3 L50 27.5 M50 72.5 L50 97"></path>
-                        <path d="M3 50 L27.5 50 M72.5 50 L97 50"></path>
+                        <path d="M50 3 L50 27.5 M50 72.5 L50 97" fill="none"></path>
+                        <path d="M3 50 L27.5 50 M72.5 50 L97 50" fill="none"></path>
                     </g>
                 </svg>
             </div>

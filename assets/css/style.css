@@ -300,6 +300,11 @@
     overflow: hidden;
 }
 
+.tooth-grid--deciduous .tooth-grid__svg {
+    overflow: hidden;
+    border-radius: 50%;
+}
+
 .tooth-grid__svg {
     width: 100%;
     height: auto;
@@ -308,7 +313,7 @@
 
 .tooth-grid__selections .tooth-cell {
     fill: transparent;
-    pointer-events: visiblePainted;
+    pointer-events: all;
 }
 
 .tooth-grid__overlay {
@@ -461,8 +466,4 @@
 
 .tooth-grid--permanent .surface-center {
     clip-path: inset(30% 30% 30% 30%);
-}
-
-.tooth-grid--deciduous .surface-center {
-    clip-path: circle(22.5% at 50% 50%);
 }
