@@ -227,6 +227,15 @@ function setupOdontogram() {
                 applyStateToCell(cell, { color: colorToApply, mark: markToApply });
                 form.dataset.odontogramDirty = 'true';
             });
+
+            if (cell.tagName !== 'BUTTON') {
+                cell.addEventListener('keydown', (event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        cell.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+                    }
+                });
+            }
         });
     });
 

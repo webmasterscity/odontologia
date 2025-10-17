@@ -48,12 +48,20 @@ $odontogramStatuses = [
     'en_tratamiento' => 'En tratamiento'
 ];
 
-$odontogramSurfaces = [
+$permanentSurfaces = [
     'top' => 'Superficie oclusal',
     'left' => 'Superficie mesial',
     'center' => 'Superficie central',
     'right' => 'Superficie distal',
     'bottom' => 'Superficie lingual'
+];
+
+$deciduousSurfaces = [
+    'upper_left' => 'Superficie superior izquierda',
+    'upper_right' => 'Superficie superior derecha',
+    'center' => 'Superficie central',
+    'lower_right' => 'Superficie inferior derecha',
+    'lower_left' => 'Superficie inferior izquierda'
 ];
 
 $odontogramGroups = [
@@ -79,21 +87,124 @@ $odontogramGroups = [
     ],
 ];
 
-$renderToothCard = static function (string $code, array $surfaceLabels, bool $isDeciduous = false): void {
+$allSurfaces = $permanentSurfaces + $deciduousSurfaces;
+
+$renderToothCard = static function (
+    string $code,
+    array $permanentSurfaceLabels,
+    array $deciduousSurfaceLabels,
+    bool $isDeciduous = false
+): void {
+    static $clipCounter = 0;
+    $clipId = 'tooth-clip-' . (++$clipCounter);
     ?>
     <div class="tooth-card<?= $isDeciduous ? ' tooth-card--deciduous' : '' ?>" data-tooth="<?= htmlspecialchars($code) ?>">
         <span class="tooth-card__code"><?= htmlspecialchars($code) ?></span>
-        <div class="tooth-grid<?= $isDeciduous ? ' tooth-grid--deciduous' : ' tooth-grid--permanent' ?>" role="group" aria-label="Pieza <?= htmlspecialchars($code) ?>">
-            <?php foreach ($surfaceLabels as $surface => $surfaceLabel): ?>
-                <button type="button" class="tooth-cell surface-<?= htmlspecialchars($surface) ?>" data-surface="<?= htmlspecialchars($surface) ?>" aria-label="<?= htmlspecialchars($surfaceLabel) ?>"></button>
-            <?php endforeach; ?>
-            <span class="tooth-grid__overlay" aria-hidden="true"></span>
-        </div>
+        <?php if ($isDeciduous): ?>
+            <div class="tooth-grid tooth-grid--deciduous" role="group" aria-label="Pieza <?= htmlspecialchars($code) ?>">
+                <svg class="tooth-grid__svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" aria-hidden="false">
+                    <defs>
+                        <clipPath id="<?= htmlspecialchars($clipId) ?>">
+                            <circle cx="50" cy="50" r="47"></circle>
+                        </clipPath>
+                    </defs>
+                    <g class="tooth-grid__selections" id="<?= htmlspecialchars($clipId . '-selections') ?>" clip-path="url(#<?= htmlspecialchars($clipId) ?>)">
+                        <?php foreach ($deciduousSurfaceLabels as $surface => $surfaceLabel): ?>
+                            <?php if ($surface === 'center'): ?>
+                                <circle
+                                    class="tooth-cell tooth-cell--svg surface-<?= htmlspecialchars($surface) ?>"
+                                    data-surface="<?= htmlspecialchars($surface) ?>"
+                                    id="<?= htmlspecialchars($clipId . '-center') ?>"
+                                    role="button"
+                                    tabindex="0"
+                                    pointer-events="visiblePainted"
+                                    aria-label="<?= htmlspecialchars($surfaceLabel) ?>"
+                                    cx="50"
+                                    cy="50"
+                                    r="22.5"
+                                    fill="transparent"
+                                ></circle>
+                            <?php elseif ($surface === 'upper_left'): ?>
+                                <path
+                                    class="tooth-cell tooth-cell--svg surface-upper_left"
+                                    data-surface="upper_left"
+                                    id="<?= htmlspecialchars($clipId . '-upper_left') ?>"
+                                    role="button"
+                                    tabindex="0"
+                                    pointer-events="visiblePainted"
+                                    aria-label="<?= htmlspecialchars($surfaceLabel) ?>"
+                                    d="M50 3 A47 47 0 0 0 3 50 L27.5 50 A22.5 22.5 0 0 1 50 27.5 Z"
+                                    fill="transparent"
+                                ></path>
+                            <?php elseif ($surface === 'upper_right'): ?>
+                                <path
+                                    class="tooth-cell tooth-cell--svg surface-upper_right"
+                                    data-surface="upper_right"
+                                    id="<?= htmlspecialchars($clipId . '-upper_right') ?>"
+                                    role="button"
+                                    tabindex="0"
+                                    pointer-events="visiblePainted"
+                                    aria-label="<?= htmlspecialchars($surfaceLabel) ?>"
+                                    d="M50 3 A47 47 0 0 1 97 50 L72.5 50 A22.5 22.5 0 0 1 50 27.5 Z"
+                                    fill="transparent"
+                                ></path>
+                            <?php elseif ($surface === 'lower_right'): ?>
+                                <path
+                                    class="tooth-cell tooth-cell--svg surface-lower_right"
+                                    data-surface="lower_right"
+                                    id="<?= htmlspecialchars($clipId . '-lower_right') ?>"
+                                    role="button"
+                                    tabindex="0"
+                                    pointer-events="visiblePainted"
+                                    aria-label="<?= htmlspecialchars($surfaceLabel) ?>"
+                                    d="M97 50 A47 47 0 0 1 50 97 L50 72.5 A22.5 22.5 0 0 1 72.5 50 Z"
+                                    fill="transparent"
+                                ></path>
+                            <?php elseif ($surface === 'lower_left'): ?>
+                                <path
+                                    class="tooth-cell tooth-cell--svg surface-lower_left"
+                                    data-surface="lower_left"
+                                    id="<?= htmlspecialchars($clipId . '-lower_left') ?>"
+                                    role="button"
+                                    tabindex="0"
+                                    pointer-events="visiblePainted"
+                                    aria-label="<?= htmlspecialchars($surfaceLabel) ?>"
+                                    d="M50 97 A47 47 0 0 1 3 50 L27.5 50 A22.5 22.5 0 0 1 50 72.5 Z"
+                                    fill="transparent"
+                                ></path>
+                            <?php endif; ?>
+                        <?php endforeach; ?>
+                    </g>
+                    <g class="tooth-grid__overlay" id="<?= htmlspecialchars($clipId . '-overlay') ?>" aria-hidden="true">
+                        <circle cx="50" cy="50" r="47" fill="none"></circle>
+                        <circle cx="50" cy="50" r="22.5" fill="none"></circle>
+                        <path d="M50 3 L50 27.5 M50 72.5 L50 97"></path>
+                        <path d="M3 50 L27.5 50 M72.5 50 L97 50"></path>
+                    </g>
+                </svg>
+            </div>
+        <?php else: ?>
+            <div class="tooth-grid tooth-grid--permanent" role="group" aria-label="Pieza <?= htmlspecialchars($code) ?>">
+                <?php foreach ($permanentSurfaceLabels as $surface => $surfaceLabel): ?>
+                    <button type="button" class="tooth-cell surface-<?= htmlspecialchars($surface) ?>" data-surface="<?= htmlspecialchars($surface) ?>" aria-label="<?= htmlspecialchars($surfaceLabel) ?>"></button>
+                <?php endforeach; ?>
+                <span class="tooth-grid__overlay" aria-hidden="true"></span>
+            </div>
+        <?php endif; ?>
     </div>
     <?php
 };
 
-$renderOdontogramSection = static function (string $diagramKey, string $title, string $summary) use ($renderToothCard, $odontogramGroups, $odontogramSurfaces): void {
+$renderOdontogramSection = static function (
+    string $diagramKey,
+    string $title,
+    string $summary
+) use (
+    $renderToothCard,
+    $odontogramGroups,
+    $permanentSurfaces,
+    $deciduousSurfaces
+): void {
     ?>
     <fieldset class="space-y-6 rounded-2xl border border-slate-200/80 bg-white/90 p-4 sm:p-6 shadow-sm" data-odontogram-section="<?= htmlspecialchars($diagramKey) ?>">
         <legend class="px-3 text-xs font-semibold uppercase tracking-wide text-brand-700"><?= htmlspecialchars($title) ?></legend>
@@ -141,7 +252,7 @@ $renderOdontogramSection = static function (string $diagramKey, string $title, s
                         </div>
                         <div class="odontogram-row">
                             <?php foreach ($group['teeth'] as $tooth): ?>
-                                <?php $renderToothCard($tooth, $odontogramSurfaces, $group['is_deciduous']); ?>
+                                <?php $renderToothCard($tooth, $permanentSurfaces, $deciduousSurfaces, $group['is_deciduous']); ?>
                             <?php endforeach; ?>
                         </div>
                     </div>
@@ -237,7 +348,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $surfaces = $toothPayload['surfaces'] ?? [];
                     if (is_array($surfaces)) {
                         foreach ($surfaces as $surfaceKey => $surfaceData) {
-                            if (!array_key_exists($surfaceKey, $odontogramSurfaces) || !is_array($surfaceData)) {
+                            if (!array_key_exists($surfaceKey, $allSurfaces) || !is_array($surfaceData)) {
                                 continue;
                             }
                             $color = $surfaceData['color'] ?? '';
@@ -780,7 +891,7 @@ $hasAlert = $alertText && trim((string) $alertText) !== '';
                     </div>
                     <div class="odontogram-row">
                         <?php foreach ($group['teeth'] as $tooth): ?>
-                            <?php $renderToothCard($tooth, $odontogramSurfaces, $group['is_deciduous']); ?>
+                            <?php $renderToothCard($tooth, $permanentSurfaces, $deciduousSurfaces, $group['is_deciduous']); ?>
                         <?php endforeach; ?>
                     </div>
                 </div>
