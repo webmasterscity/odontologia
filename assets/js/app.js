@@ -67,35 +67,180 @@ function setupOdontogram() {
     }
 
     const allowedColors = ['blue', 'red'];
-    const allowedMarks = ['', 'dot', 'x', 'vertical', 'horizontal'];
-    const markClasses = ['mark-dot', 'mark-x', 'mark-vertical', 'mark-horizontal'];
+    const strokePalette = {
+        blue: '#1D4ED8',
+        red: '#B91C1C',
+    };
+    const symbolRefs = {
+        dot: '#mark-dot',
+        x: '#mark-x',
+        vertical: '#mark-vert',
+        horizontal: '#mark-horz',
+    };
+    const allowedMarks = Object.keys(symbolRefs);
     const colorClasses = ['color-blue', 'color-red'];
     const fillClasses = ['fill-blue', 'fill-red'];
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const xlinkNS = 'http://www.w3.org/1999/xlink';
 
-    const clearCell = (cell) => {
-        markClasses.forEach((cls) => cell.classList.remove(cls));
-        colorClasses.forEach((cls) => cell.classList.remove(cls));
+    const normalizeCellState = (cellState) => {
+        if (!cellState || typeof cellState !== 'object') {
+            return null;
+        }
+        const fillColor = allowedColors.includes(cellState.color) ? cellState.color : '';
+        const mark = allowedMarks.includes(cellState.mark) ? cellState.mark : '';
+        let markColor = '';
+        if (mark) {
+            if (allowedColors.includes(cellState.markColor)) {
+                markColor = cellState.markColor;
+            } else if (fillColor) {
+                markColor = fillColor;
+            } else {
+                markColor = allowedColors[0];
+            }
+        }
+
+        if (!fillColor && !mark) {
+            return null;
+        }
+
+        return {
+            color: fillColor,
+            mark,
+            markColor,
+        };
+    };
+
+    const sanitizeLoadedState = () => {
+        Object.keys(state).forEach((diagramKey) => {
+            const diagramData = state[diagramKey];
+            if (!diagramData || typeof diagramData !== 'object') {
+                state[diagramKey] = {};
+                return;
+            }
+            Object.keys(diagramData).forEach((toothKey) => {
+                const toothEntry = diagramData[toothKey];
+                if (!toothEntry || typeof toothEntry !== 'object') {
+                    delete diagramData[toothKey];
+                    return;
+                }
+                if (!toothEntry.surfaces || typeof toothEntry.surfaces !== 'object') {
+                    toothEntry.surfaces = {};
+                }
+                Object.keys(toothEntry.surfaces).forEach((surfaceKey) => {
+                    const normalized = normalizeCellState(toothEntry.surfaces[surfaceKey]);
+                    if (normalized) {
+                        toothEntry.surfaces[surfaceKey] = normalized;
+                    } else {
+                        delete toothEntry.surfaces[surfaceKey];
+                    }
+                });
+                if (!Object.keys(toothEntry.surfaces).length && !toothEntry.status && !toothEntry.notes) {
+                    delete diagramData[toothKey];
+                }
+            });
+        });
+    };
+
+    sanitizeLoadedState();
+
+    const clearFill = (cell) => {
         fillClasses.forEach((cls) => cell.classList.remove(cls));
-        cell.classList.remove('has-mark', 'has-fill');
-        cell.dataset.mark = '';
+        cell.classList.remove('has-fill');
         cell.dataset.color = '';
     };
 
-    const applyStateToCell = (cell, cellState) => {
-        clearCell(cell);
-        if (!cellState || !cellState.color || !allowedColors.includes(cellState.color)) {
+    const applyFill = (cell, color) => {
+        clearFill(cell);
+        if (!color || !allowedColors.includes(color)) {
+            return;
+        }
+        cell.classList.add(`fill-${color}`);
+        cell.classList.add('has-fill');
+        cell.dataset.color = color;
+    };
+
+    const clearMarkState = (cell) => {
+        cell.classList.remove('has-mark');
+        colorClasses.forEach((cls) => cell.classList.remove(cls));
+        cell.dataset.mark = '';
+        cell.dataset.markColor = '';
+    };
+
+    const removeSurfaceSymbol = (symbolGroup, surface) => {
+        if (!symbolGroup) {
+            return;
+        }
+        const nodes = Array.from(symbolGroup.querySelectorAll(`[data-surface="${surface}"]`));
+        nodes.forEach((node) => node.remove());
+    };
+
+    const addSurfaceSymbol = (symbolGroup, surface, markType, markColor, position, fillColor) => {
+        if (!symbolGroup || !symbolRefs[markType]) {
+            return;
+        }
+        const stroke = strokePalette[markColor] || strokePalette.blue;
+        const translateX = (position?.x ?? 50) - 50;
+        const translateY = (position?.y ?? 50) - 50;
+
+        removeSurfaceSymbol(symbolGroup, surface);
+
+        const group = document.createElementNS(svgNS, 'g');
+        group.setAttribute('data-surface', surface);
+        group.setAttribute('data-mark', markType);
+        group.setAttribute('data-color', markColor);
+        group.setAttribute('transform', `translate(${translateX}, ${translateY})`);
+        group.setAttribute('pointer-events', 'none');
+        group.setAttribute('fill', 'none');
+
+        const symbolHref = symbolRefs[markType];
+        const needsHalo = Boolean(fillColor && allowedColors.includes(fillColor));
+
+        if (needsHalo) {
+            const halo = document.createElementNS(svgNS, 'use');
+            halo.setAttribute('stroke', '#ffffff');
+            halo.setAttribute('stroke-width', '5');
+            halo.setAttribute('stroke-linecap', 'round');
+            halo.setAttribute('fill', 'none');
+            halo.setAttribute('href', symbolHref);
+            halo.setAttributeNS(xlinkNS, 'href', symbolHref);
+            group.appendChild(halo);
+        }
+
+        const use = document.createElementNS(svgNS, 'use');
+        use.setAttribute('stroke', stroke);
+        use.setAttribute('stroke-width', '3');
+        use.setAttribute('stroke-linecap', 'round');
+        use.setAttribute('fill', 'none');
+        use.setAttribute('href', symbolHref);
+        use.setAttributeNS(xlinkNS, 'href', symbolHref);
+        group.appendChild(use);
+
+        symbolGroup.appendChild(group);
+    };
+
+    const applyStateToCell = (cell, cellState, symbolGroup, surface, position) => {
+        const normalized = normalizeCellState(cellState);
+        clearFill(cell);
+        clearMarkState(cell);
+        removeSurfaceSymbol(symbolGroup, surface);
+
+        if (!normalized) {
             return;
         }
 
-        cell.dataset.color = cellState.color;
-        cell.classList.add(`fill-${cellState.color}`);
-        cell.classList.add('has-fill');
+        if (normalized.color) {
+            applyFill(cell, normalized.color);
+        }
 
-        if (cellState.mark && allowedMarks.includes(cellState.mark)) {
-            cell.dataset.mark = cellState.mark;
-            cell.classList.add(`mark-${cellState.mark}`);
-            cell.classList.add(`color-${cellState.color}`);
+        if (normalized.mark) {
+            addSurfaceSymbol(symbolGroup, surface, normalized.mark, normalized.markColor, position, normalized.color);
             cell.classList.add('has-mark');
+            cell.dataset.mark = normalized.mark;
+            cell.dataset.markColor = normalized.markColor;
+            if (normalized.markColor) {
+                cell.classList.add(`color-${normalized.markColor}`);
+            }
         }
     };
 
@@ -121,11 +266,9 @@ function setupOdontogram() {
 
     const setCellState = (diagram, tooth, surface, cellState) => {
         const entry = getToothEntry(diagram, tooth);
-        if (cellState) {
-            entry.surfaces[surface] = {
-                color: cellState.color,
-                mark: cellState.mark || '',
-            };
+        const normalized = cellState ? normalizeCellState(cellState) : null;
+        if (normalized) {
+            entry.surfaces[surface] = { ...normalized };
         } else {
             delete entry.surfaces[surface];
         }
@@ -153,20 +296,63 @@ function setupOdontogram() {
         }
 
         const colorButtons = Array.from(wrapper.querySelectorAll('.color-option'));
+        const modeButtons = Array.from(wrapper.querySelectorAll('.mode-option'));
         const markButtons = Array.from(wrapper.querySelectorAll('.mark-option'));
         const cells = Array.from(wrapper.querySelectorAll('.tooth-cell'));
 
-        if (!colorButtons.length || !markButtons.length || !cells.length) {
+        if (!colorButtons.length || !cells.length) {
             return;
         }
 
         let currentColorButton = colorButtons.find((button) => button.classList.contains('is-active')) || colorButtons[0];
-        let currentMarkButton = markButtons.find((button) => button.classList.contains('is-active')) || null;
-
-        let currentColor = currentColorButton?.dataset.color || 'blue';
-        let currentMark = currentMarkButton?.dataset.mark || '';
-
+        let currentColor = allowedColors.includes(currentColorButton?.dataset.color || '') ? currentColorButton?.dataset.color || 'blue' : 'blue';
         wrapper.dataset.activeColor = currentColor;
+
+        let currentModeButton = modeButtons.find((button) => button.classList.contains('is-active')) || modeButtons[0] || null;
+        let currentMode = currentModeButton?.dataset.mode === 'mark' ? 'mark' : 'color';
+
+        let currentMarkButton = null;
+        let currentMarkType = '';
+        let currentTool = 'paint';
+
+        const updateMode = (mode) => {
+            currentMode = mode === 'mark' ? 'mark' : 'color';
+            wrapper.dataset.mode = currentMode;
+            wrapper.classList.toggle('mark-mode', currentMode === 'mark');
+        };
+
+        if (modeButtons.length) {
+            if (!currentModeButton) {
+                currentModeButton = modeButtons[0];
+                setActiveButton(modeButtons, currentModeButton);
+                currentMode = currentModeButton.dataset.mode === 'mark' ? 'mark' : 'color';
+            }
+            updateMode(currentMode);
+        } else {
+            updateMode(currentMode);
+        }
+
+        const setMarkButton = (button) => {
+            currentMarkButton = button || null;
+            if (!button) {
+                currentMarkType = '';
+                currentTool = 'paint';
+                setActiveButton(markButtons, null);
+                return;
+            }
+            const markValue = button.dataset.mark || '';
+            if (markValue === 'erase') {
+                currentMarkType = '';
+                currentTool = 'erase';
+            } else {
+                currentMarkType = allowedMarks.includes(markValue) ? markValue : '';
+                currentTool = 'paint';
+            }
+            setActiveButton(markButtons, button);
+        };
+
+        const initialMarkButton = markButtons.find((button) => button.classList.contains('is-active')) || null;
+        setMarkButton(initialMarkButton);
 
         colorButtons.forEach((button) => {
             button.addEventListener('click', () => {
@@ -174,25 +360,41 @@ function setupOdontogram() {
                     return;
                 }
                 currentColorButton = button;
-                currentColor = allowedColors.includes(button.dataset.color || '') ? button.dataset.color || 'blue' : 'blue';
+                const colorValue = button.dataset.color || '';
+                currentColor = allowedColors.includes(colorValue) ? colorValue : 'blue';
                 wrapper.dataset.activeColor = currentColor;
                 setActiveButton(colorButtons, button);
+            });
+        });
+
+        modeButtons.forEach((button) => {
+            button.addEventListener('click', () => {
+                if (button === currentModeButton) {
+                    return;
+                }
+                currentModeButton = button;
+                setActiveButton(modeButtons, button);
+                updateMode(button.dataset.mode || 'color');
             });
         });
 
         markButtons.forEach((button) => {
             button.addEventListener('click', () => {
                 if (button === currentMarkButton) {
-                    currentMarkButton = null;
-                    currentMark = '';
-                    setActiveButton(markButtons, null);
-                    wrapper.classList.remove('erase-mode');
+                    setMarkButton(null);
                     return;
                 }
-                currentMarkButton = button;
-                currentMark = button.dataset.mark || '';
-                setActiveButton(markButtons, button);
-                wrapper.classList.toggle('erase-mode', currentMark === 'erase');
+                setMarkButton(button);
+                if (button.dataset.mark !== 'erase' && currentMode !== 'mark') {
+                    updateMode('mark');
+                    if (modeButtons.length) {
+                        const markModeButton = modeButtons.find((modeBtn) => (modeBtn.dataset.mode || 'color') === 'mark');
+                        if (markModeButton) {
+                            currentModeButton = markModeButton;
+                            setActiveButton(modeButtons, markModeButton);
+                        }
+                    }
+                }
             });
         });
 
@@ -200,12 +402,18 @@ function setupOdontogram() {
             const toothCard = cell.closest('.tooth-card');
             const toothCode = toothCard?.dataset.tooth || '';
             const surface = cell.dataset.surface || '';
+            const symbolGroupId = toothCard?.dataset.symbolGroup || '';
+            const symbolGroup = symbolGroupId ? document.getElementById(symbolGroupId) : null;
+            const xPosition = Number.parseFloat(cell.dataset.symbolX || '50');
+            const yPosition = Number.parseFloat(cell.dataset.symbolY || '50');
+            const position = {
+                x: Number.isFinite(xPosition) ? xPosition : 50,
+                y: Number.isFinite(yPosition) ? yPosition : 50,
+            };
 
             if (toothCode && surface) {
                 const storedState = getCellState(diagram, toothCode, surface);
-                if (storedState) {
-                    applyStateToCell(cell, storedState);
-                }
+                applyStateToCell(cell, storedState, symbolGroup, surface, position);
             }
 
             cell.addEventListener('click', () => {
@@ -213,18 +421,55 @@ function setupOdontogram() {
                     return;
                 }
 
-                if (currentMark === 'erase') {
+                const existingState = getCellState(diagram, toothCode, surface);
+
+                if (currentTool === 'erase') {
+                    if (!existingState) {
+                        return;
+                    }
                     setCellState(diagram, toothCode, surface, null);
-                    applyStateToCell(cell, null);
+                    applyStateToCell(cell, null, symbolGroup, surface, position);
+                    form.dataset.odontogramDirty = 'true';
+                    return;
+                }
+
+                if (currentMode === 'mark') {
+                    if (!currentMarkType || !allowedMarks.includes(currentMarkType)) {
+                        return;
+                    }
+                    const markColor = allowedColors.includes(currentColor) ? currentColor : 'blue';
+                    const nextState = existingState ? { ...existingState } : { color: '', mark: '', markColor: '' };
+                    const sameMark = existingState
+                        && existingState.mark === currentMarkType
+                        && (existingState.markColor || '') === markColor;
+
+                    if (sameMark) {
+                        nextState.mark = '';
+                        nextState.markColor = '';
+                    } else {
+                        nextState.mark = currentMarkType;
+                        nextState.markColor = markColor;
+                    }
+
+                    setCellState(diagram, toothCode, surface, nextState);
+                    const updatedState = getCellState(diagram, toothCode, surface);
+                    applyStateToCell(cell, updatedState, symbolGroup, surface, position);
                     form.dataset.odontogramDirty = 'true';
                     return;
                 }
 
                 const colorToApply = allowedColors.includes(currentColor) ? currentColor : 'blue';
-                const markToApply = allowedMarks.includes(currentMark) ? currentMark : '';
+                const nextState = existingState
+                    ? { ...existingState, color: colorToApply }
+                    : { color: colorToApply, mark: '', markColor: '' };
 
-                setCellState(diagram, toothCode, surface, { color: colorToApply, mark: markToApply });
-                applyStateToCell(cell, { color: colorToApply, mark: markToApply });
+                if (nextState.mark && !nextState.markColor) {
+                    nextState.markColor = colorToApply;
+                }
+
+                setCellState(diagram, toothCode, surface, nextState);
+                const updatedState = getCellState(diagram, toothCode, surface);
+                applyStateToCell(cell, updatedState, symbolGroup, surface, position);
                 form.dataset.odontogramDirty = 'true';
             });
 

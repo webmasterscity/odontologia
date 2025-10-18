@@ -96,6 +96,20 @@ $renderToothCard = static function (
     bool $isDeciduous = false
 ): void {
     static $clipCounter = 0;
+    static $permanentSymbolCenters = [
+        'top' => ['x' => 50, 'y' => 18],
+        'left' => ['x' => 18, 'y' => 50],
+        'center' => ['x' => 50, 'y' => 50],
+        'right' => ['x' => 82, 'y' => 50],
+        'bottom' => ['x' => 50, 'y' => 82],
+    ];
+    static $deciduousSymbolCenters = [
+        'upper_left' => ['x' => 32, 'y' => 32],
+        'upper_right' => ['x' => 68, 'y' => 32],
+        'center' => ['x' => 50, 'y' => 50],
+        'lower_right' => ['x' => 68, 'y' => 68],
+        'lower_left' => ['x' => 32, 'y' => 68],
+    ];
     $clipId = 'tooth-clip-' . (++$clipCounter);
     $sanitizedCode = preg_replace('/[^a-zA-Z0-9_-]/', '', $code);
     if ($sanitizedCode === '') {
@@ -104,8 +118,17 @@ $renderToothCard = static function (
     $uniqueSuffix = $sanitizedCode . '-' . $clipCounter;
     $clipOuterId = 'clipOuter-' . $uniqueSuffix;
     $clipDonutId = 'clipDonut-' . $uniqueSuffix;
+    $symbolGroupId = 'tooth-symbols-' . $uniqueSuffix;
+    $symbolClipId = 'symbols-clip-' . $uniqueSuffix;
+    $symbolCenters = $isDeciduous ? $deciduousSymbolCenters : $permanentSymbolCenters;
     ?>
-    <div class="tooth-card<?= $isDeciduous ? ' tooth-card--deciduous' : '' ?>" data-tooth="<?= htmlspecialchars($code) ?>">
+    <div
+        class="tooth-card<?= $isDeciduous ? ' tooth-card--deciduous' : '' ?>"
+        data-tooth="<?= htmlspecialchars($code) ?>"
+        data-symbol-group="<?= htmlspecialchars($symbolGroupId) ?>"
+        data-symbol-clip="<?= htmlspecialchars($isDeciduous ? $clipOuterId : $symbolClipId) ?>"
+        data-tooth-kind="<?= $isDeciduous ? 'deciduous' : 'permanent' ?>"
+    >
         <span class="tooth-card__code"><?= htmlspecialchars($code) ?></span>
         <?php if ($isDeciduous): ?>
             <div class="tooth-grid tooth-grid--deciduous" role="group" aria-label="Pieza <?= htmlspecialchars($code) ?>">
@@ -140,6 +163,8 @@ $renderToothCard = static function (
                                         tabindex="0"
                                         pointer-events="visiblePainted"
                                         aria-label="<?= htmlspecialchars($surfaceLabel) ?>"
+                                        data-symbol-x="<?= htmlspecialchars((string) ($symbolCenters[$surface]['x'] ?? 50)) ?>"
+                                        data-symbol-y="<?= htmlspecialchars((string) ($symbolCenters[$surface]['y'] ?? 50)) ?>"
                                         d="M50 3 A47 47 0 0 0 3 50 L27.5 50 A22.5 22.5 0 0 1 50 27.5 Z"
                                         fill="transparent"
                                     ></path>
@@ -152,6 +177,8 @@ $renderToothCard = static function (
                                         tabindex="0"
                                         pointer-events="visiblePainted"
                                         aria-label="<?= htmlspecialchars($surfaceLabel) ?>"
+                                        data-symbol-x="<?= htmlspecialchars((string) ($symbolCenters[$surface]['x'] ?? 50)) ?>"
+                                        data-symbol-y="<?= htmlspecialchars((string) ($symbolCenters[$surface]['y'] ?? 50)) ?>"
                                         d="M50 3 A47 47 0 0 1 97 50 L72.5 50 A22.5 22.5 0 0 1 50 27.5 Z"
                                         fill="transparent"
                                     ></path>
@@ -164,6 +191,8 @@ $renderToothCard = static function (
                                         tabindex="0"
                                         pointer-events="visiblePainted"
                                         aria-label="<?= htmlspecialchars($surfaceLabel) ?>"
+                                        data-symbol-x="<?= htmlspecialchars((string) ($symbolCenters[$surface]['x'] ?? 50)) ?>"
+                                        data-symbol-y="<?= htmlspecialchars((string) ($symbolCenters[$surface]['y'] ?? 50)) ?>"
                                         d="M97 50 A47 47 0 0 1 50 97 L50 72.5 A22.5 22.5 0 0 1 72.5 50 Z"
                                         fill="transparent"
                                     ></path>
@@ -176,6 +205,8 @@ $renderToothCard = static function (
                                         tabindex="0"
                                         pointer-events="visiblePainted"
                                         aria-label="<?= htmlspecialchars($surfaceLabel) ?>"
+                                        data-symbol-x="<?= htmlspecialchars((string) ($symbolCenters[$surface]['x'] ?? 50)) ?>"
+                                        data-symbol-y="<?= htmlspecialchars((string) ($symbolCenters[$surface]['y'] ?? 50)) ?>"
                                         d="M50 97 A47 47 0 0 1 3 50 L27.5 50 A22.5 22.5 0 0 1 50 72.5 Z"
                                         fill="transparent"
                                     ></path>
@@ -194,6 +225,8 @@ $renderToothCard = static function (
                                 tabindex="0"
                                 pointer-events="visiblePainted"
                                 aria-label="<?= htmlspecialchars($centerSurfaceLabel) ?>"
+                                data-symbol-x="<?= htmlspecialchars((string) ($symbolCenters['center']['x'] ?? 50)) ?>"
+                                data-symbol-y="<?= htmlspecialchars((string) ($symbolCenters['center']['y'] ?? 50)) ?>"
                                 cx="50"
                                 cy="50"
                                 r="22.5"
@@ -207,14 +240,56 @@ $renderToothCard = static function (
                         <path d="M50 3 L50 27.5 M50 72.5 L50 97" fill="none"></path>
                         <path d="M3 50 L27.5 50 M72.5 50 L97 50" fill="none"></path>
                     </g>
+                    <g
+                        id="<?= htmlspecialchars($symbolGroupId) ?>"
+                        class="tooth-symbol-layer"
+                        aria-hidden="false"
+                        pointer-events="none"
+                        fill="none"
+                        stroke="#1D4ED8"
+                        stroke-width="3"
+                        stroke-linecap="round"
+                        clip-path="url(#<?= htmlspecialchars($clipOuterId) ?>)"
+                    ></g>
                 </svg>
             </div>
         <?php else: ?>
             <div class="tooth-grid tooth-grid--permanent" role="group" aria-label="Pieza <?= htmlspecialchars($code) ?>">
                 <?php foreach ($permanentSurfaceLabels as $surface => $surfaceLabel): ?>
-                    <button type="button" class="tooth-cell surface-<?= htmlspecialchars($surface) ?>" data-surface="<?= htmlspecialchars($surface) ?>" aria-label="<?= htmlspecialchars($surfaceLabel) ?>"></button>
+                    <button
+                        type="button"
+                        class="tooth-cell surface-<?= htmlspecialchars($surface) ?>"
+                        data-surface="<?= htmlspecialchars($surface) ?>"
+                        aria-label="<?= htmlspecialchars($surfaceLabel) ?>"
+                        data-symbol-x="<?= htmlspecialchars((string) ($symbolCenters[$surface]['x'] ?? 50)) ?>"
+                        data-symbol-y="<?= htmlspecialchars((string) ($symbolCenters[$surface]['y'] ?? 50)) ?>"
+                    ></button>
                 <?php endforeach; ?>
                 <span class="tooth-grid__overlay" aria-hidden="true"></span>
+                <svg
+                    class="tooth-grid__symbols"
+                    viewBox="0 0 100 100"
+                    preserveAspectRatio="xMidYMid meet"
+                    aria-hidden="true"
+                    focusable="false"
+                >
+                    <defs>
+                        <clipPath id="<?= htmlspecialchars($symbolClipId) ?>">
+                            <rect x="3.4" y="3.4" width="93.2" height="93.2" rx="8.2" ry="8.2"></rect>
+                        </clipPath>
+                    </defs>
+                    <g
+                        id="<?= htmlspecialchars($symbolGroupId) ?>"
+                        class="tooth-symbol-layer"
+                        aria-hidden="false"
+                        pointer-events="none"
+                        fill="none"
+                        stroke="#1D4ED8"
+                        stroke-width="3"
+                        stroke-linecap="round"
+                        clip-path="url(#<?= htmlspecialchars($symbolClipId) ?>)"
+                    ></g>
+                </svg>
             </div>
         <?php endif; ?>
     </div>
@@ -244,6 +319,15 @@ $renderOdontogramSection = static function (
                     </button>
                     <button type="button" class="tool-button color-option" data-color="red" aria-pressed="false">
                         <span class="sr-only">Rojo</span>
+                    </button>
+                </div>
+                <div class="toolbar-group mode-group flex items-center gap-3" role="radiogroup" aria-label="Modo de edición">
+                    <span class="toolbar-label text-xs font-semibold uppercase tracking-wide text-slate-500">Modo</span>
+                    <button type="button" class="tool-button mode-option is-active" data-mode="color" aria-pressed="true">
+                        <span class="tool-name">Color</span>
+                    </button>
+                    <button type="button" class="tool-button mode-option" data-mode="mark" aria-pressed="false">
+                        <span class="tool-name">Marcas</span>
                     </button>
                 </div>
                 <div class="toolbar-group mark-group flex flex-wrap items-center gap-3" role="radiogroup" aria-label="Seleccionar trazo opcional">
@@ -378,17 +462,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 continue;
                             }
                             $color = $surfaceData['color'] ?? '';
-                            if (!in_array($color, ['blue', 'red'], true)) {
-                                continue;
+                            if ($color !== '' && !in_array($color, ['blue', 'red'], true)) {
+                                $color = '';
                             }
                             $mark = $surfaceData['mark'] ?? '';
-                            if ($mark !== '' && !in_array($mark, ['dot', 'x', 'vertical', 'horizontal'], true)) {
+                            if (!in_array($mark, ['dot', 'x', 'vertical', 'horizontal'], true)) {
                                 $mark = '';
                             }
-                            $normalized[$toothCode][$diagramKey]['surfaces'][$surfaceKey] = [
+                            $markColor = $surfaceData['markColor'] ?? '';
+                            if ($mark !== '') {
+                                if (!in_array($markColor, ['blue', 'red'], true)) {
+                                    $markColor = $color !== '' ? $color : 'blue';
+                                }
+                            } else {
+                                $markColor = '';
+                            }
+                            if ($color === '' && $mark === '') {
+                                continue;
+                            }
+                            $surfacePayload = [
                                 'color' => $color,
                                 'mark' => $mark,
                             ];
+                            if ($mark !== '') {
+                                $surfacePayload['markColor'] = $markColor;
+                            }
+                            $normalized[$toothCode][$diagramKey]['surfaces'][$surfaceKey] = $surfacePayload;
                         }
                     }
                     if (isset($toothPayload['status']) && array_key_exists($toothPayload['status'], $odontogramStatuses)) {
@@ -699,6 +798,28 @@ $hasAlert = $alertText && trim((string) $alertText) !== '';
     <form method="post" class="space-y-6" data-odontogram-form>
         <input type="hidden" name="action" value="save_odontogram">
         <input type="hidden" name="odontogram_payload" value="<?= htmlspecialchars($odontogramInitialJson, ENT_QUOTES) ?>">
+        <svg
+            aria-hidden="true"
+            focusable="false"
+            class="odontogram-symbol-defs"
+            width="0"
+            height="0"
+        >
+            <defs>
+                <symbol id="mark-x">
+                    <path d="M42 42 L58 58 M58 42 L42 58"></path>
+                </symbol>
+                <symbol id="mark-dot">
+                    <circle cx="50" cy="50" r="3"></circle>
+                </symbol>
+                <symbol id="mark-vert">
+                    <path d="M50 35 L50 65"></path>
+                </symbol>
+                <symbol id="mark-horz">
+                    <path d="M35 50 L65 50"></path>
+                </symbol>
+            </defs>
+        </svg>
         <?php
             $renderOdontogramSection(
                 'odontodiagrama',
