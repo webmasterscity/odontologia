@@ -97,83 +97,109 @@ $renderToothCard = static function (
 ): void {
     static $clipCounter = 0;
     $clipId = 'tooth-clip-' . (++$clipCounter);
+    $sanitizedCode = preg_replace('/[^a-zA-Z0-9_-]/', '', $code);
+    if ($sanitizedCode === '') {
+        $sanitizedCode = 'tooth';
+    }
+    $uniqueSuffix = $sanitizedCode . '-' . $clipCounter;
+    $clipOuterId = 'clipOuter-' . $uniqueSuffix;
+    $clipDonutId = 'clipDonut-' . $uniqueSuffix;
     ?>
     <div class="tooth-card<?= $isDeciduous ? ' tooth-card--deciduous' : '' ?>" data-tooth="<?= htmlspecialchars($code) ?>">
         <span class="tooth-card__code"><?= htmlspecialchars($code) ?></span>
         <?php if ($isDeciduous): ?>
             <div class="tooth-grid tooth-grid--deciduous" role="group" aria-label="Pieza <?= htmlspecialchars($code) ?>">
-                <svg class="tooth-grid__svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" aria-hidden="false">
+                <svg class="tooth-grid__svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" aria-hidden="false" shape-rendering="geometricPrecision">
                     <defs>
-                        <clipPath id="<?= htmlspecialchars($clipId) ?>">
+                        <clipPath id="<?= htmlspecialchars($clipOuterId) ?>">
                             <circle cx="50" cy="50" r="47"></circle>
                         </clipPath>
+                        <clipPath id="<?= htmlspecialchars($clipDonutId) ?>" clipPathUnits="userSpaceOnUse">
+                            <path fill-rule="evenodd" d="M50,50 m-47,0 a47,47 0 1,0 94,0 a47,47 0 1,0 -94,0 M50,50 m-22.7,0 a22.7,22.7 0 1,1 45.4,0 a22.7,22.7 0 1,1 -45.4,0"></path>
+                        </clipPath>
                     </defs>
-                    <g class="tooth-grid__selections" id="<?= htmlspecialchars($clipId . '-selections') ?>" clip-path="url(#<?= htmlspecialchars($clipId) ?>)">
+                    <g class="tooth-grid__selections" id="<?= htmlspecialchars($clipId . '-selections') ?>" clip-path="url(#<?= htmlspecialchars($clipOuterId) ?>)">
+                        <?php
+                        $ringGroupOpened = false;
+                        $centerSurfaceLabel = null;
+                        ?>
                         <?php foreach ($deciduousSurfaceLabels as $surface => $surfaceLabel): ?>
                             <?php if ($surface === 'center'): ?>
-                                <circle
-                                    class="tooth-cell tooth-cell--svg surface-<?= htmlspecialchars($surface) ?>"
-                                    data-surface="<?= htmlspecialchars($surface) ?>"
-                                    id="<?= htmlspecialchars($clipId . '-center') ?>"
-                                    role="button"
-                                    tabindex="0"
-                                    pointer-events="visiblePainted"
-                                    aria-label="<?= htmlspecialchars($surfaceLabel) ?>"
-                                    cx="50"
-                                    cy="50"
-                                    r="22.5"
-                                    fill="transparent"
-                                ></circle>
-                            <?php elseif ($surface === 'upper_left'): ?>
-                                <path
-                                    class="tooth-cell tooth-cell--svg surface-upper_left"
-                                    data-surface="upper_left"
-                                    id="<?= htmlspecialchars($clipId . '-upper_left') ?>"
-                                    role="button"
-                                    tabindex="0"
-                                    pointer-events="visiblePainted"
-                                    aria-label="<?= htmlspecialchars($surfaceLabel) ?>"
-                                    d="M50 3 A47 47 0 0 0 3 50 L27.5 50 A22.5 22.5 0 0 1 50 27.5 Z"
-                                    fill="transparent"
-                                ></path>
-                            <?php elseif ($surface === 'upper_right'): ?>
-                                <path
-                                    class="tooth-cell tooth-cell--svg surface-upper_right"
-                                    data-surface="upper_right"
-                                    id="<?= htmlspecialchars($clipId . '-upper_right') ?>"
-                                    role="button"
-                                    tabindex="0"
-                                    pointer-events="visiblePainted"
-                                    aria-label="<?= htmlspecialchars($surfaceLabel) ?>"
-                                    d="M50 3 A47 47 0 0 1 97 50 L72.5 50 A22.5 22.5 0 0 1 50 27.5 Z"
-                                    fill="transparent"
-                                ></path>
-                            <?php elseif ($surface === 'lower_right'): ?>
-                                <path
-                                    class="tooth-cell tooth-cell--svg surface-lower_right"
-                                    data-surface="lower_right"
-                                    id="<?= htmlspecialchars($clipId . '-lower_right') ?>"
-                                    role="button"
-                                    tabindex="0"
-                                    pointer-events="visiblePainted"
-                                    aria-label="<?= htmlspecialchars($surfaceLabel) ?>"
-                                    d="M97 50 A47 47 0 0 1 50 97 L50 72.5 A22.5 22.5 0 0 1 72.5 50 Z"
-                                    fill="transparent"
-                                ></path>
-                            <?php elseif ($surface === 'lower_left'): ?>
-                                <path
-                                    class="tooth-cell tooth-cell--svg surface-lower_left"
-                                    data-surface="lower_left"
-                                    id="<?= htmlspecialchars($clipId . '-lower_left') ?>"
-                                    role="button"
-                                    tabindex="0"
-                                    pointer-events="visiblePainted"
-                                    aria-label="<?= htmlspecialchars($surfaceLabel) ?>"
-                                    d="M50 97 A47 47 0 0 1 3 50 L27.5 50 A22.5 22.5 0 0 1 50 72.5 Z"
-                                    fill="transparent"
-                                ></path>
+                                <?php $centerSurfaceLabel = $surfaceLabel; ?>
+                            <?php else: ?>
+                                <?php if (!$ringGroupOpened): ?>
+                                    <?php $ringGroupOpened = true; ?>
+                                    <g class="ring" clip-path="url(#<?= htmlspecialchars($clipDonutId) ?>)">
+                                <?php endif; ?>
+                                <?php if ($surface === 'upper_left'): ?>
+                                    <path
+                                        class="tooth-cell tooth-cell--svg surface-upper_left"
+                                        data-surface="upper_left"
+                                        id="<?= htmlspecialchars($clipId . '-upper_left') ?>"
+                                        role="button"
+                                        tabindex="0"
+                                        pointer-events="visiblePainted"
+                                        aria-label="<?= htmlspecialchars($surfaceLabel) ?>"
+                                        d="M50 3 A47 47 0 0 0 3 50 L27.5 50 A22.5 22.5 0 0 1 50 27.5 Z"
+                                        fill="transparent"
+                                    ></path>
+                                <?php elseif ($surface === 'upper_right'): ?>
+                                    <path
+                                        class="tooth-cell tooth-cell--svg surface-upper_right"
+                                        data-surface="upper_right"
+                                        id="<?= htmlspecialchars($clipId . '-upper_right') ?>"
+                                        role="button"
+                                        tabindex="0"
+                                        pointer-events="visiblePainted"
+                                        aria-label="<?= htmlspecialchars($surfaceLabel) ?>"
+                                        d="M50 3 A47 47 0 0 1 97 50 L72.5 50 A22.5 22.5 0 0 1 50 27.5 Z"
+                                        fill="transparent"
+                                    ></path>
+                                <?php elseif ($surface === 'lower_right'): ?>
+                                    <path
+                                        class="tooth-cell tooth-cell--svg surface-lower_right"
+                                        data-surface="lower_right"
+                                        id="<?= htmlspecialchars($clipId . '-lower_right') ?>"
+                                        role="button"
+                                        tabindex="0"
+                                        pointer-events="visiblePainted"
+                                        aria-label="<?= htmlspecialchars($surfaceLabel) ?>"
+                                        d="M97 50 A47 47 0 0 1 50 97 L50 72.5 A22.5 22.5 0 0 1 72.5 50 Z"
+                                        fill="transparent"
+                                    ></path>
+                                <?php elseif ($surface === 'lower_left'): ?>
+                                    <path
+                                        class="tooth-cell tooth-cell--svg surface-lower_left"
+                                        data-surface="lower_left"
+                                        id="<?= htmlspecialchars($clipId . '-lower_left') ?>"
+                                        role="button"
+                                        tabindex="0"
+                                        pointer-events="visiblePainted"
+                                        aria-label="<?= htmlspecialchars($surfaceLabel) ?>"
+                                        d="M50 97 A47 47 0 0 1 3 50 L27.5 50 A22.5 22.5 0 0 1 50 72.5 Z"
+                                        fill="transparent"
+                                    ></path>
+                                <?php endif; ?>
                             <?php endif; ?>
                         <?php endforeach; ?>
+                        <?php if ($ringGroupOpened): ?>
+                            </g>
+                        <?php endif; ?>
+                        <?php if ($centerSurfaceLabel !== null): ?>
+                            <circle
+                                class="tooth-cell tooth-cell--svg surface-center"
+                                data-surface="center"
+                                id="<?= htmlspecialchars($clipId . '-center') ?>"
+                                role="button"
+                                tabindex="0"
+                                pointer-events="visiblePainted"
+                                aria-label="<?= htmlspecialchars($centerSurfaceLabel) ?>"
+                                cx="50"
+                                cy="50"
+                                r="22.5"
+                                fill="transparent"
+                            ></circle>
+                        <?php endif; ?>
                     </g>
                     <g class="tooth-grid__overlay" id="<?= htmlspecialchars($clipId . '-overlay') ?>" aria-hidden="true">
                         <circle cx="50" cy="50" r="47" fill="none"></circle>

@@ -384,7 +384,7 @@
 }
 
 .tooth-cell--svg:hover {
-    fill: rgba(115, 80, 176, 0.12);
+    fill: rgba(122, 95, 255, 0.15);
 }
 
 .tooth-cell--svg.has-fill {
