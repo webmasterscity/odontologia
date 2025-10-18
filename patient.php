@@ -118,15 +118,21 @@ $renderToothCard = static function (
     $uniqueSuffix = $sanitizedCode . '-' . $clipCounter;
     $clipOuterId = 'clipOuter-' . $uniqueSuffix;
     $clipDonutId = 'clipDonut-' . $uniqueSuffix;
-    $symbolGroupId = 'tooth-symbols-' . $uniqueSuffix;
+    $clipSafeRingId = 'clipSafeRing-' . $uniqueSuffix;
+    $clipSafeCenterId = 'clipSafeCenter-' . $uniqueSuffix;
+    $symbolRingGroupId = 'tooth-symbols-ring-' . $uniqueSuffix;
+    $symbolCenterGroupId = 'tooth-symbols-center-' . $uniqueSuffix;
     $symbolClipId = 'symbols-clip-' . $uniqueSuffix;
     $symbolCenters = $isDeciduous ? $deciduousSymbolCenters : $permanentSymbolCenters;
+    if (!$isDeciduous) {
+        $symbolCenterGroupId = $symbolRingGroupId;
+    }
     ?>
     <div
         class="tooth-card<?= $isDeciduous ? ' tooth-card--deciduous' : '' ?>"
         data-tooth="<?= htmlspecialchars($code) ?>"
-        data-symbol-group="<?= htmlspecialchars($symbolGroupId) ?>"
-        data-symbol-clip="<?= htmlspecialchars($isDeciduous ? $clipOuterId : $symbolClipId) ?>"
+        data-symbol-group-ring="<?= htmlspecialchars($symbolRingGroupId) ?>"
+        data-symbol-group-center="<?= htmlspecialchars($symbolCenterGroupId) ?>"
         data-tooth-kind="<?= $isDeciduous ? 'deciduous' : 'permanent' ?>"
     >
         <span class="tooth-card__code"><?= htmlspecialchars($code) ?></span>
@@ -139,6 +145,12 @@ $renderToothCard = static function (
                         </clipPath>
                         <clipPath id="<?= htmlspecialchars($clipDonutId) ?>" clipPathUnits="userSpaceOnUse">
                             <path fill-rule="evenodd" d="M50,50 m-47,0 a47,47 0 1,0 94,0 a47,47 0 1,0 -94,0 M50,50 m-22.7,0 a22.7,22.7 0 1,1 45.4,0 a22.7,22.7 0 1,1 -45.4,0"></path>
+                        </clipPath>
+                        <clipPath id="<?= htmlspecialchars($clipSafeRingId) ?>" clipPathUnits="userSpaceOnUse">
+                            <path fill-rule="evenodd" d="M50,50 m-44,0 a44,44 0 1,0 88,0 a44,44 0 1,0 -88,0 M50,50 m-25.5,0 a25.5,25.5 0 1,1 51,0 a25.5,25.5 0 1,1 -51,0"></path>
+                        </clipPath>
+                        <clipPath id="<?= htmlspecialchars($clipSafeCenterId) ?>" clipPathUnits="userSpaceOnUse">
+                            <circle cx="50" cy="50" r="19.5"></circle>
                         </clipPath>
                     </defs>
                     <g class="tooth-grid__selections" id="<?= htmlspecialchars($clipId . '-selections') ?>" clip-path="url(#<?= htmlspecialchars($clipOuterId) ?>)">
@@ -157,6 +169,7 @@ $renderToothCard = static function (
                                 <?php if ($surface === 'upper_left'): ?>
                                     <path
                                         class="tooth-cell tooth-cell--svg surface-upper_left"
+                                        data-symbol-zone="ring"
                                         data-surface="upper_left"
                                         id="<?= htmlspecialchars($clipId . '-upper_left') ?>"
                                         role="button"
@@ -171,6 +184,7 @@ $renderToothCard = static function (
                                 <?php elseif ($surface === 'upper_right'): ?>
                                     <path
                                         class="tooth-cell tooth-cell--svg surface-upper_right"
+                                        data-symbol-zone="ring"
                                         data-surface="upper_right"
                                         id="<?= htmlspecialchars($clipId . '-upper_right') ?>"
                                         role="button"
@@ -185,6 +199,7 @@ $renderToothCard = static function (
                                 <?php elseif ($surface === 'lower_right'): ?>
                                     <path
                                         class="tooth-cell tooth-cell--svg surface-lower_right"
+                                        data-symbol-zone="ring"
                                         data-surface="lower_right"
                                         id="<?= htmlspecialchars($clipId . '-lower_right') ?>"
                                         role="button"
@@ -199,6 +214,7 @@ $renderToothCard = static function (
                                 <?php elseif ($surface === 'lower_left'): ?>
                                     <path
                                         class="tooth-cell tooth-cell--svg surface-lower_left"
+                                        data-symbol-zone="ring"
                                         data-surface="lower_left"
                                         id="<?= htmlspecialchars($clipId . '-lower_left') ?>"
                                         role="button"
@@ -219,6 +235,7 @@ $renderToothCard = static function (
                         <?php if ($centerSurfaceLabel !== null): ?>
                             <circle
                                 class="tooth-cell tooth-cell--svg surface-center"
+                                data-symbol-zone="center"
                                 data-surface="center"
                                 id="<?= htmlspecialchars($clipId . '-center') ?>"
                                 role="button"
@@ -241,7 +258,7 @@ $renderToothCard = static function (
                         <path d="M3 50 L27.5 50 M72.5 50 L97 50" fill="none"></path>
                     </g>
                     <g
-                        id="<?= htmlspecialchars($symbolGroupId) ?>"
+                        id="<?= htmlspecialchars($symbolRingGroupId) ?>"
                         class="tooth-symbol-layer"
                         aria-hidden="false"
                         pointer-events="none"
@@ -249,7 +266,20 @@ $renderToothCard = static function (
                         stroke="#1D4ED8"
                         stroke-width="3"
                         stroke-linecap="round"
-                        clip-path="url(#<?= htmlspecialchars($clipOuterId) ?>)"
+                        stroke-linejoin="round"
+                        clip-path="url(#<?= htmlspecialchars($clipSafeRingId) ?>)"
+                    ></g>
+                    <g
+                        id="<?= htmlspecialchars($symbolCenterGroupId) ?>"
+                        class="tooth-symbol-layer"
+                        aria-hidden="false"
+                        pointer-events="none"
+                        fill="none"
+                        stroke="#1D4ED8"
+                        stroke-width="3"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        clip-path="url(#<?= htmlspecialchars($clipSafeCenterId) ?>)"
                     ></g>
                 </svg>
             </div>
@@ -261,6 +291,7 @@ $renderToothCard = static function (
                         class="tooth-cell surface-<?= htmlspecialchars($surface) ?>"
                         data-surface="<?= htmlspecialchars($surface) ?>"
                         aria-label="<?= htmlspecialchars($surfaceLabel) ?>"
+                        data-symbol-zone="<?= htmlspecialchars($surface === 'center' ? 'center' : 'ring') ?>"
                         data-symbol-x="<?= htmlspecialchars((string) ($symbolCenters[$surface]['x'] ?? 50)) ?>"
                         data-symbol-y="<?= htmlspecialchars((string) ($symbolCenters[$surface]['y'] ?? 50)) ?>"
                     ></button>
@@ -279,7 +310,7 @@ $renderToothCard = static function (
                         </clipPath>
                     </defs>
                     <g
-                        id="<?= htmlspecialchars($symbolGroupId) ?>"
+                        id="<?= htmlspecialchars($symbolRingGroupId) ?>"
                         class="tooth-symbol-layer"
                         aria-hidden="false"
                         pointer-events="none"
@@ -287,6 +318,7 @@ $renderToothCard = static function (
                         stroke="#1D4ED8"
                         stroke-width="3"
                         stroke-linecap="round"
+                        stroke-linejoin="round"
                         clip-path="url(#<?= htmlspecialchars($symbolClipId) ?>)"
                     ></g>
                 </svg>
@@ -806,17 +838,17 @@ $hasAlert = $alertText && trim((string) $alertText) !== '';
             height="0"
         >
             <defs>
-                <symbol id="mark-x">
-                    <path d="M42 42 L58 58 M58 42 L42 58"></path>
+                <symbol id="mark-x" overflow="visible">
+                    <path d="M-6 -6 L 6 6 M 6 -6 L -6 6"></path>
                 </symbol>
-                <symbol id="mark-dot">
-                    <circle cx="50" cy="50" r="3"></circle>
+                <symbol id="mark-dot" overflow="visible">
+                    <circle cx="0" cy="0" r="2.8"></circle>
                 </symbol>
-                <symbol id="mark-vert">
-                    <path d="M50 35 L50 65"></path>
+                <symbol id="mark-vert" overflow="visible">
+                    <path d="M0 -8 L 0 8"></path>
                 </symbol>
-                <symbol id="mark-horz">
-                    <path d="M35 50 L65 50"></path>
+                <symbol id="mark-horz" overflow="visible">
+                    <path d="M-10 0 L 10 0"></path>
                 </symbol>
             </defs>
         </svg>

@@ -78,6 +78,22 @@ function setupOdontogram() {
         horizontal: '#mark-horz',
     };
     const allowedMarks = Object.keys(symbolRefs);
+    const sectorAngles = {
+        upper_right: 315,
+        upper_left: 225,
+        lower_left: 135,
+        lower_right: 45,
+    };
+    const geometry = {
+        cx: 50,
+        cy: 50,
+        outerRadius: 47,
+        innerRadius: 22.5,
+        padding: 3,
+    };
+    const safeOuterRadius = geometry.outerRadius - geometry.padding;
+    const safeInnerRadius = geometry.innerRadius + geometry.padding;
+    const ringAnchorRadius = (safeOuterRadius + safeInnerRadius) / 2;
     const colorClasses = ['color-blue', 'color-red'];
     const fillClasses = ['fill-blue', 'fill-red'];
     const svgNS = 'http://www.w3.org/2000/svg';
@@ -180,8 +196,8 @@ function setupOdontogram() {
             return;
         }
         const stroke = strokePalette[markColor] || strokePalette.blue;
-        const translateX = (position?.x ?? 50) - 50;
-        const translateY = (position?.y ?? 50) - 50;
+        const anchorX = Number.isFinite(position?.x) ? position.x : geometry.cx;
+        const anchorY = Number.isFinite(position?.y) ? position.y : geometry.cy;
 
         removeSurfaceSymbol(symbolGroup, surface);
 
@@ -189,7 +205,7 @@ function setupOdontogram() {
         group.setAttribute('data-surface', surface);
         group.setAttribute('data-mark', markType);
         group.setAttribute('data-color', markColor);
-        group.setAttribute('transform', `translate(${translateX}, ${translateY})`);
+        group.setAttribute('transform', `translate(${anchorX}, ${anchorY})`);
         group.setAttribute('pointer-events', 'none');
         group.setAttribute('fill', 'none');
 
@@ -402,18 +418,41 @@ function setupOdontogram() {
             const toothCard = cell.closest('.tooth-card');
             const toothCode = toothCard?.dataset.tooth || '';
             const surface = cell.dataset.surface || '';
-            const symbolGroupId = toothCard?.dataset.symbolGroup || '';
-            const symbolGroup = symbolGroupId ? document.getElementById(symbolGroupId) : null;
-            const xPosition = Number.parseFloat(cell.dataset.symbolX || '50');
-            const yPosition = Number.parseFloat(cell.dataset.symbolY || '50');
-            const position = {
-                x: Number.isFinite(xPosition) ? xPosition : 50,
-                y: Number.isFinite(yPosition) ? yPosition : 50,
+            const symbolZone = cell.dataset.symbolZone || 'ring';
+            const ringGroupId = toothCard?.dataset.symbolGroupRing || toothCard?.dataset.symbolGroup || '';
+            const centerGroupId = toothCard?.dataset.symbolGroupCenter || ringGroupId;
+            const targetGroupId = symbolZone === 'center' ? centerGroupId : ringGroupId;
+            const symbolGroup = targetGroupId ? document.getElementById(targetGroupId) : null;
+            const resolveFallbackPosition = () => {
+                const xRaw = Number.parseFloat(cell.dataset.symbolX || `${geometry.cx}`);
+                const yRaw = Number.parseFloat(cell.dataset.symbolY || `${geometry.cy}`);
+                const x = Number.isFinite(xRaw) ? xRaw : geometry.cx;
+                const y = Number.isFinite(yRaw) ? yRaw : geometry.cy;
+                return { x, y };
             };
+
+            const resolveAnchorPosition = () => {
+                if (symbolZone === 'center') {
+                    return { x: geometry.cx, y: geometry.cy };
+                }
+                const toothKind = toothCard?.dataset.toothKind || '';
+                if (toothKind === 'deciduous') {
+                    const angleDeg = sectorAngles[surface];
+                    if (typeof angleDeg === 'number') {
+                        const theta = (angleDeg * Math.PI) / 180;
+                        const x = geometry.cx + ringAnchorRadius * Math.cos(theta);
+                        const y = geometry.cy + ringAnchorRadius * Math.sin(theta);
+                        return { x, y };
+                    }
+                }
+                return resolveFallbackPosition();
+            };
+
+            const anchorPosition = resolveAnchorPosition();
 
             if (toothCode && surface) {
                 const storedState = getCellState(diagram, toothCode, surface);
-                applyStateToCell(cell, storedState, symbolGroup, surface, position);
+                applyStateToCell(cell, storedState, symbolGroup, surface, anchorPosition);
             }
 
             cell.addEventListener('click', () => {
@@ -428,7 +467,7 @@ function setupOdontogram() {
                         return;
                     }
                     setCellState(diagram, toothCode, surface, null);
-                    applyStateToCell(cell, null, symbolGroup, surface, position);
+                    applyStateToCell(cell, null, symbolGroup, surface, anchorPosition);
                     form.dataset.odontogramDirty = 'true';
                     return;
                 }
@@ -453,7 +492,7 @@ function setupOdontogram() {
 
                     setCellState(diagram, toothCode, surface, nextState);
                     const updatedState = getCellState(diagram, toothCode, surface);
-                    applyStateToCell(cell, updatedState, symbolGroup, surface, position);
+                    applyStateToCell(cell, updatedState, symbolGroup, surface, anchorPosition);
                     form.dataset.odontogramDirty = 'true';
                     return;
                 }
@@ -469,7 +508,7 @@ function setupOdontogram() {
 
                 setCellState(diagram, toothCode, surface, nextState);
                 const updatedState = getCellState(diagram, toothCode, surface);
-                applyStateToCell(cell, updatedState, symbolGroup, surface, position);
+                applyStateToCell(cell, updatedState, symbolGroup, surface, anchorPosition);
                 form.dataset.odontogramDirty = 'true';
             });
 
