@@ -1068,66 +1068,6 @@ $hasAlert = $alertText && trim((string) $alertText) !== '';
     </form>
 </section>
 
-<section class="rounded-3xl bg-white/95 p-6 shadow-sm shadow-slate-200/60 ring-1 ring-slate-200/70 sm:p-8 space-y-6" id="odontograma">
-    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div class="space-y-1">
-            <h2 class="text-2xl font-semibold text-slate-900">Odontograma evolutivo</h2>
-            <p class="text-sm text-slate-500">Selecciona un color y, si lo necesitas, un trazo para marcar los cuadrantes de cada pieza y reflejar la evolución clínica.</p>
-        </div>
-        <p class="text-xs text-slate-400 md:text-right">La persistencia en SQLite se incorporará en la siguiente etapa.</p>
-    </div>
-    <div class="odontogram-wrapper space-y-6" data-odontogram='<?= htmlspecialchars(json_encode($odontogramData), ENT_QUOTES) ?>'>
-        <div class="odontogram-toolbar flex flex-wrap items-center justify-between gap-6 rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm">
-            <div class="toolbar-group color-group flex items-center gap-3" role="radiogroup" aria-label="Seleccionar color">
-                <span class="toolbar-label text-xs font-semibold uppercase tracking-wide text-slate-500">Color</span>
-                <button type="button" class="tool-button color-option is-active" data-color="blue" aria-pressed="true">
-                    <span class="sr-only">Azul</span>
-                </button>
-                <button type="button" class="tool-button color-option" data-color="red" aria-pressed="false">
-                    <span class="sr-only">Rojo</span>
-                </button>
-            </div>
-            <div class="toolbar-group mark-group flex flex-wrap items-center gap-3" role="radiogroup" aria-label="Seleccionar trazo opcional">
-                <span class="toolbar-label text-xs font-semibold uppercase tracking-wide text-slate-500">Trazo (opcional)</span>
-                <button type="button" class="tool-button mark-option" data-mark="dot" aria-pressed="false">
-                    <span class="tool-glyph" aria-hidden="true"></span>
-                    <span class="tool-name">Punto</span>
-                </button>
-                <button type="button" class="tool-button mark-option" data-mark="x" aria-pressed="false">
-                    <span class="tool-glyph" aria-hidden="true"></span>
-                    <span class="tool-name">Equis</span>
-                </button>
-                <button type="button" class="tool-button mark-option" data-mark="vertical" aria-pressed="false">
-                    <span class="tool-glyph" aria-hidden="true"></span>
-                    <span class="tool-name">Vertical</span>
-                </button>
-                <button type="button" class="tool-button mark-option" data-mark="horizontal" aria-pressed="false">
-                    <span class="tool-glyph" aria-hidden="true"></span>
-                    <span class="tool-name">Horizontal</span>
-                </button>
-                <button type="button" class="tool-button mark-option" data-mark="erase" aria-pressed="false">
-                    <span class="tool-glyph tool-glyph--erase" aria-hidden="true"></span>
-                    <span class="tool-name">Borrar</span>
-                </button>
-            </div>
-        </div>
-        <div class="odontogram-canvas space-y-10">
-            <?php foreach ($odontogramGroups as $group): ?>
-                <div class="odontogram-arch<?= $group['is_deciduous'] ? ' odontogram-arch--deciduous' : '' ?>">
-                    <div class="odontogram-arch__header">
-                        <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-600"><?= htmlspecialchars($group['label']) ?></h3>
-                    </div>
-                    <div class="odontogram-row">
-                        <?php foreach ($group['teeth'] as $tooth): ?>
-                            <?php $renderToothCard($tooth, $permanentSurfaces, $deciduousSurfaces, $group['is_deciduous']); ?>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-            <?php endforeach; ?>
-        </div>
-    </div>
-    <p class="text-xs text-slate-500">Marca cada cuadrante con el color y figura seleccionados para documentar hallazgos, tratamientos o ausencias.</p>
-</section>
 
 <section class="rounded-3xl bg-white/95 p-6 shadow-sm shadow-slate-200/60 ring-1 ring-slate-200/70 sm:p-8 space-y-6" id="visitas">
     <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
