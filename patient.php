@@ -127,6 +127,22 @@ $renderToothCard = static function (
     if (!$isDeciduous) {
         $symbolCenterGroupId = $symbolRingGroupId;
     }
+    $shape = $isDeciduous ? 'circle' : 'square';
+    $sectorBySurface = $isDeciduous
+        ? [
+            'upper_left' => 'upper_left',
+            'upper_right' => 'upper_right',
+            'center' => 'center',
+            'lower_right' => 'lower_right',
+            'lower_left' => 'lower_left',
+        ]
+        : [
+            'top' => 'upper_right',
+            'left' => 'upper_left',
+            'center' => 'center',
+            'right' => 'lower_right',
+            'bottom' => 'lower_left',
+        ];
     ?>
     <div
         class="tooth-card<?= $isDeciduous ? ' tooth-card--deciduous' : '' ?>"
@@ -134,6 +150,7 @@ $renderToothCard = static function (
         data-symbol-group-ring="<?= htmlspecialchars($symbolRingGroupId) ?>"
         data-symbol-group-center="<?= htmlspecialchars($symbolCenterGroupId) ?>"
         data-tooth-kind="<?= $isDeciduous ? 'deciduous' : 'permanent' ?>"
+        data-shape="<?= htmlspecialchars($shape) ?>"
     >
         <span class="tooth-card__code"><?= htmlspecialchars($code) ?></span>
         <?php if ($isDeciduous): ?>
@@ -169,8 +186,10 @@ $renderToothCard = static function (
                                 <?php if ($surface === 'upper_left'): ?>
                                     <path
                                         class="tooth-cell tooth-cell--svg surface-upper_left"
+                                        data-shape="circle"
                                         data-symbol-zone="ring"
                                         data-surface="upper_left"
+                                        data-sector="<?= htmlspecialchars($sectorBySurface['upper_left']) ?>"
                                         id="<?= htmlspecialchars($clipId . '-upper_left') ?>"
                                         role="button"
                                         tabindex="0"
@@ -184,8 +203,10 @@ $renderToothCard = static function (
                                 <?php elseif ($surface === 'upper_right'): ?>
                                     <path
                                         class="tooth-cell tooth-cell--svg surface-upper_right"
+                                        data-shape="circle"
                                         data-symbol-zone="ring"
                                         data-surface="upper_right"
+                                        data-sector="<?= htmlspecialchars($sectorBySurface['upper_right']) ?>"
                                         id="<?= htmlspecialchars($clipId . '-upper_right') ?>"
                                         role="button"
                                         tabindex="0"
@@ -199,8 +220,10 @@ $renderToothCard = static function (
                                 <?php elseif ($surface === 'lower_right'): ?>
                                     <path
                                         class="tooth-cell tooth-cell--svg surface-lower_right"
+                                        data-shape="circle"
                                         data-symbol-zone="ring"
                                         data-surface="lower_right"
+                                        data-sector="<?= htmlspecialchars($sectorBySurface['lower_right']) ?>"
                                         id="<?= htmlspecialchars($clipId . '-lower_right') ?>"
                                         role="button"
                                         tabindex="0"
@@ -214,8 +237,10 @@ $renderToothCard = static function (
                                 <?php elseif ($surface === 'lower_left'): ?>
                                     <path
                                         class="tooth-cell tooth-cell--svg surface-lower_left"
+                                        data-shape="circle"
                                         data-symbol-zone="ring"
                                         data-surface="lower_left"
+                                        data-sector="<?= htmlspecialchars($sectorBySurface['lower_left']) ?>"
                                         id="<?= htmlspecialchars($clipId . '-lower_left') ?>"
                                         role="button"
                                         tabindex="0"
@@ -235,8 +260,10 @@ $renderToothCard = static function (
                         <?php if ($centerSurfaceLabel !== null): ?>
                             <circle
                                 class="tooth-cell tooth-cell--svg surface-center"
+                                data-shape="circle"
                                 data-symbol-zone="center"
                                 data-surface="center"
+                                data-sector="<?= htmlspecialchars($sectorBySurface['center']) ?>"
                                 id="<?= htmlspecialchars($clipId . '-center') ?>"
                                 role="button"
                                 tabindex="0"
@@ -290,7 +317,9 @@ $renderToothCard = static function (
                         type="button"
                         class="tooth-cell surface-<?= htmlspecialchars($surface) ?>"
                         data-surface="<?= htmlspecialchars($surface) ?>"
+                        data-sector="<?= htmlspecialchars($sectorBySurface[$surface] ?? '') ?>"
                         aria-label="<?= htmlspecialchars($surfaceLabel) ?>"
+                        data-shape="square"
                         data-symbol-zone="<?= htmlspecialchars($surface === 'center' ? 'center' : 'ring') ?>"
                         data-symbol-x="<?= htmlspecialchars((string) ($symbolCenters[$surface]['x'] ?? 50)) ?>"
                         data-symbol-y="<?= htmlspecialchars((string) ($symbolCenters[$surface]['y'] ?? 50)) ?>"
@@ -360,6 +389,9 @@ $renderOdontogramSection = static function (
                     </button>
                     <button type="button" class="tool-button mode-option" data-mode="mark" aria-pressed="false">
                         <span class="tool-name">Marcas</span>
+                    </button>
+                    <button type="button" class="tool-button mode-option" data-mode="move" aria-pressed="false">
+                        <span class="tool-name">Mover</span>
                     </button>
                 </div>
                 <div class="toolbar-group mark-group flex flex-wrap items-center gap-3" role="radiogroup" aria-label="Seleccionar trazo opcional">
@@ -506,8 +538,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 if (!in_array($markColor, ['blue', 'red'], true)) {
                                     $markColor = $color !== '' ? $color : 'blue';
                                 }
+                                $position = null;
+                                if (isset($surfaceData['position']) && is_array($surfaceData['position'])) {
+                                    $posX = $surfaceData['position']['x'] ?? null;
+                                    $posY = $surfaceData['position']['y'] ?? null;
+                                    if (is_numeric($posX) && is_numeric($posY)) {
+                                        $posX = max(0, min(100, (float) $posX));
+                                        $posY = max(0, min(100, (float) $posY));
+                                        $position = [
+                                            'x' => round($posX, 2),
+                                            'y' => round($posY, 2),
+                                        ];
+                                    }
+                                }
                             } else {
                                 $markColor = '';
+                                $position = null;
                             }
                             if ($color === '' && $mark === '') {
                                 continue;
@@ -518,6 +564,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             ];
                             if ($mark !== '') {
                                 $surfacePayload['markColor'] = $markColor;
+                                if ($position !== null) {
+                                    $surfacePayload['position'] = $position;
+                                }
                             }
                             $normalized[$toothCode][$diagramKey]['surfaces'][$surfaceKey] = $surfacePayload;
                         }

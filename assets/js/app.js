@@ -78,6 +78,12 @@ function setupOdontogram() {
         horizontal: '#mark-horz',
     };
     const allowedMarks = Object.keys(symbolRefs);
+    const markTypeDatasetMap = {
+        dot: 'dot',
+        x: 'x',
+        vertical: 'vert',
+        horizontal: 'horz',
+    };
     const sectorAngles = {
         upper_right: 315,
         upper_left: 225,
@@ -94,10 +100,284 @@ function setupOdontogram() {
     const safeOuterRadius = geometry.outerRadius - geometry.padding;
     const safeInnerRadius = geometry.innerRadius + geometry.padding;
     const ringAnchorRadius = (safeOuterRadius + safeInnerRadius) / 2;
+    const safeCenterRadius = 19.5;
+    const sectorAngleRanges = {
+        upper_right: [270, 360],
+        upper_left: [180, 270],
+        lower_left: [90, 180],
+        lower_right: [0, 90],
+    };
+    const squarePadding = geometry.padding;
+    const squarePolygons = {
+        top: [
+            [3 + squarePadding, 3 + squarePadding],
+            [97 - squarePadding, 3 + squarePadding],
+            [72.5 - squarePadding, 27.5 + squarePadding],
+            [27.5 + squarePadding, 27.5 + squarePadding],
+        ],
+        right: [
+            [97 - squarePadding, 3 + squarePadding],
+            [97 - squarePadding, 97 - squarePadding],
+            [72.5 - squarePadding, 72.5 - squarePadding],
+            [72.5 - squarePadding, 27.5 + squarePadding],
+        ],
+        bottom: [
+            [27.5 + squarePadding, 72.5 - squarePadding],
+            [72.5 - squarePadding, 72.5 - squarePadding],
+            [97 - squarePadding, 97 - squarePadding],
+            [3 + squarePadding, 97 - squarePadding],
+        ],
+        left: [
+            [3 + squarePadding, 3 + squarePadding],
+            [27.5 + squarePadding, 27.5 + squarePadding],
+            [27.5 + squarePadding, 72.5 - squarePadding],
+            [3 + squarePadding, 97 - squarePadding],
+        ],
+        center: [
+            [27.5 + squarePadding, 27.5 + squarePadding],
+            [72.5 - squarePadding, 27.5 + squarePadding],
+            [72.5 - squarePadding, 72.5 - squarePadding],
+            [27.5 + squarePadding, 72.5 - squarePadding],
+        ],
+    };
+    const squareSectorPolygons = {
+        upper_right: squarePolygons.top,
+        upper_left: squarePolygons.left,
+        lower_left: squarePolygons.bottom,
+        lower_right: squarePolygons.right,
+        center: squarePolygons.center,
+    };
+    const squareSurfaceDefaultSectors = {
+        top: 'upper_right',
+        left: 'upper_left',
+        center: 'center',
+        right: 'lower_right',
+        bottom: 'lower_left',
+    };
     const colorClasses = ['color-blue', 'color-red'];
     const fillClasses = ['fill-blue', 'fill-red'];
     const svgNS = 'http://www.w3.org/2000/svg';
     const xlinkNS = 'http://www.w3.org/1999/xlink';
+
+    const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+    const isFiniteNumber = (value) => Number.isFinite(value);
+    const normalizePosition = (position) => {
+        if (!position || typeof position !== 'object') {
+            return null;
+        }
+        const x = Number.parseFloat(position.x);
+        const y = Number.parseFloat(position.y);
+        if (!isFiniteNumber(x) || !isFiniteNumber(y)) {
+            return null;
+        }
+        return {
+            x: clamp(x, 0, 100),
+            y: clamp(y, 0, 100),
+        };
+    };
+    const clonePosition = (position) => (position ? { x: position.x, y: position.y } : null);
+    const normalizeAngle = (angleDeg) => {
+        const normalized = angleDeg % 360;
+        return normalized < 0 ? normalized + 360 : normalized;
+    };
+    const angleToSector = (angleDeg) => {
+        const normalized = normalizeAngle(angleDeg);
+        if (normalized >= 270 || normalized < 0) {
+            return 'upper_right';
+        }
+        if (normalized >= 180) {
+            return 'upper_left';
+        }
+        if (normalized >= 90) {
+            return 'lower_left';
+        }
+        return 'lower_right';
+    };
+    const determineSector = (symbolZone, surface, position) => {
+        if (symbolZone === 'center') {
+            return 'center';
+        }
+        const mappedSquareSector = squareSurfaceDefaultSectors[surface];
+        if (mappedSquareSector) {
+            return mappedSquareSector;
+        }
+        if (['upper_right', 'upper_left', 'lower_right', 'lower_left'].includes(surface)) {
+            return surface;
+        }
+        if (position) {
+            const dx = position.x - geometry.cx;
+            const dy = position.y - geometry.cy;
+            if (dx !== 0 || dy !== 0) {
+                const angleDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
+                return angleToSector(angleDeg);
+            }
+        }
+        return 'upper_right';
+    };
+    const roundPositionValue = (value) => Math.round(value * 100) / 100;
+    const parseTranslate = (transformValue) => {
+        const match = typeof transformValue === 'string'
+            ? transformValue.match(/translate\(\s*([-\d.]+)[,\s]+([-\d.]+)\s*\)/i)
+            : null;
+        if (match) {
+            const x = Number.parseFloat(match[1]);
+            const y = Number.parseFloat(match[2]);
+            if (isFiniteNumber(x) && isFiniteNumber(y)) {
+                return { x, y };
+            }
+        }
+        return { x: geometry.cx, y: geometry.cy };
+    };
+    const formatTranslate = (x, y) => `translate(${roundPositionValue(x)}, ${roundPositionValue(y)})`;
+    const getSvgPoint = (svg, event) => {
+        if (!svg) {
+            return { x: 0, y: 0 };
+        }
+        const point = svg.createSVGPoint();
+        point.x = event.clientX;
+        point.y = event.clientY;
+        const ctm = svg.getScreenCTM();
+        if (!ctm) {
+            return { x: 0, y: 0 };
+        }
+        const transformed = point.matrixTransform(ctm.inverse());
+        return {
+            x: transformed.x,
+            y: transformed.y,
+        };
+    };
+    const pointInPolygon = (point, polygon) => {
+        if (!Array.isArray(polygon) || polygon.length < 3) {
+            return false;
+        }
+        const [x, y] = point;
+        let inside = false;
+        for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
+            const [xi, yi] = polygon[i];
+            const [xj, yj] = polygon[j];
+            const intersects = ((yi > y) !== (yj > y))
+                && (x < ((xj - xi) * (y - yi)) / ((yj - yi) || Number.EPSILON) + xi);
+            if (intersects) {
+                inside = !inside;
+            }
+        }
+        return inside;
+    };
+    const closestPointOnSegment = (ax, ay, bx, by, px, py) => {
+        const abx = bx - ax;
+        const aby = by - ay;
+        const apx = px - ax;
+        const apy = py - ay;
+        const denominator = (abx * abx) + (aby * aby);
+        if (denominator === 0) {
+            return { x: ax, y: ay };
+        }
+        const t = Math.max(0, Math.min(1, (apx * abx + apy * aby) / denominator));
+        return {
+            x: ax + t * abx,
+            y: ay + t * aby,
+        };
+    };
+    const snapToPolygon = (polygon, x, y) => {
+        if (!Array.isArray(polygon) || polygon.length < 3) {
+            return { x, y };
+        }
+        if (pointInPolygon([x, y], polygon)) {
+            return { x, y };
+        }
+        let bestPoint = { x, y };
+        let bestDistance = Number.POSITIVE_INFINITY;
+        for (let i = 0; i < polygon.length; i += 1) {
+            const a = polygon[i];
+            const b = polygon[(i + 1) % polygon.length];
+            const candidate = closestPointOnSegment(a[0], a[1], b[0], b[1], x, y);
+            const dx = candidate.x - x;
+            const dy = candidate.y - y;
+            const distanceSquared = (dx * dx) + (dy * dy);
+            if (distanceSquared < bestDistance) {
+                bestDistance = distanceSquared;
+                bestPoint = candidate;
+            }
+        }
+        return bestPoint;
+    };
+    const restrictCircularPosition = (position, { sector, symbolZone }) => {
+        const fallbackSector = sector && sectorAngleRanges[sector] ? sector : 'upper_right';
+        const zone = symbolZone === 'center' ? 'center' : 'ring';
+        let { x, y } = position;
+        x = clamp(x, 0, 100);
+        y = clamp(y, 0, 100);
+        const dx = x - geometry.cx;
+        const dy = y - geometry.cy;
+        let rho = Math.sqrt(dx * dx + dy * dy);
+        let theta = Math.atan2(dy, dx);
+        let angleDeg = normalizeAngle((theta * 180) / Math.PI);
+
+        if (zone === 'center' || fallbackSector === 'center') {
+            const limitedRho = Math.min(rho, safeCenterRadius);
+            if (limitedRho === 0) {
+                return { x: geometry.cx, y: geometry.cy };
+            }
+            const finalX = geometry.cx + limitedRho * Math.cos(theta);
+            const finalY = geometry.cy + limitedRho * Math.sin(theta);
+            return {
+                x: roundPositionValue(finalX),
+                y: roundPositionValue(finalY),
+            };
+        }
+
+        if (rho === 0) {
+            const [minAngle, maxAngle] = sectorAngleRanges[fallbackSector] || [0, 90];
+            angleDeg = (minAngle + maxAngle) / 2;
+            theta = (angleDeg * Math.PI) / 180;
+            rho = safeInnerRadius;
+        }
+
+        const [rangeMinRaw, rangeMaxRaw] = sectorAngleRanges[fallbackSector] || [0, 90];
+        const rangeMin = normalizeAngle(rangeMinRaw);
+        const rangeMax = normalizeAngle(rangeMaxRaw);
+        let clampedAngleDeg = angleDeg;
+        if (rangeMin <= rangeMax) {
+            clampedAngleDeg = clamp(angleDeg, rangeMin, rangeMax);
+        } else {
+            // Range crosses 0°
+            const inRange = angleDeg >= rangeMin || angleDeg <= rangeMax;
+            if (!inRange) {
+                const distanceToMin = Math.min(
+                    Math.abs(angleDeg - rangeMin),
+                    Math.abs(angleDeg - (rangeMin + 360)),
+                );
+                const distanceToMax = Math.min(
+                    Math.abs(angleDeg - rangeMax),
+                    Math.abs(angleDeg + 360 - rangeMax),
+                );
+                clampedAngleDeg = distanceToMin <= distanceToMax ? rangeMin : rangeMax;
+            }
+        }
+        const clampedTheta = (clampedAngleDeg * Math.PI) / 180;
+        const clampedRho = clamp(rho, safeInnerRadius, safeOuterRadius);
+        const finalX = geometry.cx + clampedRho * Math.cos(clampedTheta);
+        const finalY = geometry.cy + clampedRho * Math.sin(clampedTheta);
+        return {
+            x: roundPositionValue(finalX),
+            y: roundPositionValue(finalY),
+        };
+    };
+    const restrictSquarePosition = (position, { sector, symbolZone }) => {
+        const zoneKey = symbolZone === 'center' ? 'center' : sector;
+        const polygon = squareSectorPolygons[zoneKey] || squareSectorPolygons.center;
+        const snapped = snapToPolygon(polygon, position.x, position.y);
+        return {
+            x: roundPositionValue(snapped.x),
+            y: roundPositionValue(snapped.y),
+        };
+    };
+    const restrictPositionToZone = (position, restriction) => {
+        if (!restriction || restriction.shape !== 'square') {
+            return restrictCircularPosition(position, restriction || { sector: 'upper_right', symbolZone: 'ring' });
+        }
+        return restrictSquarePosition(position, restriction);
+    };
 
     const normalizeCellState = (cellState) => {
         if (!cellState || typeof cellState !== 'object') {
@@ -106,6 +386,7 @@ function setupOdontogram() {
         const fillColor = allowedColors.includes(cellState.color) ? cellState.color : '';
         const mark = allowedMarks.includes(cellState.mark) ? cellState.mark : '';
         let markColor = '';
+        let position = null;
         if (mark) {
             if (allowedColors.includes(cellState.markColor)) {
                 markColor = cellState.markColor;
@@ -114,6 +395,11 @@ function setupOdontogram() {
             } else {
                 markColor = allowedColors[0];
             }
+            position = normalizePosition(cellState.position);
+        }
+
+        if (!mark) {
+            position = null;
         }
 
         if (!fillColor && !mark) {
@@ -124,6 +410,7 @@ function setupOdontogram() {
             color: fillColor,
             mark,
             markColor,
+            position,
         };
     };
 
@@ -181,6 +468,8 @@ function setupOdontogram() {
         colorClasses.forEach((cls) => cell.classList.remove(cls));
         cell.dataset.mark = '';
         cell.dataset.markColor = '';
+        delete cell.dataset.markX;
+        delete cell.dataset.markY;
     };
 
     const removeSurfaceSymbol = (symbolGroup, surface) => {
@@ -191,9 +480,21 @@ function setupOdontogram() {
         nodes.forEach((node) => node.remove());
     };
 
-    const addSurfaceSymbol = (symbolGroup, surface, markType, markColor, position, fillColor) => {
+    const addSurfaceSymbol = ({
+        symbolGroup,
+        surface,
+        markType,
+        markColor,
+        position,
+        fillColor,
+        toothCode,
+        diagram,
+        symbolZone,
+        sector,
+        shape,
+    }) => {
         if (!symbolGroup || !symbolRefs[markType]) {
-            return;
+            return null;
         }
         const stroke = strokePalette[markColor] || strokePalette.blue;
         const anchorX = Number.isFinite(position?.x) ? position.x : geometry.cx;
@@ -204,8 +505,31 @@ function setupOdontogram() {
         const group = document.createElementNS(svgNS, 'g');
         group.setAttribute('data-surface', surface);
         group.setAttribute('data-mark', markType);
+        if (diagram) {
+            group.setAttribute('data-diagram', diagram);
+        }
+        if (toothCode) {
+            group.setAttribute('data-tooth', toothCode);
+        }
+        if (symbolZone) {
+            group.setAttribute('data-zone', symbolZone);
+        }
+        if (toothCode && surface) {
+            group.setAttribute('data-cell-key', `${toothCode}::${surface}`);
+        }
+        if (sector) {
+            group.setAttribute('data-sector', sector);
+        }
+        const typeAlias = markTypeDatasetMap[markType] || '';
+        if (typeAlias) {
+            group.setAttribute('data-type', typeAlias);
+        }
         group.setAttribute('data-color', markColor);
-        group.setAttribute('transform', `translate(${anchorX}, ${anchorY})`);
+        const shapeAttr = shape === 'square' ? 'square' : 'circle';
+        group.setAttribute('data-shape', shapeAttr);
+        group.setAttribute('transform', formatTranslate(anchorX, anchorY));
+        group.setAttribute('data-x', String(roundPositionValue(anchorX)));
+        group.setAttribute('data-y', String(roundPositionValue(anchorY)));
         group.setAttribute('pointer-events', 'none');
         group.setAttribute('fill', 'none');
 
@@ -233,16 +557,32 @@ function setupOdontogram() {
         group.appendChild(use);
 
         symbolGroup.appendChild(group);
+        return group;
     };
 
-    const applyStateToCell = (cell, cellState, symbolGroup, surface, position) => {
+    const applyStateToCell = ({
+        cell,
+        cellState,
+        symbolGroup,
+        surface,
+        anchorPosition,
+        symbolZone,
+        diagram,
+        toothCode,
+    }) => {
         const normalized = normalizeCellState(cellState);
         clearFill(cell);
         clearMarkState(cell);
         removeSurfaceSymbol(symbolGroup, surface);
+        let createdSymbol = null;
+        const cellShape = cell.dataset.shape === 'square' ? 'square' : 'circle';
+        const initialSector = cell.dataset.sector || determineSector(symbolZone, surface, anchorPosition);
+        if (initialSector) {
+            cell.dataset.sector = initialSector;
+        }
 
         if (!normalized) {
-            return;
+            return null;
         }
 
         if (normalized.color) {
@@ -250,14 +590,48 @@ function setupOdontogram() {
         }
 
         if (normalized.mark) {
-            addSurfaceSymbol(symbolGroup, surface, normalized.mark, normalized.markColor, position, normalized.color);
+            const basePosition = normalized.position ? clonePosition(normalized.position) : clonePosition(anchorPosition);
+            const resolvedPosition = basePosition || clonePosition(anchorPosition);
+            let sector = cell.dataset.sector || determineSector(symbolZone, surface, resolvedPosition);
+            if (!sector) {
+                sector = symbolZone === 'center' ? 'center' : 'upper_right';
+            }
+            cell.dataset.sector = sector;
+            const restriction = {
+                sector,
+                symbolZone,
+                shape: cellShape,
+            };
+            const fallbackPosition = resolvedPosition || clonePosition(anchorPosition) || { x: geometry.cx, y: geometry.cy };
+            const safePosition = restrictPositionToZone(fallbackPosition, restriction);
+            createdSymbol = addSurfaceSymbol({
+                symbolGroup,
+                surface,
+                markType: normalized.mark,
+                markColor: normalized.markColor,
+                position: safePosition,
+                fillColor: normalized.color,
+                toothCode,
+                diagram,
+                symbolZone,
+                sector,
+                shape: cellShape,
+            });
             cell.classList.add('has-mark');
             cell.dataset.mark = normalized.mark;
             cell.dataset.markColor = normalized.markColor;
             if (normalized.markColor) {
                 cell.classList.add(`color-${normalized.markColor}`);
             }
+            if (safePosition) {
+                cell.dataset.markX = String(safePosition.x);
+                cell.dataset.markY = String(safePosition.y);
+            } else {
+                delete cell.dataset.markX;
+                delete cell.dataset.markY;
+            }
         }
+        return createdSymbol;
     };
 
     const getToothEntry = (diagram, tooth) => {
@@ -315,6 +689,311 @@ function setupOdontogram() {
         const modeButtons = Array.from(wrapper.querySelectorAll('.mode-option'));
         const markButtons = Array.from(wrapper.querySelectorAll('.mark-option'));
         const cells = Array.from(wrapper.querySelectorAll('.tooth-cell'));
+        const cellLookup = new Map();
+        const makeCellKey = (tooth, surfaceKey) => `${tooth}::${surfaceKey}`;
+        const symbolElements = new Map();
+        const dragState = {
+            symbolElement: null,
+            pointerId: null,
+            svg: null,
+            cellKey: null,
+            diagram: null,
+            toothCode: null,
+            surface: null,
+            symbolZone: null,
+            sector: null,
+            shape: null,
+            offsetX: 0,
+            offsetY: 0,
+            currentPosition: null,
+            startPosition: null,
+        };
+        const resetDragState = () => {
+            dragState.symbolElement = null;
+            dragState.pointerId = null;
+            dragState.svg = null;
+            dragState.cellKey = null;
+            dragState.diagram = null;
+            dragState.toothCode = null;
+            dragState.surface = null;
+            dragState.symbolZone = null;
+            dragState.sector = null;
+            dragState.shape = null;
+            dragState.offsetX = 0;
+            dragState.offsetY = 0;
+            dragState.currentPosition = null;
+            dragState.startPosition = null;
+        };
+        const getCellKeyFromSymbol = (symbolElement) => {
+            if (!symbolElement) {
+                return null;
+            }
+            const explicitKey = symbolElement.getAttribute('data-cell-key');
+            if (explicitKey) {
+                return explicitKey;
+            }
+            const toothAttr = symbolElement.getAttribute('data-tooth');
+            const surfaceAttr = symbolElement.getAttribute('data-surface');
+            if (toothAttr && surfaceAttr) {
+                return makeCellKey(toothAttr, surfaceAttr);
+            }
+            return null;
+        };
+        const getRestrictionContext = (symbolElement, cellContext, explicitSector) => {
+            const symbolZoneAttr = symbolElement.getAttribute('data-zone') || cellContext?.symbolZone || 'ring';
+            let sectorAttr = explicitSector || symbolElement.getAttribute('data-sector') || '';
+            const defaultSector = cellContext?.defaultSector || cellContext?.cell?.dataset.sector || '';
+            if (!sectorAttr && defaultSector) {
+                sectorAttr = defaultSector;
+            }
+            if (!sectorAttr && cellContext) {
+                sectorAttr = determineSector(symbolZoneAttr, cellContext.surface, cellContext.anchorPosition);
+            }
+            if (!sectorAttr) {
+                sectorAttr = symbolZoneAttr === 'center' ? 'center' : 'upper_right';
+            }
+            const shapeAttr = symbolElement.getAttribute('data-shape')
+                || cellContext?.shape
+                || cellContext?.cell?.dataset.shape
+                || 'circle';
+            const normalizedShape = shapeAttr === 'square' ? 'square' : 'circle';
+            symbolElement.setAttribute('data-sector', sectorAttr);
+            symbolElement.setAttribute('data-zone', symbolZoneAttr);
+            symbolElement.setAttribute('data-shape', normalizedShape);
+            return {
+                sector: sectorAttr,
+                symbolZone: symbolZoneAttr,
+                shape: normalizedShape,
+            };
+        };
+        const applyPositionToSymbol = (symbolElement, position, restriction) => {
+            const restricted = restrictPositionToZone(position, restriction);
+            symbolElement.setAttribute('transform', formatTranslate(restricted.x, restricted.y));
+            symbolElement.setAttribute('data-x', String(restricted.x));
+            symbolElement.setAttribute('data-y', String(restricted.y));
+            return restricted;
+        };
+        const updateCellPositionDataset = (cellContext, position) => {
+            if (!cellContext) {
+                return;
+            }
+            cellContext.cell.dataset.markX = String(position.x);
+            cellContext.cell.dataset.markY = String(position.y);
+        };
+        const commitPositionChange = (cellKey, position) => {
+            if (!cellKey || !position) {
+                return;
+            }
+            const cellContext = cellLookup.get(cellKey);
+            if (!cellContext) {
+                return;
+            }
+            const { diagram: ctxDiagram, toothCode, surface } = cellContext;
+            const existingState = getCellState(ctxDiagram, toothCode, surface);
+            if (!existingState || !existingState.mark) {
+                return;
+            }
+            const nextState = {
+                ...existingState,
+                position: { x: position.x, y: position.y },
+            };
+            setCellState(ctxDiagram, toothCode, surface, nextState);
+            form.dataset.odontogramDirty = 'true';
+        };
+        const handlePointerDown = (event) => {
+            if (currentMode !== 'move') {
+                return;
+            }
+            const symbolElement = event.currentTarget;
+            if (!symbolElement || symbolElement.tagName.toLowerCase() !== 'g') {
+                return;
+            }
+            const cellKey = getCellKeyFromSymbol(symbolElement);
+            if (!cellKey) {
+                return;
+            }
+            const cellContext = cellLookup.get(cellKey);
+            if (!cellContext) {
+                return;
+            }
+            const svg = symbolElement.ownerSVGElement;
+            if (!svg) {
+                return;
+            }
+            event.preventDefault();
+            event.stopPropagation();
+
+            const restriction = getRestrictionContext(symbolElement, cellContext);
+            const transformValue = symbolElement.getAttribute('transform');
+            const startPosition = parseTranslate(transformValue);
+            const pointerPoint = getSvgPoint(svg, event);
+
+            dragState.symbolElement = symbolElement;
+            dragState.pointerId = event.pointerId;
+            dragState.svg = svg;
+            dragState.cellKey = cellKey;
+            dragState.diagram = cellContext.diagram;
+            dragState.toothCode = cellContext.toothCode;
+            dragState.surface = cellContext.surface;
+            dragState.symbolZone = restriction.symbolZone;
+            dragState.sector = restriction.sector;
+            dragState.shape = restriction.shape;
+            dragState.offsetX = startPosition.x - pointerPoint.x;
+            dragState.offsetY = startPosition.y - pointerPoint.y;
+            dragState.startPosition = { x: startPosition.x, y: startPosition.y };
+            dragState.currentPosition = null;
+
+            symbolElement.setPointerCapture(event.pointerId);
+            symbolElement.style.cursor = 'grabbing';
+            symbolElement.classList.add('is-dragging');
+        };
+        const handlePointerMove = (event) => {
+            if (!dragState.symbolElement || dragState.pointerId !== event.pointerId) {
+                return;
+            }
+            event.preventDefault();
+            const svg = dragState.svg;
+            const symbolElement = dragState.symbolElement;
+            if (!svg || !symbolElement) {
+                return;
+            }
+            const pointerPoint = getSvgPoint(svg, event);
+            const proposed = {
+                x: pointerPoint.x + dragState.offsetX,
+                y: pointerPoint.y + dragState.offsetY,
+            };
+            const restriction = {
+                sector: dragState.sector,
+                symbolZone: dragState.symbolZone,
+                shape: dragState.shape || 'circle',
+            };
+            const restricted = applyPositionToSymbol(symbolElement, proposed, restriction);
+            dragState.currentPosition = restricted;
+            const cellContext = cellLookup.get(dragState.cellKey);
+            updateCellPositionDataset(cellContext, restricted);
+        };
+        const finishPointerInteraction = (event, cancel = false) => {
+            if (!dragState.symbolElement || dragState.pointerId !== event.pointerId) {
+                return;
+            }
+            const symbolElement = dragState.symbolElement;
+            try {
+                symbolElement.releasePointerCapture(event.pointerId);
+            } catch (error) {
+                /* Ignorado si el pointer capture ya no es válido */
+            }
+            symbolElement.style.cursor = 'grab';
+            symbolElement.classList.remove('is-dragging');
+
+            if (!cancel && dragState.currentPosition) {
+                const cellContext = cellLookup.get(dragState.cellKey);
+                updateCellPositionDataset(cellContext, dragState.currentPosition);
+                commitPositionChange(dragState.cellKey, dragState.currentPosition);
+            }
+            resetDragState();
+        };
+        const handlePointerUp = (event) => {
+            if (dragState.pointerId === event.pointerId) {
+                event.preventDefault();
+            }
+            finishPointerInteraction(event, false);
+        };
+        const handlePointerCancel = (event) => {
+            finishPointerInteraction(event, true);
+        };
+        const handleSymbolKeydown = (event) => {
+            if (currentMode !== 'move') {
+                return;
+            }
+            const { key } = event;
+            if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(key)) {
+                return;
+            }
+            const symbolElement = event.currentTarget;
+            const cellKey = getCellKeyFromSymbol(symbolElement);
+            if (!cellKey) {
+                return;
+            }
+            const cellContext = cellLookup.get(cellKey);
+            if (!cellContext) {
+                return;
+            }
+            event.preventDefault();
+            const restriction = getRestrictionContext(symbolElement, cellContext);
+            const currentTransform = symbolElement.getAttribute('transform');
+            const currentPosition = parseTranslate(currentTransform);
+            const step = event.shiftKey ? 2 : 0.5;
+            const proposed = { ...currentPosition };
+            if (key === 'ArrowUp') {
+                proposed.y -= step;
+            } else if (key === 'ArrowDown') {
+                proposed.y += step;
+            } else if (key === 'ArrowLeft') {
+                proposed.x -= step;
+            } else if (key === 'ArrowRight') {
+                proposed.x += step;
+            }
+            const restricted = applyPositionToSymbol(symbolElement, proposed, restriction);
+            updateCellPositionDataset(cellContext, restricted);
+            commitPositionChange(cellKey, restricted);
+            dragState.currentPosition = restricted;
+            dragState.cellKey = cellKey;
+            dragState.diagram = cellContext.diagram;
+            dragState.toothCode = cellContext.toothCode;
+            dragState.surface = cellContext.surface;
+            dragState.symbolZone = restriction.symbolZone;
+            dragState.sector = restriction.sector;
+            dragState.shape = restriction.shape;
+        };
+        const refreshSymbolInteractivity = () => {
+            const isMoveMode = currentMode === 'move';
+            symbolElements.forEach((symbolElement) => {
+                if (!symbolElement) {
+                    return;
+                }
+                symbolElement.setAttribute('pointer-events', isMoveMode ? 'visiblePainted' : 'none');
+                symbolElement.style.cursor = isMoveMode ? 'grab' : '';
+                symbolElement.setAttribute('tabindex', isMoveMode ? '0' : '-1');
+                symbolElement.style.touchAction = 'none';
+            });
+        };
+        const initializeSymbolElement = (symbolElement) => {
+            if (!symbolElement) {
+                return;
+            }
+            if (symbolElement.dataset.dragInit === 'true') {
+                return;
+            }
+            symbolElement.dataset.dragInit = 'true';
+            if (!symbolElement.hasAttribute('tabindex')) {
+                symbolElement.setAttribute('tabindex', '-1');
+            }
+            symbolElement.addEventListener('pointerdown', handlePointerDown);
+            symbolElement.addEventListener('pointermove', handlePointerMove);
+            symbolElement.addEventListener('pointerup', handlePointerUp);
+            symbolElement.addEventListener('pointercancel', handlePointerCancel);
+            symbolElement.addEventListener('keydown', handleSymbolKeydown);
+            symbolElement.addEventListener('focus', () => {
+                if (currentMode === 'move') {
+                    symbolElement.style.cursor = 'grab';
+                }
+            });
+            symbolElement.addEventListener('blur', () => {
+                symbolElement.classList.remove('is-dragging');
+            });
+        };
+        const syncSymbolElement = (cellKey, symbolElement) => {
+            if (!cellKey) {
+                return;
+            }
+            if (symbolElement) {
+                symbolElements.set(cellKey, symbolElement);
+                initializeSymbolElement(symbolElement);
+            } else {
+                symbolElements.delete(cellKey);
+            }
+            refreshSymbolInteractivity();
+        };
 
         if (!colorButtons.length || !cells.length) {
             return;
@@ -325,23 +1004,41 @@ function setupOdontogram() {
         wrapper.dataset.activeColor = currentColor;
 
         let currentModeButton = modeButtons.find((button) => button.classList.contains('is-active')) || modeButtons[0] || null;
-        let currentMode = currentModeButton?.dataset.mode === 'mark' ? 'mark' : 'color';
+        const resolveMode = (modeValue) => {
+            if (modeValue === 'mark' || modeValue === 'move') {
+                return modeValue;
+            }
+            return 'color';
+        };
+        let currentMode = resolveMode(currentModeButton?.dataset.mode || 'color');
 
         let currentMarkButton = null;
         let currentMarkType = '';
         let currentTool = 'paint';
 
         const updateMode = (mode) => {
-            currentMode = mode === 'mark' ? 'mark' : 'color';
+            currentMode = resolveMode(mode);
             wrapper.dataset.mode = currentMode;
             wrapper.classList.toggle('mark-mode', currentMode === 'mark');
+            wrapper.classList.toggle('move-mode', currentMode === 'move');
+            refreshSymbolInteractivity();
+            if (currentMode !== 'move' && dragState.symbolElement && dragState.pointerId !== null) {
+                try {
+                    dragState.symbolElement.releasePointerCapture(dragState.pointerId);
+                } catch (error) {
+                    /* Ignorado */
+                }
+                dragState.symbolElement.classList.remove('is-dragging');
+                dragState.symbolElement.style.cursor = '';
+                resetDragState();
+            }
         };
 
         if (modeButtons.length) {
             if (!currentModeButton) {
                 currentModeButton = modeButtons[0];
                 setActiveButton(modeButtons, currentModeButton);
-                currentMode = currentModeButton.dataset.mode === 'mark' ? 'mark' : 'color';
+                currentMode = resolveMode(currentModeButton.dataset.mode || 'color');
             }
             updateMode(currentMode);
         } else {
@@ -419,6 +1116,9 @@ function setupOdontogram() {
             const toothCode = toothCard?.dataset.tooth || '';
             const surface = cell.dataset.surface || '';
             const symbolZone = cell.dataset.symbolZone || 'ring';
+            const shapeAttr = (cell.dataset.shape || toothCard?.dataset.shape || '').toLowerCase();
+            const cellShape = shapeAttr === 'square' ? 'square' : 'circle';
+            cell.dataset.shape = cellShape;
             const ringGroupId = toothCard?.dataset.symbolGroupRing || toothCard?.dataset.symbolGroup || '';
             const centerGroupId = toothCard?.dataset.symbolGroupCenter || ringGroupId;
             const targetGroupId = symbolZone === 'center' ? centerGroupId : ringGroupId;
@@ -449,14 +1149,47 @@ function setupOdontogram() {
             };
 
             const anchorPosition = resolveAnchorPosition();
+            const defaultSector = cell.dataset.sector || determineSector(symbolZone, surface, anchorPosition);
+            if (defaultSector) {
+                cell.dataset.sector = defaultSector;
+            }
+            const cellKey = toothCode && surface ? makeCellKey(toothCode, surface) : null;
+            if (cellKey) {
+                cellLookup.set(cellKey, {
+                    cell,
+                    symbolGroup,
+                    anchorPosition: clonePosition(anchorPosition),
+                    symbolZone,
+                    toothCode,
+                    diagram,
+                    surface,
+                    shape: cellShape,
+                    defaultSector,
+                });
+            }
 
             if (toothCode && surface) {
                 const storedState = getCellState(diagram, toothCode, surface);
-                applyStateToCell(cell, storedState, symbolGroup, surface, anchorPosition);
+                const symbolElement = applyStateToCell({
+                    cell,
+                    cellState: storedState,
+                    symbolGroup,
+                    surface,
+                    anchorPosition,
+                    symbolZone,
+                    diagram,
+                    toothCode,
+                });
+                if (cellKey) {
+                    syncSymbolElement(cellKey, symbolElement);
+                }
             }
 
             cell.addEventListener('click', () => {
                 if (!toothCode || !surface) {
+                    return;
+                }
+                if (currentMode === 'move') {
                     return;
                 }
 
@@ -467,7 +1200,19 @@ function setupOdontogram() {
                         return;
                     }
                     setCellState(diagram, toothCode, surface, null);
-                    applyStateToCell(cell, null, symbolGroup, surface, anchorPosition);
+                    const symbolElement = applyStateToCell({
+                        cell,
+                        cellState: null,
+                        symbolGroup,
+                        surface,
+                        anchorPosition,
+                        symbolZone,
+                        diagram,
+                        toothCode,
+                    });
+                    if (cellKey) {
+                        syncSymbolElement(cellKey, symbolElement);
+                    }
                     form.dataset.odontogramDirty = 'true';
                     return;
                 }
@@ -492,7 +1237,19 @@ function setupOdontogram() {
 
                     setCellState(diagram, toothCode, surface, nextState);
                     const updatedState = getCellState(diagram, toothCode, surface);
-                    applyStateToCell(cell, updatedState, symbolGroup, surface, anchorPosition);
+                    const symbolElement = applyStateToCell({
+                        cell,
+                        cellState: updatedState,
+                        symbolGroup,
+                        surface,
+                        anchorPosition,
+                        symbolZone,
+                        diagram,
+                        toothCode,
+                    });
+                    if (cellKey) {
+                        syncSymbolElement(cellKey, symbolElement);
+                    }
                     form.dataset.odontogramDirty = 'true';
                     return;
                 }
@@ -508,7 +1265,19 @@ function setupOdontogram() {
 
                 setCellState(diagram, toothCode, surface, nextState);
                 const updatedState = getCellState(diagram, toothCode, surface);
-                applyStateToCell(cell, updatedState, symbolGroup, surface, anchorPosition);
+                const symbolElement = applyStateToCell({
+                    cell,
+                    cellState: updatedState,
+                    symbolGroup,
+                    surface,
+                    anchorPosition,
+                    symbolZone,
+                    diagram,
+                    toothCode,
+                });
+                if (cellKey) {
+                    syncSymbolElement(cellKey, symbolElement);
+                }
                 form.dataset.odontogramDirty = 'true';
             });
 
