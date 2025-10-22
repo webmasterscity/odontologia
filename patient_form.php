@@ -58,11 +58,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     ];
 
     if (empty($errors)) {
+        $redirectTarget = '';
         if ($patientId) {
             updateById($pdo, 'patients', $payload, $patientId);
             $targetId = $patientId;
+            $redirectTarget = 'patient.php?id=' . $targetId;
         } else {
             $targetId = insertRow($pdo, 'patients', $payload);
+            $redirectTarget = 'patient_history.php?id=' . $targetId;
         }
 
         // Garantiza que exista el registro de perfil clínico.
@@ -70,7 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'INSERT OR IGNORE INTO clinical_profiles (patient_id) VALUES (:patient_id)'
         )->execute([':patient_id' => $targetId]);
 
-        header('Location: patient.php?id=' . $targetId);
+        header('Location: ' . $redirectTarget);
         exit;
     } else {
         $patient = array_merge($patient ?? [], $payload);
@@ -188,13 +191,19 @@ require __DIR__ . '/templates/header.php';
             </label>
         </fieldset>
 
-        <div class="flex flex-col gap-3 sm:flex-row sm:justify-end">
-            <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-full bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-soft transition hover:-translate-y-0.5 hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500">
-                <?= $patientId ? 'Guardar cambios' : 'Crear paciente' ?>
-            </button>
-            <a class="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 transition hover:border-rose-200 hover:text-rose-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500" href="<?= $patientId ? 'patient.php?id=' . $patientId : 'index.php' ?>">
-                Cancelar
-            </a>
+        <div class="sticky bottom-4 z-20 flex flex-col gap-3 rounded-2xl border border-brand-100 bg-white/95 p-4 shadow-lg shadow-brand-100/70 backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex flex-col gap-1 text-xs text-slate-600">
+                <span class="font-semibold uppercase tracking-wide text-slate-700">Datos del paciente</span>
+                <span>Revisa que la información sea correcta y guarda para continuar.</span>
+            </div>
+            <div class="flex flex-wrap items-center gap-3">
+                <a class="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 transition hover:border-rose-200 hover:text-rose-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500" href="<?= $patientId ? 'patient.php?id=' . $patientId : 'index.php' ?>">
+                    Cancelar
+                </a>
+                <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-full bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-soft transition hover:-translate-y-0.5 hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500">
+                    <?= $patientId ? 'Guardar cambios' : 'Crear paciente' ?>
+                </button>
+            </div>
         </div>
     </form>
 </section>

@@ -440,69 +440,6 @@ $renderOdontogramSection = static function (
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = post('action');
 
-    if ($action === 'update_profile') {
-        $profileData = [
-            'patient_id' => $patientId,
-            'consultation_reason' => trim((string) post('consultation_reason')) ?: null,
-            'current_condition' => trim((string) post('current_condition')) ?: null,
-            'medical_alerts' => trim((string) post('medical_alerts')) ?: null,
-            'medications' => trim((string) post('medications')) ?: null,
-            'hospitalizations' => trim((string) post('hospitalizations')) ?: null,
-            'family_history' => trim((string) post('family_history')) ?: null,
-            'extraoral_exam' => trim((string) post('extraoral_exam')) ?: null,
-            'intraoral_exam' => trim((string) post('intraoral_exam')) ?: null,
-            'periodontal_status' => trim((string) post('periodontal_status')) ?: null,
-            'physical_exam_bp' => trim((string) post('physical_exam_bp')) ?: null,
-            'diagnosis' => trim((string) post('diagnosis')) ?: null,
-            'treatment_plan' => trim((string) post('treatment_plan')) ?: null,
-            'consent_signed' => postCheckbox('consent_signed'),
-            'consent_signed_at' => null,
-            'consent_notes' => trim((string) post('consent_notes')) ?: null,
-            'antecedent_cardiovascular' => postCheckbox('antecedent_cardiovascular'),
-            'antecedent_respiratory' => postCheckbox('antecedent_respiratory'),
-            'antecedent_gastrointestinal' => postCheckbox('antecedent_gastrointestinal'),
-            'antecedent_endocrine' => postCheckbox('antecedent_endocrine'),
-            'antecedent_renal' => postCheckbox('antecedent_renal'),
-            'antecedent_ent' => postCheckbox('antecedent_ent'),
-            'antecedent_hepatic' => postCheckbox('antecedent_hepatic'),
-            'antecedent_neurologic' => postCheckbox('antecedent_neurologic'),
-            'antecedent_allergy' => postCheckbox('antecedent_allergy'),
-            'antecedent_neoplastic' => postCheckbox('antecedent_neoplastic'),
-            'antecedent_hematologic' => postCheckbox('antecedent_hematologic'),
-            'antecedent_viral' => postCheckbox('antecedent_viral'),
-            'antecedent_gynecologic' => postCheckbox('antecedent_gynecologic'),
-            'antecedent_covid' => postCheckbox('antecedent_covid'),
-            'pain_level' => post('pain_level') !== '' ? (int) post('pain_level') : null,
-            'habits' => trim((string) post('habits')) ?: null,
-            'risk_assessment' => trim((string) post('risk_assessment')) ?: null,
-        ];
-        if ($profileData['consent_signed'] === 1) {
-            $profileData['consent_signed_at'] = normalizeDate(post('consent_signed_at')) ?? date('Y-m-d');
-        }
-
-        $columns = array_keys($profileData);
-        $placeholders = array_map(fn($c) => ':' . $c, $columns);
-        $sets = array_map(fn($c) => "$c = excluded.$c", $columns);
-        $sql = 'INSERT INTO clinical_profiles (' . implode(', ', $columns) . ')
-                VALUES (' . implode(', ', $placeholders) . ')
-                ON CONFLICT(patient_id) DO UPDATE SET
-                    ' . implode(', ', $sets) . ',
-                    last_updated = CURRENT_TIMESTAMP';
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($profileData);
-        $messages[] = 'Perfil clínico actualizado.';
-
-        if ($medicalAlert = $profileData['medical_alerts']) {
-            $pdo->prepare('UPDATE patients SET notes = :notes WHERE id = :id')->execute([
-                ':notes' => $medicalAlert,
-                ':id' => $patientId,
-            ]);
-        }
-
-        header('Location: patient.php?id=' . $patientId . '#historia');
-        exit;
-    }
-
     if ($action === 'save_odontogram') {
         $rawPayload = (string) post('odontogram_payload', '');
         $decodedPayload = json_decode($rawPayload, true);
@@ -793,6 +730,9 @@ $hasAlert = $alertText && trim((string) $alertText) !== '';
             <p class="text-sm text-slate-500">Resumen actualizado de <?= htmlspecialchars($patient['full_name']) ?>.</p>
         </div>
         <div class="flex flex-wrap gap-2">
+            <a class="inline-flex items-center justify-center gap-2 rounded-full border border-brand-200 bg-brand-50 px-4 py-2 text-xs font-semibold text-brand-700 transition hover:-translate-y-0.5 hover:bg-brand-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500" href="patient_history.php?id=<?= $patientId ?>">
+                Historia clínica
+            </a>
             <a class="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 transition hover:border-brand-200 hover:text-brand-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500" href="patient_form.php?id=<?= $patientId ?>">
                 Editar datos
             </a>
@@ -921,154 +861,155 @@ $hasAlert = $alertText && trim((string) $alertText) !== '';
     </form>
 </section>
 
+
+
 <section class="rounded-3xl bg-white/95 p-6 shadow-sm shadow-slate-200/60 ring-1 ring-slate-200/70 sm:p-8 space-y-6" id="historia">
     <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <h2 class="text-2xl font-semibold text-slate-900">Historia clínica</h2>
-        <p class="text-sm text-slate-500">Actualiza los antecedentes y hallazgos para mantener un seguimiento integral.</p>
-    </div>
-    <form method="post" class="space-y-6">
-        <input type="hidden" name="action" value="update_profile">
-
-        <fieldset class="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4 sm:p-6">
-            <legend class="px-3 text-xs font-semibold uppercase tracking-wide text-brand-700">Motivo de consulta</legend>
-            <div class="mt-4 grid gap-4 md:grid-cols-2">
-                <label class="flex flex-col gap-2 text-sm text-slate-600 md:col-span-2">
-                    <span class="font-medium text-slate-700">Motivo principal</span>
-                    <textarea name="consultation_reason" rows="2" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"><?= htmlspecialchars($profile['consultation_reason'] ?? '') ?></textarea>
-                </label>
-                <label class="flex flex-col gap-2 text-sm text-slate-600">
-                    <span class="font-medium text-slate-700">Enfermedad actual / evolución</span>
-                    <textarea name="current_condition" rows="3" class="h-28 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"><?= htmlspecialchars($profile['current_condition'] ?? '') ?></textarea>
-                </label>
-                <label class="flex flex-col gap-2 text-sm text-slate-600">
-                    <span class="font-medium text-slate-700">Alertas clínicas (alergias, riesgos)</span>
-                    <textarea name="medical_alerts" rows="3" class="h-28 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"><?= htmlspecialchars($profile['medical_alerts'] ?? '') ?></textarea>
-                </label>
-            </div>
-        </fieldset>
-
-        <fieldset class="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-6">
-            <legend class="px-3 text-xs font-semibold uppercase tracking-wide text-brand-700">Antecedentes personales</legend>
-            <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                <?php
-                $antecedents = [
-                    'antecedent_ent' => 'Oído, nariz y garganta',
-                    'antecedent_respiratory' => 'Respiratorio',
-                    'antecedent_allergy' => 'Alergia',
-                    'antecedent_cardiovascular' => 'Cardio vascular',
-                    'antecedent_gastrointestinal' => 'Gastrointestinal',
-                    'antecedent_endocrine' => 'Endocrino',
-                    'antecedent_renal' => 'Renal',
-                    'antecedent_hepatic' => 'Hepático',
-                    'antecedent_neurologic' => 'Neurológico',
-                    'antecedent_neoplastic' => 'Neoplásico',
-                    'antecedent_hematologic' => 'Sanguíneo',
-                    'antecedent_viral' => 'Virales',
-                    'antecedent_gynecologic' => 'Ginecológicos',
-                    'antecedent_covid' => 'COVID-19',
-                ];
-                foreach ($antecedents as $field => $label):
-                    $checked = !empty($profile[$field]) ? 'checked' : '';
-                    ?>
-                    <label class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:border-brand-200">
-                        <input type="checkbox" name="<?= $field ?>" <?= $checked ?> class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
-                        <span><?= htmlspecialchars($label) ?></span>
-                    </label>
-                <?php endforeach; ?>
-            </div>
-            <div class="mt-4 grid gap-4 md:grid-cols-2">
-                <label class="flex flex-col gap-2 text-sm text-slate-600">
-                    <span class="font-medium text-slate-700">Hospitalizaciones / procedimientos</span>
-                    <textarea name="hospitalizations" rows="2" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"><?= htmlspecialchars($profile['hospitalizations'] ?? '') ?></textarea>
-                </label>
-                <label class="flex flex-col gap-2 text-sm text-slate-600">
-                    <span class="font-medium text-slate-700">Medicación actual</span>
-                    <textarea name="medications" rows="2" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"><?= htmlspecialchars($profile['medications'] ?? '') ?></textarea>
-                </label>
-                <label class="flex flex-col gap-2 text-sm text-slate-600 md:col-span-2">
-                    <span class="font-medium text-slate-700">Antecedentes familiares</span>
-                    <textarea name="family_history" rows="2" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"><?= htmlspecialchars($profile['family_history'] ?? '') ?></textarea>
-                </label>
-            </div>
-        </fieldset>
-
-        <fieldset class="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4 sm:p-6">
-            <legend class="px-3 text-xs font-semibold uppercase tracking-wide text-brand-700">Examen clínico</legend>
-            <div class="mt-4 grid gap-4 md:grid-cols-2">
-                <label class="flex flex-col gap-2 text-sm text-slate-600">
-                    <span class="font-medium text-slate-700">Examen extraoral</span>
-                    <textarea name="extraoral_exam" rows="2" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"><?= htmlspecialchars($profile['extraoral_exam'] ?? '') ?></textarea>
-                </label>
-                <label class="flex flex-col gap-2 text-sm text-slate-600">
-                    <span class="font-medium text-slate-700">Examen intraoral</span>
-                    <textarea name="intraoral_exam" rows="2" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"><?= htmlspecialchars($profile['intraoral_exam'] ?? '') ?></textarea>
-                </label>
-                <label class="flex flex-col gap-2 text-sm text-slate-600">
-                    <span class="font-medium text-slate-700">PA (mmHg)</span>
-                    <input type="text" name="physical_exam_bp" value="<?= htmlspecialchars($profile['physical_exam_bp'] ?? '') ?>" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400" placeholder="Ej: 120/80">
-                </label>
-                <label class="flex flex-col gap-2 text-sm text-slate-600 md:col-span-2">
-                    <span class="font-medium text-slate-700">Tejidos periodontales</span>
-                    <textarea name="periodontal_status" rows="2" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"><?= htmlspecialchars($profile['periodontal_status'] ?? '') ?></textarea>
-                </label>
-            </div>
-            <div class="mt-4 grid gap-4 md:grid-cols-3">
-                <label class="flex flex-col gap-2 text-sm text-slate-600">
-                    <span class="font-medium text-slate-700">Dolor (0-10)</span>
-                    <input type="number" name="pain_level" min="0" max="10" value="<?= htmlspecialchars((string) ($profile['pain_level'] ?? '')) ?>" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
-                </label>
-                <label class="flex flex-col gap-2 text-sm text-slate-600">
-                    <span class="font-medium text-slate-700">Hábitos (bruxismo, tabaquismo...)</span>
-                    <input type="text" name="habits" value="<?= htmlspecialchars($profile['habits'] ?? '') ?>" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
-                </label>
-                <label class="flex flex-col gap-2 text-sm text-slate-600">
-                    <span class="font-medium text-slate-700">Evaluación de riesgo</span>
-                    <input type="text" name="risk_assessment" value="<?= htmlspecialchars($profile['risk_assessment'] ?? '') ?>" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
-                </label>
-            </div>
-        </fieldset>
-
-        <fieldset class="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-6">
-            <legend class="px-3 text-xs font-semibold uppercase tracking-wide text-brand-700">Diagnóstico y plan</legend>
-            <div class="mt-4 grid gap-4 md:grid-cols-2">
-                <label class="flex flex-col gap-2 text-sm text-slate-600">
-                    <span class="font-medium text-slate-700">Diagnóstico</span>
-                    <textarea name="diagnosis" rows="2" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"><?= htmlspecialchars($profile['diagnosis'] ?? '') ?></textarea>
-                </label>
-                <label class="flex flex-col gap-2 text-sm text-slate-600">
-                    <span class="font-medium text-slate-700">Plan de tratamiento</span>
-                    <textarea name="treatment_plan" rows="3" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"><?= htmlspecialchars($profile['treatment_plan'] ?? '') ?></textarea>
-                </label>
-            </div>
-        </fieldset>
-
-        <fieldset class="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4 sm:p-6">
-            <legend class="px-3 text-xs font-semibold uppercase tracking-wide text-brand-700">Consentimiento informado</legend>
-            <div class="mt-4 grid gap-4 md:grid-cols-[auto_minmax(0,1fr)]">
-                <label class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:border-brand-200">
-                    <input type="checkbox" name="consent_signed" <?= !empty($profile['consent_signed']) ? 'checked' : '' ?> class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
-                    <span>Consentimiento firmado</span>
-                </label>
-                <label class="flex flex-col gap-2 text-sm text-slate-600">
-                    <span class="font-medium text-slate-700">Fecha de firma</span>
-                    <input type="date" name="consent_signed_at" value="<?= htmlspecialchars($profile['consent_signed_at'] ?? '') ?>" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
-                </label>
-            </div>
-            <label class="mt-4 flex flex-col gap-2 text-sm text-slate-600">
-                <span class="font-medium text-slate-700">Observaciones / condiciones especiales</span>
-                <textarea name="consent_notes" rows="2" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"><?= htmlspecialchars($profile['consent_notes'] ?? '') ?></textarea>
-            </label>
-        </fieldset>
-
-        <div class="flex justify-end">
-            <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-full bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-soft transition hover:-translate-y-0.5 hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500">
-                Guardar historia clínica
-            </button>
+        <div class="space-y-1">
+            <h2 class="text-2xl font-semibold text-slate-900">Historia clínica</h2>
+            <p class="text-sm text-slate-500">Revisa los antecedentes registrados y actualízalos cuando sea necesario.</p>
         </div>
-    </form>
+        <a class="inline-flex items-center justify-center gap-2 rounded-full bg-brand-600 px-4 py-2 text-xs font-semibold text-white shadow-soft transition hover:-translate-y-0.5 hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500" href="patient_history.php?id=<?= $patientId ?>">
+            Editar historia clínica
+        </a>
+    </div>
+    <?php
+    $antecedentLabels = [
+        'antecedent_ent' => 'Oído, nariz y garganta',
+        'antecedent_respiratory' => 'Respiratorio',
+        'antecedent_allergy' => 'Alergia',
+        'antecedent_cardiovascular' => 'Cardio vascular',
+        'antecedent_gastrointestinal' => 'Gastrointestinal',
+        'antecedent_endocrine' => 'Endocrino',
+        'antecedent_renal' => 'Renal',
+        'antecedent_hepatic' => 'Hepático',
+        'antecedent_neurologic' => 'Neurológico',
+        'antecedent_neoplastic' => 'Neoplásico',
+        'antecedent_hematologic' => 'Sanguíneo',
+        'antecedent_viral' => 'Virales',
+        'antecedent_gynecologic' => 'Ginecológicos',
+        'antecedent_covid' => 'COVID-19',
+    ];
+    $activeAntecedents = [];
+    foreach ($antecedentLabels as $field => $label) {
+        if (!empty($profile[$field])) {
+            $activeAntecedents[] = $label;
+        }
+    }
+    ?>
+    <?php if (!$profile): ?>
+        <p class="text-sm text-slate-500">Aún no se ha registrado la historia clínica de este paciente.</p>
+    <?php else: ?>
+        <div class="grid gap-6 lg:grid-cols-2">
+            <div class="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-5">
+                <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-600">Motivo y alertas</h3>
+                <dl class="mt-3 space-y-3 text-sm text-slate-600">
+                    <div>
+                        <dt class="font-medium text-slate-700">Motivo principal</dt>
+                        <dd><?= $profile['consultation_reason'] ? nl2br(htmlspecialchars($profile['consultation_reason'])) : '—' ?></dd>
+                    </div>
+                    <div>
+                        <dt class="font-medium text-slate-700">Evolución / enfermedad actual</dt>
+                        <dd><?= $profile['current_condition'] ? nl2br(htmlspecialchars($profile['current_condition'])) : '—' ?></dd>
+                    </div>
+                    <div>
+                        <dt class="font-medium text-slate-700">Alertas clínicas</dt>
+                        <dd><?= $profile['medical_alerts'] ? nl2br(htmlspecialchars($profile['medical_alerts'])) : '—' ?></dd>
+                    </div>
+                    <div>
+                        <dt class="font-medium text-slate-700">Medicación actual</dt>
+                        <dd><?= $profile['medications'] ? nl2br(htmlspecialchars($profile['medications'])) : '—' ?></dd>
+                    </div>
+                    <div>
+                        <dt class="font-medium text-slate-700">Hospitalizaciones / procedimientos</dt>
+                        <dd><?= $profile['hospitalizations'] ? nl2br(htmlspecialchars($profile['hospitalizations'])) : '—' ?></dd>
+                    </div>
+                </dl>
+            </div>
+            <div class="rounded-2xl border border-slate-200/80 bg-white p-5">
+                <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-600">Antecedentes personales</h3>
+                <?php if ($activeAntecedents): ?>
+                    <ul class="mt-3 list-disc space-y-1 pl-5 text-sm text-slate-600">
+                        <?php foreach ($activeAntecedents as $item): ?>
+                            <li><?= htmlspecialchars($item) ?></li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php else: ?>
+                    <p class="mt-3 text-sm text-slate-500">Sin antecedentes personales registrados.</p>
+                <?php endif; ?>
+                <div class="mt-4 grid gap-3 text-sm text-slate-600">
+                    <div>
+                        <h4 class="font-medium text-slate-700">Antecedentes familiares</h4>
+                        <p><?= $profile['family_history'] ? nl2br(htmlspecialchars($profile['family_history'])) : '—' ?></p>
+                    </div>
+                    <div>
+                        <h4 class="font-medium text-slate-700">Hábitos</h4>
+                        <p><?= $profile['habits'] ? nl2br(htmlspecialchars($profile['habits'])) : '—' ?></p>
+                    </div>
+                </div>
+            </div>
+            <div class="rounded-2xl border border-slate-200/80 bg-white p-5">
+                <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-600">Examen clínico</h3>
+                <dl class="mt-3 space-y-3 text-sm text-slate-600">
+                    <div>
+                        <dt class="font-medium text-slate-700">Examen extraoral</dt>
+                        <dd><?= $profile['extraoral_exam'] ? nl2br(htmlspecialchars($profile['extraoral_exam'])) : '—' ?></dd>
+                    </div>
+                    <div>
+                        <dt class="font-medium text-slate-700">Examen intraoral</dt>
+                        <dd><?= $profile['intraoral_exam'] ? nl2br(htmlspecialchars($profile['intraoral_exam'])) : '—' ?></dd>
+                    </div>
+                    <div>
+                        <dt class="font-medium text-slate-700">Tejidos periodontales</dt>
+                        <dd><?= $profile['periodontal_status'] ? nl2br(htmlspecialchars($profile['periodontal_status'])) : '—' ?></dd>
+                    </div>
+                    <div>
+                        <dt class="font-medium text-slate-700">PA (mmHg)</dt>
+                        <dd><?= $profile['physical_exam_bp'] ? htmlspecialchars($profile['physical_exam_bp']) : '—' ?></dd>
+                    </div>
+                    <div>
+                        <dt class="font-medium text-slate-700">Dolor (0-10)</dt>
+                        <dd><?= $profile['pain_level'] !== null ? (int) $profile['pain_level'] : '—' ?></dd>
+                    </div>
+                    <div>
+                        <dt class="font-medium text-slate-700">Evaluación de riesgo</dt>
+                        <dd><?= $profile['risk_assessment'] ? nl2br(htmlspecialchars($profile['risk_assessment'])) : '—' ?></dd>
+                    </div>
+                </dl>
+            </div>
+            <div class="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-5">
+                <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-600">Diagnóstico y plan</h3>
+                <dl class="mt-3 space-y-3 text-sm text-slate-600">
+                    <div>
+                        <dt class="font-medium text-slate-700">Diagnóstico</dt>
+                        <dd><?= $profile['diagnosis'] ? nl2br(htmlspecialchars($profile['diagnosis'])) : '—' ?></dd>
+                    </div>
+                    <div>
+                        <dt class="font-medium text-slate-700">Plan de tratamiento</dt>
+                        <dd><?= $profile['treatment_plan'] ? nl2br(htmlspecialchars($profile['treatment_plan'])) : '—' ?></dd>
+                    </div>
+                </dl>
+            </div>
+            <div class="rounded-2xl border border-slate-200/80 bg-white p-5">
+                <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-600">Consentimiento informado</h3>
+                <dl class="mt-3 space-y-3 text-sm text-slate-600">
+                    <div>
+                        <dt class="font-medium text-slate-700">Estado</dt>
+                        <dd><?= !empty($profile['consent_signed']) ? 'Firmado' : 'Pendiente' ?></dd>
+                    </div>
+                    <div>
+                        <dt class="font-medium text-slate-700">Fecha de firma</dt>
+                        <dd><?= $profile['consent_signed_at'] ? htmlspecialchars($profile['consent_signed_at']) : '—' ?></dd>
+                    </div>
+                    <div>
+                        <dt class="font-medium text-slate-700">Observaciones</dt>
+                        <dd><?= $profile['consent_notes'] ? nl2br(htmlspecialchars($profile['consent_notes'])) : '—' ?></dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+    <?php endif; ?>
 </section>
-
-
 <section class="rounded-3xl bg-white/95 p-6 shadow-sm shadow-slate-200/60 ring-1 ring-slate-200/70 sm:p-8 space-y-6" id="visitas">
     <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h2 class="text-2xl font-semibold text-slate-900">Evolución por visita</h2>

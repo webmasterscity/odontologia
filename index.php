@@ -39,6 +39,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'restore_backup'
 
 $pdo = db();
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'delete_patient') {
+    $patientId = (int) post('patient_id');
+    if ($patientId <= 0) {
+        $errors[] = 'No se pudo eliminar el paciente: identificador inválido.';
+    } else {
+        $patientNameStmt = $pdo->prepare('SELECT full_name FROM patients WHERE id = :id');
+        $patientNameStmt->execute([':id' => $patientId]);
+        $patientName = $patientNameStmt->fetchColumn();
+        if (is_string($patientName)) {
+            $patientName = trim($patientName);
+        }
+
+        if (!$patientName) {
+            $errors[] = 'El paciente seleccionado ya no existe.';
+        } else {
+            $deleteStmt = $pdo->prepare('DELETE FROM patients WHERE id = :id');
+            $deleteStmt->execute([':id' => $patientId]);
+
+            if ($deleteStmt->rowCount() > 0) {
+                $messages[] = 'Paciente eliminado: ' . $patientName . '.';
+            } else {
+                $errors[] = 'No se pudo eliminar el paciente. Inténtalo nuevamente.';
+            }
+        }
+    }
+}
+
 $search = trim($_GET['search'] ?? '');
 $searchSql = '';
 $params = [];
@@ -219,6 +246,13 @@ require __DIR__ . '/templates/header.php';
                                     <a href="patient_form.php?id=<?= (int) $patient['id'] ?>" class="inline-flex items-center rounded-full border border-slate-200 px-3.5 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-brand-200 hover:text-brand-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500">
                                         Editar
                                     </a>
+                                    <form method="post" class="inline-flex" onsubmit="return confirm('¿Eliminar al paciente <?= htmlspecialchars($patient['full_name'], ENT_QUOTES) ?>? Esta acción no se puede deshacer.');">
+                                        <input type="hidden" name="action" value="delete_patient">
+                                        <input type="hidden" name="patient_id" value="<?= (int) $patient['id'] ?>">
+                                        <button type="submit" class="inline-flex items-center rounded-full border border-rose-200 px-3.5 py-1.5 text-xs font-semibold text-rose-600 transition hover:border-rose-300 hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500">
+                                            Eliminar
+                                        </button>
+                                    </form>
                                 </div>
                             </td>
                         </tr>
