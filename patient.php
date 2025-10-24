@@ -453,7 +453,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     continue;
                 }
                 foreach ($decodedPayload[$diagramKey] as $toothCode => $toothPayload) {
-                    if (!in_array($toothCode, $validToothCodes, true) || !is_array($toothPayload)) {
+                    if (!is_array($toothPayload)) {
+                        continue;
+                    }
+
+                    $toothCodeKey = trim((string) $toothCode);
+                    if ($toothCodeKey === '' || !in_array($toothCodeKey, $validToothCodes, true)) {
                         continue;
                     }
                     $surfaces = $toothPayload['surfaces'] ?? [];
@@ -505,15 +510,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     $surfacePayload['position'] = $position;
                                 }
                             }
-                            $normalized[$toothCode][$diagramKey]['surfaces'][$surfaceKey] = $surfacePayload;
+                            $normalized[$toothCodeKey][$diagramKey]['surfaces'][$surfaceKey] = $surfacePayload;
                         }
                     }
                     if (isset($toothPayload['status']) && array_key_exists($toothPayload['status'], $odontogramStatuses)) {
-                        $normalized[$toothCode]['status'] = $toothPayload['status'];
+                        $normalized[$toothCodeKey]['status'] = $toothPayload['status'];
                     }
                     if (isset($toothPayload['notes']) && is_string($toothPayload['notes'])) {
                         $note = trim($toothPayload['notes']);
-                        $normalized[$toothCode]['notes'] = $note !== '' ? $note : null;
+                        $normalized[$toothCodeKey]['notes'] = $note !== '' ? $note : null;
                     }
                 }
             }
@@ -524,6 +529,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ->execute([':patient_id' => $patientId]);
 
                 foreach ($normalized as $toothCode => $diagramData) {
+                    $toothCodeKey = trim((string) $toothCode);
+                    if ($toothCodeKey === '') {
+                        continue;
+                    }
                     $surfacesPayload = [
                         'odontodiagrama' => $diagramData['odontodiagrama']['surfaces'] ?? [],
                         'evolucion' => $diagramData['evolucion']['surfaces'] ?? [],
@@ -538,7 +547,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         continue;
                     }
 
-                    upsertOdontogramEntry($pdo, $patientId, $toothCode, [
+                    upsertOdontogramEntry($pdo, $patientId, $toothCodeKey, [
                         'status' => $diagramData['status'] ?? 'sin_registro',
                         'surface_data' => $surfaceJson,
                         'notes' => $diagramData['notes'] ?? null,
@@ -551,6 +560,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 exit;
             } catch (Throwable $e) {
                 $pdo->rollBack();
+                error_log('Odontogram save failed: ' . $e->getMessage());
                 $errors[] = 'No se pudo guardar el odontograma. Inténtalo nuevamente.';
             }
         }
