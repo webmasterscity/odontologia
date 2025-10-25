@@ -124,7 +124,7 @@ require __DIR__ . '/templates/header.php';
                     </label>
                     <label class="flex flex-col gap-2 text-sm text-slate-600">
                         <span class="font-medium text-slate-700">Edad</span>
-                        <input type="number" name="age_display" value="<?= htmlspecialchars($patient['age'] ?? '') ?>" readonly class="rounded-2xl border border-slate-200 bg-slate-100 px-4 py-2.5 text-slate-700 shadow-inner">
+                        <input type="number" name="age_display" value="<?= htmlspecialchars((string) ($patient['age'] ?? '')) ?>" readonly class="rounded-2xl border border-slate-200 bg-slate-100 px-4 py-2.5 text-slate-700 shadow-inner">
                     </label>
                 </div>
                 <label class="flex flex-col gap-2 text-sm text-slate-600 md:col-span-2 md:max-w-xs">

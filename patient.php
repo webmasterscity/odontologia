@@ -23,6 +23,37 @@ if (!$patient) {
 $messages = [];
 $errors = [];
 
+$formatValue = static function ($value, string $default = '—'): string {
+    if ($value === null) {
+        return $default;
+    }
+    if (is_string($value)) {
+        $trimmed = trim($value);
+        if ($trimmed === '') {
+            return $default;
+        }
+        return htmlspecialchars($trimmed);
+    }
+    if (is_numeric($value)) {
+        return htmlspecialchars((string) $value);
+    }
+    return $default;
+};
+
+$formatMultiline = static function ($value, string $default = '—') use ($formatValue): string {
+    if ($value === null) {
+        return $default;
+    }
+    if (is_string($value)) {
+        $trimmed = trim($value);
+        if ($trimmed === '') {
+            return $default;
+        }
+        return nl2br(htmlspecialchars($trimmed));
+    }
+    return $default;
+};
+
 $validToothCodes = [
     '18','17','16','15','14','13','12','11',
     '21','22','23','24','25','26','27','28',
@@ -732,6 +763,13 @@ require __DIR__ . '/templates/header.php';
 <?php
 $alertText = $profile['medical_alerts'] ?? $patient['notes'] ?? null;
 $hasAlert = $alertText && trim((string) $alertText) !== '';
+$birthDateDisplay = '—';
+if (!empty($patient['birth_date'])) {
+    $timestamp = strtotime((string) $patient['birth_date']);
+    if ($timestamp !== false) {
+        $birthDateDisplay = date('d/m/Y', $timestamp);
+    }
+}
 ?>
 <section class="rounded-3xl bg-white/95 p-6 shadow-sm shadow-slate-200/60 ring-1 ring-slate-200/70 sm:p-8 space-y-6">
     <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -751,13 +789,25 @@ $hasAlert = $alertText && trim((string) $alertText) !== '';
             </a>
         </div>
     </div>
-    <div class="grid gap-6 lg:grid-cols-3">
-        <div class="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-5 shadow-inner">
+    <div class="grid gap-6 lg:grid-cols-2 xl:grid-cols-4">
+        <div class="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-5 shadow-inner xl:col-span-2">
             <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-600">Información general</h3>
             <dl class="mt-3 space-y-2 text-sm text-slate-600">
                 <div class="flex justify-between gap-2">
-                    <dt class="font-medium text-slate-700">Cédula</dt>
-                    <dd class="text-right"><?= htmlspecialchars($patient['document_id'] ?? '—') ?></dd>
+                    <dt class="font-medium text-slate-700">Nombre y apellidos</dt>
+                    <dd class="text-right"><?= $formatValue($patient['full_name'] ?? null) ?></dd>
+                </div>
+                <div class="flex justify-between gap-2">
+                    <dt class="font-medium text-slate-700">Nombre preferido</dt>
+                    <dd class="text-right"><?= $formatValue($patient['preferred_name'] ?? null) ?></dd>
+                </div>
+                <div class="flex justify-between gap-2">
+                    <dt class="font-medium text-slate-700">Documento</dt>
+                    <dd class="text-right"><?= $formatValue($patient['document_id'] ?? null) ?></dd>
+                </div>
+                <div class="flex justify-between gap-2">
+                    <dt class="font-medium text-slate-700">Fecha de nacimiento</dt>
+                    <dd class="text-right"><?= htmlspecialchars($birthDateDisplay) ?></dd>
                 </div>
                 <div class="flex justify-between gap-2">
                     <dt class="font-medium text-slate-700">Edad</dt>
@@ -765,48 +815,101 @@ $hasAlert = $alertText && trim((string) $alertText) !== '';
                 </div>
                 <div class="flex justify-between gap-2">
                     <dt class="font-medium text-slate-700">Género</dt>
-                    <dd class="text-right"><?= htmlspecialchars($patient['gender'] ?? '—') ?></dd>
+                    <dd class="text-right"><?= $formatValue($patient['gender'] ?? null) ?></dd>
+                </div>
+                <div class="flex justify-between gap-2">
+                    <dt class="font-medium text-slate-700">Estado civil</dt>
+                    <dd class="text-right"><?= $formatValue($patient['marital_status'] ?? null) ?></dd>
+                </div>
+                <div class="space-y-1">
+                    <dt class="font-medium text-slate-700">Ocupación</dt>
+                    <dd><?= $formatValue($patient['occupation'] ?? null) ?></dd>
                 </div>
                 <div class="space-y-1">
                     <dt class="font-medium text-slate-700">Dirección</dt>
-                    <dd><?= nl2br(htmlspecialchars($patient['address'] ?? '—')) ?></dd>
+                    <dd><?= $formatMultiline($patient['address'] ?? null) ?></dd>
                 </div>
             </dl>
         </div>
-        <div class="rounded-2xl border border-slate-200/80 bg-white p-5">
-            <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-600">Contacto</h3>
+        <div class="rounded-2xl border border-slate-200/80 bg-white p-5 xl:col-span-2 space-y-4">
+            <div>
+                <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-600">Red de contacto</h3>
+                <dl class="mt-3 space-y-2 text-sm text-slate-600">
+                    <div class="flex justify-between gap-2">
+                        <dt class="font-medium text-slate-700">Correo</dt>
+                        <dd class="text-right break-words"><?= $formatValue($patient['email'] ?? null) ?></dd>
+                    </div>
+                    <div class="flex justify-between gap-2">
+                        <dt class="font-medium text-slate-700">Tel. principal</dt>
+                        <dd class="text-right"><?= $formatValue($patient['phone_primary'] ?? null) ?></dd>
+                    </div>
+                    <div class="flex justify-between gap-2">
+                        <dt class="font-medium text-slate-700">Tel. alterno</dt>
+                        <dd class="text-right"><?= $formatValue($patient['phone_secondary'] ?? null) ?></dd>
+                    </div>
+                </dl>
+            </div>
+            <div class="rounded-xl border border-brand-100/70 bg-brand-50/50 p-4">
+                <h4 class="text-xs font-semibold uppercase tracking-wide text-brand-700">Contacto de emergencia</h4>
+                <dl class="mt-2 space-y-1 text-sm text-brand-800">
+                    <div class="flex justify-between gap-2">
+                        <dt class="font-medium">Nombre</dt>
+                        <dd class="text-right"><?= $formatValue($patient['emergency_contact'] ?? null) ?></dd>
+                    </div>
+                    <div class="flex justify-between gap-2">
+                        <dt class="font-medium">Parentesco</dt>
+                        <dd class="text-right"><?= $formatValue($patient['emergency_contact_relationship'] ?? null) ?></dd>
+                    </div>
+                    <div class="flex justify-between gap-2">
+                        <dt class="font-medium">Teléfono</dt>
+                        <dd class="text-right"><?= $formatValue($patient['emergency_contact_phone'] ?? null) ?></dd>
+                    </div>
+                </dl>
+            </div>
+            <div class="rounded-xl border border-slate-200/70 bg-slate-50/80 p-4">
+                <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-600">Responsable legal</h4>
+                <dl class="mt-2 space-y-1 text-sm text-slate-600">
+                    <div class="space-y-1">
+                        <dt class="font-medium text-slate-700">Nombre</dt>
+                        <dd><?= $formatValue($patient['representative_name'] ?? null) ?></dd>
+                    </div>
+                    <div class="flex justify-between gap-2">
+                        <dt class="font-medium text-slate-700">Documento</dt>
+                        <dd class="text-right"><?= $formatValue($patient['representative_document'] ?? null) ?></dd>
+                    </div>
+                    <div class="flex justify-between gap-2">
+                        <dt class="font-medium text-slate-700">Teléfono</dt>
+                        <dd class="text-right"><?= $formatValue($patient['representative_phone'] ?? null) ?></dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+        <div class="rounded-2xl border border-slate-200/80 bg-white p-5 xl:col-span-2">
+            <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-600">Información administrativa</h3>
             <dl class="mt-3 space-y-2 text-sm text-slate-600">
-                <div class="flex justify-between gap-2">
-                    <dt class="font-medium text-slate-700">Correo</dt>
-                    <dd class="text-right break-words"><?= htmlspecialchars($patient['email'] ?? '—') ?></dd>
-                </div>
-                <div class="flex justify-between gap-2">
-                    <dt class="font-medium text-slate-700">Tel. principal</dt>
-                    <dd class="text-right"><?= htmlspecialchars($patient['phone_primary'] ?? '—') ?></dd>
-                </div>
-                <div class="flex justify-between gap-2">
-                    <dt class="font-medium text-slate-700">Tel. alterno</dt>
-                    <dd class="text-right"><?= htmlspecialchars($patient['phone_secondary'] ?? '—') ?></dd>
+                <div class="space-y-1">
+                    <dt class="font-medium text-slate-700">Referido por</dt>
+                    <dd><?= $formatValue($patient['referred_by'] ?? null) ?></dd>
                 </div>
                 <div class="space-y-1">
-                    <dt class="font-medium text-slate-700">Representante</dt>
-                    <dd><?= htmlspecialchars($patient['representative_name'] ?? '—') ?></dd>
+                    <dt class="font-medium text-slate-700">Médico tratante</dt>
+                    <dd><?= $formatValue($patient['primary_physician'] ?? null) ?></dd>
                 </div>
                 <div class="flex justify-between gap-2">
-                    <dt class="font-medium text-slate-700">C.I. representante</dt>
-                    <dd class="text-right"><?= htmlspecialchars($patient['representative_document'] ?? '—') ?></dd>
-                </div>
-                <div class="flex justify-between gap-2">
-                    <dt class="font-medium text-slate-700">Tel. representante</dt>
-                    <dd class="text-right"><?= htmlspecialchars($patient['representative_phone'] ?? '—') ?></dd>
+                    <dt class="font-medium text-slate-700">Tel. del médico</dt>
+                    <dd class="text-right"><?= $formatValue($patient['primary_physician_phone'] ?? null) ?></dd>
                 </div>
                 <div class="space-y-1">
-                    <dt class="font-medium text-slate-700">Contacto emergencia</dt>
-                    <dd><?= htmlspecialchars($patient['emergency_contact'] ?? '—') ?></dd>
+                    <dt class="font-medium text-slate-700">Aseguradora</dt>
+                    <dd><?= $formatValue($patient['insurance_provider'] ?? null) ?></dd>
+                </div>
+                <div class="flex justify-between gap-2">
+                    <dt class="font-medium text-slate-700">N.º de póliza</dt>
+                    <dd class="text-right"><?= $formatValue($patient['insurance_policy_number'] ?? null) ?></dd>
                 </div>
             </dl>
         </div>
-        <div class="rounded-2xl border <?= $hasAlert ? 'border-amber-200/70 bg-amber-50/80' : 'border-emerald-200/70 bg-emerald-50/80' ?> p-5">
+        <div class="rounded-2xl border <?= $hasAlert ? 'border-amber-200/70 bg-amber-50/80' : 'border-emerald-200/70 bg-emerald-50/80' ?> p-5 xl:col-span-2">
             <h3 class="text-xs font-semibold uppercase tracking-wide <?= $hasAlert ? 'text-amber-700' : 'text-emerald-700' ?>">Alertas y saldo</h3>
             <div class="mt-3 space-y-3 text-sm <?= $hasAlert ? 'text-amber-700' : 'text-emerald-700' ?>">
                 <p><?= $hasAlert ? nl2br(htmlspecialchars((string) $alertText)) : 'Sin alertas registradas.' ?></p>
