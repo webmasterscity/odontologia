@@ -439,6 +439,8 @@ $renderToothCard = static function (
     <?php
 };
 
+$hasBaseOdontogram = false;
+
 $renderOdontogramSection = static function (
     string $diagramKey,
     string $title,
@@ -447,14 +449,17 @@ $renderOdontogramSection = static function (
     $renderToothCard,
     $odontogramGroups,
     $permanentSurfaces,
-    $deciduousSurfaces
+    $deciduousSurfaces,
+    &$hasBaseOdontogram
 ): void {
+    $isBaseDiagram = $diagramKey === 'odontodiagrama';
+    $baseIsLocked = $isBaseDiagram && $hasBaseOdontogram;
     ?>
     <fieldset class="space-y-6 rounded-2xl border border-slate-200/80 bg-white/90 p-4 sm:p-6 shadow-sm" data-odontogram-section="<?= htmlspecialchars($diagramKey) ?>">
         <legend class="px-3 text-xs font-semibold uppercase tracking-wide text-brand-700"><?= htmlspecialchars($title) ?></legend>
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p class="text-sm text-slate-500"><?= htmlspecialchars($summary) ?></p>
-            <?php if ($diagramKey === 'odontodiagrama'): ?>
+            <?php if ($isBaseDiagram && $hasBaseOdontogram): ?>
                 <button
                     type="button"
                     class="odontogram-toggle-button inline-flex items-center justify-center gap-2 rounded-full bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-soft transition hover:-translate-y-0.5 hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 self-start sm:self-start"
@@ -467,9 +472,9 @@ $renderOdontogramSection = static function (
             <?php endif; ?>
         </div>
         <div
-            class="odontogram-wrapper space-y-6<?= $diagramKey === 'odontodiagrama' ? ' is-locked' : '' ?>"
+            class="odontogram-wrapper space-y-6<?= $baseIsLocked ? ' is-locked' : '' ?>"
             data-diagram="<?= htmlspecialchars($diagramKey) ?>"
-            data-locked="<?= $diagramKey === 'odontodiagrama' ? 'true' : 'false' ?>"
+            data-locked="<?= $baseIsLocked ? 'true' : 'false' ?>"
         >
             <div class="odontogram-toolbar flex flex-wrap items-center justify-between gap-6 rounded-2xl border border-slate-200/80 bg-white/95 p-4 shadow-sm">
                 <div class="toolbar-group color-group flex items-center gap-3" role="radiogroup" aria-label="Seleccionar color">
@@ -939,10 +944,24 @@ foreach ($odontogramStmt->fetchAll(PDO::FETCH_ASSOC) as $entry) {
 }
 
 // Ensure evolution diagram starts with the base odontogram when empty so clinicians can adjust it.
+$hasBaseOdontogram = false;
 foreach ($odontogramPayload['odontodiagrama'] as $toothCode => $baseEntry) {
     $baseSurfaces = $baseEntry['surfaces'] ?? [];
     if (!$baseSurfaces) {
         continue;
+    }
+    if (!$hasBaseOdontogram) {
+        foreach ($baseSurfaces as $surfaceState) {
+            if (!is_array($surfaceState)) {
+                continue;
+            }
+            $color = isset($surfaceState['color']) ? trim((string) $surfaceState['color']) : '';
+            $mark = isset($surfaceState['mark']) ? trim((string) $surfaceState['mark']) : '';
+            if ($color !== '' || $mark !== '') {
+                $hasBaseOdontogram = true;
+                break;
+            }
+        }
     }
     if (!isset($odontogramPayload['evolucion'][$toothCode]) || empty($odontogramPayload['evolucion'][$toothCode]['surfaces'])) {
         $clone = [];
