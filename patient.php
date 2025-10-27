@@ -55,6 +55,56 @@ $formatMultiline = static function ($value, string $default = '—') use ($forma
     return $default;
 };
 
+/**
+ * Capitalize the first character of a given value while trimming surrounding whitespace.
+ */
+function capitalizeInitial($value): ?string
+{
+    if ($value === null) {
+        return null;
+    }
+    if (is_array($value)) {
+        return null;
+    }
+    $trimmed = trim((string) $value);
+    if ($trimmed === '') {
+        return null;
+    }
+    $firstChar = mb_substr($trimmed, 0, 1, 'UTF-8');
+    $rest = mb_substr($trimmed, 1, null, 'UTF-8');
+    return mb_strtoupper($firstChar, 'UTF-8') . $rest;
+}
+
+/**
+ * Recalculate outstanding balances for all activities of a patient.
+ */
+function recalculateActivityBalances(PDO $pdo, int $patientId): void
+{
+    $fetchStmt = $pdo->prepare(
+        'SELECT id, fee, payment, activity_date FROM treatment_activities WHERE patient_id = :patient_id ORDER BY date(activity_date) ASC, id ASC'
+    );
+    $fetchStmt->execute([':patient_id' => $patientId]);
+    $activities = $fetchStmt->fetchAll(PDO::FETCH_ASSOC);
+    if (!$activities) {
+        return;
+    }
+
+    $updateStmt = $pdo->prepare('UPDATE treatment_activities SET balance = :balance WHERE id = :id');
+    $runningBalance = 0.0;
+    foreach ($activities as $activity) {
+        $fee = isset($activity['fee']) ? (float) $activity['fee'] : 0.0;
+        $payment = isset($activity['payment']) ? (float) $activity['payment'] : 0.0;
+        $runningBalance = $runningBalance + $fee - $payment;
+        if ($runningBalance < 0) {
+            $runningBalance = 0.0;
+        }
+        $updateStmt->execute([
+            ':balance' => $runningBalance,
+            ':id' => (int) $activity['id'],
+        ]);
+    }
+}
+
 $validToothCodes = [
     '18','17','16','15','14','13','12','11',
     '21','22','23','24','25','26','27','28',
@@ -402,8 +452,25 @@ $renderOdontogramSection = static function (
     ?>
     <fieldset class="space-y-6 rounded-2xl border border-slate-200/80 bg-white/90 p-4 sm:p-6 shadow-sm" data-odontogram-section="<?= htmlspecialchars($diagramKey) ?>">
         <legend class="px-3 text-xs font-semibold uppercase tracking-wide text-brand-700"><?= htmlspecialchars($title) ?></legend>
-        <p class="text-sm text-slate-500"><?= htmlspecialchars($summary) ?></p>
-        <div class="odontogram-wrapper space-y-6" data-diagram="<?= htmlspecialchars($diagramKey) ?>">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p class="text-sm text-slate-500"><?= htmlspecialchars($summary) ?></p>
+            <?php if ($diagramKey === 'odontodiagrama'): ?>
+                <button
+                    type="button"
+                    class="odontogram-toggle-button inline-flex items-center justify-center gap-2 rounded-full bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-soft transition hover:-translate-y-0.5 hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 self-start sm:self-start"
+                    data-odontogram-toggle="odontodiagrama"
+                    data-label-locked="Editar odontograma base"
+                    data-label-unlocked="Bloquear odontograma base"
+                >
+                    Editar odontograma base
+                </button>
+            <?php endif; ?>
+        </div>
+        <div
+            class="odontogram-wrapper space-y-6<?= $diagramKey === 'odontodiagrama' ? ' is-locked' : '' ?>"
+            data-diagram="<?= htmlspecialchars($diagramKey) ?>"
+            data-locked="<?= $diagramKey === 'odontodiagrama' ? 'true' : 'false' ?>"
+        >
             <div class="odontogram-toolbar flex flex-wrap items-center justify-between gap-6 rounded-2xl border border-slate-200/80 bg-white/95 p-4 shadow-sm">
                 <div class="toolbar-group color-group flex items-center gap-3" role="radiogroup" aria-label="Seleccionar color">
                     <span class="toolbar-label text-xs font-semibold uppercase tracking-wide text-slate-500">Color</span>
@@ -557,6 +624,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             try {
                 $pdo->beginTransaction();
+                $existingEvolutionSurfaces = [];
+                $existingStmt = $pdo->prepare('SELECT tooth_code, surface_data FROM odontogram_entries WHERE patient_id = :patient_id');
+                $existingStmt->execute([':patient_id' => $patientId]);
+                foreach ($existingStmt->fetchAll(PDO::FETCH_ASSOC) as $existingEntry) {
+                    $existingTooth = trim((string) ($existingEntry['tooth_code'] ?? ''));
+                    if ($existingTooth === '') {
+                        continue;
+                    }
+                    if (empty($existingEntry['surface_data'])) {
+                        $existingEvolutionSurfaces[$existingTooth] = [];
+                        continue;
+                    }
+                    $existingSurfaceData = json_decode((string) $existingEntry['surface_data'], true);
+                    if (!is_array($existingSurfaceData) || empty($existingSurfaceData['evolucion']) || !is_array($existingSurfaceData['evolucion'])) {
+                        $existingEvolutionSurfaces[$existingTooth] = [];
+                        continue;
+                    }
+                    foreach ($existingSurfaceData['evolucion'] as $surfaceKey => $surfacePayload) {
+                        if (!is_array($surfacePayload)) {
+                            continue;
+                        }
+                        $hasColor = isset($surfacePayload['color']) && trim((string) $surfacePayload['color']) !== '';
+                        $hasMark = isset($surfacePayload['mark']) && trim((string) $surfacePayload['mark']) !== '';
+                        if ($hasColor || $hasMark) {
+                            $existingEvolutionSurfaces[$existingTooth][$surfaceKey] = true;
+                        }
+                    }
+                    $existingEvolutionSurfaces[$existingTooth] = $existingEvolutionSurfaces[$existingTooth] ?? [];
+                }
+
                 $pdo->prepare('DELETE FROM odontogram_entries WHERE patient_id = :patient_id')
                     ->execute([':patient_id' => $patientId]);
 
@@ -569,6 +666,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'odontodiagrama' => $diagramData['odontodiagrama']['surfaces'] ?? [],
                         'evolucion' => $diagramData['evolucion']['surfaces'] ?? [],
                     ];
+
+                    if (!empty($surfacesPayload['odontodiagrama'])) {
+                        if (!is_array($surfacesPayload['evolucion'])) {
+                            $surfacesPayload['evolucion'] = [];
+                        }
+                        $existingEvolutionForTooth = $existingEvolutionSurfaces[$toothCodeKey] ?? [];
+                        if (empty($surfacesPayload['evolucion'])) {
+                            if (empty($existingEvolutionForTooth)) {
+                                $surfacesPayload['evolucion'] = $surfacesPayload['odontodiagrama'];
+                            }
+                        } else {
+                            foreach ($surfacesPayload['odontodiagrama'] as $surfaceKey => $surfaceState) {
+                                if (isset($surfacesPayload['evolucion'][$surfaceKey]) || isset($existingEvolutionForTooth[$surfaceKey])) {
+                                    continue;
+                                }
+                                $surfacesPayload['evolucion'][$surfaceKey] = $surfaceState;
+                            }
+                        }
+                    }
 
                     if (empty($surfacesPayload['odontodiagrama']) && empty($surfacesPayload['evolucion'])) {
                         continue;
@@ -628,17 +744,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $visitId = insertRow($pdo, 'visits', [
                 'patient_id' => $patientId,
                 'visit_date' => $visitDate,
-                'subjective_notes' => trim((string) post('subjective_notes')) ?: null,
-                'objective_notes' => trim((string) post('objective_notes')) ?: null,
-                'assessment' => trim((string) post('assessment')) ?: null,
-                'plan' => trim((string) post('plan')) ?: null,
-                'vitals_bp' => trim((string) post('vitals_bp')) ?: null,
-                'vitals_hr' => trim((string) post('vitals_hr')) ?: null,
-                'vitals_temp' => trim((string) post('vitals_temp')) ?: null,
-                'vitals_oxygen' => trim((string) post('vitals_oxygen')) ?: null,
+                'subjective_notes' => capitalizeInitial(post('subjective_notes')),
+                'objective_notes' => capitalizeInitial(post('objective_notes')),
+                'assessment' => capitalizeInitial(post('assessment')),
+                'plan' => capitalizeInitial(post('plan')),
+                'vitals_bp' => capitalizeInitial(post('vitals_bp')),
+                'vitals_hr' => capitalizeInitial(post('vitals_hr')),
+                'vitals_temp' => capitalizeInitial(post('vitals_temp')),
+                'vitals_oxygen' => capitalizeInitial(post('vitals_oxygen')),
                 'next_appointment' => normalizeDate(post('next_appointment')),
             ]);
             $messages[] = 'Consulta registrada correctamente.';
+            header('Location: patient.php?id=' . $patientId . '#visitas');
+            exit;
+        }
+    }
+
+    if ($action === 'update_visit') {
+        $visitId = (int) post('visit_id');
+        if ($visitId <= 0) {
+            $errors[] = 'Consulta no válida.';
+        } else {
+            $visitExistsStmt = $pdo->prepare('SELECT id FROM visits WHERE id = :id AND patient_id = :patient_id');
+            $visitExistsStmt->execute([':id' => $visitId, ':patient_id' => $patientId]);
+            if (!$visitExistsStmt->fetchColumn()) {
+                $errors[] = 'No se encontró la consulta seleccionada.';
+            }
+        }
+
+        $visitDate = normalizeDate(post('visit_date'));
+        if (!$visitDate) {
+            $errors[] = 'La fecha de la consulta es obligatoria.';
+        }
+
+        if (!$errors) {
+            $updateStmt = $pdo->prepare(
+                'UPDATE visits SET visit_date = :visit_date, subjective_notes = :subjective_notes, objective_notes = :objective_notes, assessment = :assessment, plan = :plan, vitals_bp = :vitals_bp, vitals_hr = :vitals_hr, vitals_temp = :vitals_temp, vitals_oxygen = :vitals_oxygen, next_appointment = :next_appointment WHERE id = :id AND patient_id = :patient_id'
+            );
+            $updateStmt->execute([
+                ':visit_date' => $visitDate,
+                ':subjective_notes' => capitalizeInitial(post('subjective_notes')),
+                ':objective_notes' => capitalizeInitial(post('objective_notes')),
+                ':assessment' => capitalizeInitial(post('assessment')),
+                ':plan' => capitalizeInitial(post('plan')),
+                ':vitals_bp' => capitalizeInitial(post('vitals_bp')),
+                ':vitals_hr' => capitalizeInitial(post('vitals_hr')),
+                ':vitals_temp' => capitalizeInitial(post('vitals_temp')),
+                ':vitals_oxygen' => capitalizeInitial(post('vitals_oxygen')),
+                ':next_appointment' => normalizeDate(post('next_appointment')),
+                ':id' => $visitId,
+                ':patient_id' => $patientId,
+            ]);
+            $messages[] = 'Consulta actualizada correctamente.';
             header('Location: patient.php?id=' . $patientId . '#visitas');
             exit;
         }
@@ -683,13 +840,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'patient_id' => $patientId,
                 'visit_id' => post('related_visit') ? (int) post('related_visit') : null,
                 'activity_date' => $activityDate,
-                'description' => $description,
+                'description' => capitalizeInitial($description),
                 'fee' => $fee,
                 'payment' => $payment,
                 'balance' => $balance,
-                'notes' => trim((string) post('activity_notes')) ?: null,
+                'notes' => capitalizeInitial(post('activity_notes')),
             ]);
+            recalculateActivityBalances($pdo, $patientId);
             $messages[] = 'Actividad registrada.';
+            header('Location: patient.php?id=' . $patientId . '#actividades');
+            exit;
+        }
+    }
+
+    if ($action === 'update_activity') {
+        $activityId = (int) post('activity_id');
+        if ($activityId <= 0) {
+            $errors[] = 'Actividad no válida.';
+        } else {
+            $activityExistsStmt = $pdo->prepare('SELECT id FROM treatment_activities WHERE id = :id AND patient_id = :patient_id');
+            $activityExistsStmt->execute([':id' => $activityId, ':patient_id' => $patientId]);
+            if (!$activityExistsStmt->fetchColumn()) {
+                $errors[] = 'No se encontró la actividad seleccionada.';
+            }
+        }
+
+        $activityDate = normalizeDate(post('activity_date'));
+        if (!$activityDate) {
+            $errors[] = 'La fecha de la actividad es obligatoria.';
+        }
+        $description = trim((string) post('description'));
+        if ($description === '') {
+            $errors[] = 'La descripción es obligatoria.';
+        }
+
+        if (!$errors) {
+            $fee = is_numeric(post('fee')) ? (float) post('fee') : 0.0;
+            $payment = is_numeric(post('payment')) ? (float) post('payment') : 0.0;
+            $updateStmt = $pdo->prepare(
+                'UPDATE treatment_activities SET visit_id = :visit_id, activity_date = :activity_date, description = :description, fee = :fee, payment = :payment, notes = :notes WHERE id = :id AND patient_id = :patient_id'
+            );
+            $updateStmt->execute([
+                ':visit_id' => post('related_visit') ? (int) post('related_visit') : null,
+                ':activity_date' => $activityDate,
+                ':description' => capitalizeInitial($description),
+                ':fee' => $fee,
+                ':payment' => $payment,
+                ':notes' => capitalizeInitial(post('activity_notes')),
+                ':id' => $activityId,
+                ':patient_id' => $patientId,
+            ]);
+            recalculateActivityBalances($pdo, $patientId);
+            $messages[] = 'Actividad actualizada correctamente.';
             header('Location: patient.php?id=' . $patientId . '#actividades');
             exit;
         }
@@ -699,6 +901,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $activityId = (int) post('activity_id');
         $stmt = $pdo->prepare('DELETE FROM treatment_activities WHERE id = :id AND patient_id = :patient_id');
         $stmt->execute([':id' => $activityId, ':patient_id' => $patientId]);
+        recalculateActivityBalances($pdo, $patientId);
         $messages[] = 'Actividad eliminada.';
         header('Location: patient.php?id=' . $patientId . '#actividades');
         exit;
@@ -734,6 +937,29 @@ foreach ($odontogramStmt->fetchAll(PDO::FETCH_ASSOC) as $entry) {
         ];
     }
 }
+
+// Ensure evolution diagram starts with the base odontogram when empty so clinicians can adjust it.
+foreach ($odontogramPayload['odontodiagrama'] as $toothCode => $baseEntry) {
+    $baseSurfaces = $baseEntry['surfaces'] ?? [];
+    if (!$baseSurfaces) {
+        continue;
+    }
+    if (!isset($odontogramPayload['evolucion'][$toothCode]) || empty($odontogramPayload['evolucion'][$toothCode]['surfaces'])) {
+        $clone = [];
+        foreach ($baseSurfaces as $surfaceKey => $surfaceState) {
+            if (!is_array($surfaceState)) {
+                continue;
+            }
+            $clone[$surfaceKey] = $surfaceState;
+        }
+        $odontogramPayload['evolucion'][$toothCode] = [
+            'surfaces' => $clone,
+            'status' => $baseEntry['status'] ?? 'sin_registro',
+            'notes' => $baseEntry['notes'] ?? null,
+        ];
+    }
+}
+
 $odontogramInitialJson = json_encode($odontogramPayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 if ($odontogramInitialJson === false) {
     $odontogramInitialJson = '{"odontodiagrama":{},"evolucion":{}}';
@@ -747,9 +973,31 @@ $activitiesStmt = $pdo->prepare('SELECT * FROM treatment_activities WHERE patien
 $activitiesStmt->execute([':id' => $patientId]);
 $activities = $activitiesStmt->fetchAll(PDO::FETCH_ASSOC);
 
-$latestOutstanding = $activities ? (float) $activities[0]['balance'] : 0.0;
-if ($latestOutstanding < 0) {
-    $latestOutstanding = 0.0;
+$activityPreviousOutstanding = [];
+$latestOutstanding = 0.0;
+if ($activities) {
+    $activitiesChronological = $activities;
+    usort(
+        $activitiesChronological,
+        static function (array $a, array $b): int {
+            $dateComparison = strcmp((string) $a['activity_date'], (string) $b['activity_date']);
+            if ($dateComparison !== 0) {
+                return $dateComparison;
+            }
+            return ((int) $a['id']) <=> ((int) $b['id']);
+        }
+    );
+    $runningBalance = 0.0;
+    foreach ($activitiesChronological as $activityRow) {
+        $activityPreviousOutstanding[(int) $activityRow['id']] = $runningBalance;
+        $fee = isset($activityRow['fee']) ? (float) $activityRow['fee'] : 0.0;
+        $payment = isset($activityRow['payment']) ? (float) $activityRow['payment'] : 0.0;
+        $runningBalance = $runningBalance + $fee - $payment;
+        if ($runningBalance < 0) {
+            $runningBalance = 0.0;
+        }
+    }
+    $latestOutstanding = $runningBalance;
 }
 $totalBalance = $latestOutstanding;
 
@@ -792,7 +1040,7 @@ if (!empty($patient['birth_date'])) {
     <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
             <h2 class="text-2xl font-semibold text-slate-900">Datos del paciente</h2>
-            <p class="text-sm text-slate-500">Resumen actualizado de <?= htmlspecialchars($patient['full_name']) ?>.</p>
+            <p class="text-sm text-slate-500">Resumen actualizado de <span class="font-semibold text-slate-700">"<?= htmlspecialchars($patient['full_name']) ?>"</span>.</p>
         </div>
         <div class="flex flex-wrap gap-2">
             <a class="inline-flex items-center justify-center gap-2 rounded-full border border-brand-200 bg-brand-50 px-4 py-2 text-xs font-semibold text-brand-700 transition hover:-translate-y-0.5 hover:bg-brand-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500" href="patient_history.php?id=<?= $patientId ?>">
@@ -814,31 +1062,31 @@ if (!empty($patient['birth_date'])) {
                     <dt class="font-semibold text-slate-700">Nombres y apellidos:</dt>
                     <dd class="text-right font-medium text-slate-900"><?= $formatValue($patient['full_name'] ?? null) ?></dd>
                 </div>
-                <div class="flex justify-between gap-4 pb-2">
+                <div class="flex justify-between gap-4 border-b border-slate-200/60 pb-3">
                     <dt class="font-medium text-slate-700">Nombre preferido:</dt>
                     <dd class="text-right"><?= $formatValue($patient['preferred_name'] ?? null) ?></dd>
                 </div>
-                <div class="flex justify-between gap-4 pb-2">
+                <div class="flex justify-between gap-4 border-b border-slate-200/60 pb-3">
                     <dt class="font-medium text-slate-700">Documento:</dt>
                     <dd class="text-right"><?= $formatValue($patient['document_id'] ?? null) ?></dd>
                 </div>
-                <div class="flex justify-between gap-4 pb-2">
+                <div class="flex justify-between gap-4 border-b border-slate-200/60 pb-3">
                     <dt class="font-medium text-slate-700">Fecha de nacimiento:</dt>
                     <dd class="text-right"><?= htmlspecialchars($birthDateDisplay) ?></dd>
                 </div>
-                <div class="flex justify-between gap-4 pb-2">
+                <div class="flex justify-between gap-4 border-b border-slate-200/60 pb-3">
                     <dt class="font-medium text-slate-700">Edad:</dt>
                     <dd class="text-right"><?= $patient['age'] ? (int) $patient['age'] . ' años' : '—' ?></dd>
                 </div>
-                <div class="flex justify-between gap-4 pb-2">
+                <div class="flex justify-between gap-4 border-b border-slate-200/60 pb-3">
                     <dt class="font-medium text-slate-700">Género:</dt>
                     <dd class="text-right"><?= $formatValue($patient['gender'] ?? null) ?></dd>
                 </div>
-                <div class="flex justify-between gap-4 pb-2">
+                <div class="flex justify-between gap-4 border-b border-slate-200/60 pb-3">
                     <dt class="font-medium text-slate-700">Estado civil:</dt>
                     <dd class="text-right"><?= $formatValue($patient['marital_status'] ?? null) ?></dd>
                 </div>
-                <div class="flex justify-between gap-4 pb-2">
+                <div class="flex justify-between gap-4 border-b border-slate-200/60 pb-3">
                     <dt class="font-medium text-slate-700">Ocupación:</dt>
                     <dd class="text-right"><?= $formatValue($patient['occupation'] ?? null) ?></dd>
                 </div>
@@ -852,11 +1100,11 @@ if (!empty($patient['birth_date'])) {
             <div>
                 <h3 class="mb-6 text-xs font-semibold uppercase tracking-wide text-slate-600">Red de contacto</h3>
                 <dl class="space-y-3 text-sm text-slate-600">
-                    <div class="flex justify-between gap-4 pb-2">
+                    <div class="flex justify-between gap-4 border-b border-slate-200/60 pb-3">
                         <dt class="font-medium text-slate-700">Correo:</dt>
                         <dd class="text-right break-words"><?= $formatValue($patient['email'] ?? null) ?></dd>
                     </div>
-                    <div class="flex justify-between gap-4 pb-2">
+                    <div class="flex justify-between gap-4 border-b border-slate-200/60 pb-3">
                         <dt class="font-medium text-slate-700">Tel. principal:</dt>
                         <dd class="text-right"><?= $formatValue($patient['phone_primary'] ?? null) ?></dd>
                     </div>
@@ -869,11 +1117,11 @@ if (!empty($patient['birth_date'])) {
             <div class="rounded-xl border border-brand-100/70 bg-brand-50/50 p-5">
                 <h4 class="mb-5 text-xs font-semibold uppercase tracking-wide text-brand-700">Contacto de emergencia</h4>
                 <dl class="space-y-3 text-sm text-brand-800">
-                    <div class="flex justify-between gap-4 pb-1">
+                    <div class="flex justify-between gap-4 border-b border-brand-200/50 pb-3">
                         <dt class="font-medium">Nombres:</dt>
                         <dd class="text-right"><?= $formatValue($patient['emergency_contact'] ?? null) ?></dd>
                     </div>
-                    <div class="flex justify-between gap-4 pb-1">
+                    <div class="flex justify-between gap-4 border-b border-brand-200/50 pb-3">
                         <dt class="font-medium">Parentesco:</dt>
                         <dd class="text-right"><?= $formatValue($patient['emergency_contact_relationship'] ?? null) ?></dd>
                     </div>
@@ -886,11 +1134,11 @@ if (!empty($patient['birth_date'])) {
             <div class="rounded-xl border border-slate-200/70 bg-slate-50/80 p-5">
                 <h4 class="mb-5 text-xs font-semibold uppercase tracking-wide text-slate-600">Responsable legal</h4>
                 <dl class="space-y-3 text-sm text-slate-600">
-                    <div class="flex justify-between gap-4 pb-1">
+                    <div class="flex justify-between gap-4 border-b border-slate-200/60 pb-3">
                         <dt class="font-medium text-slate-700">Nombres:</dt>
                         <dd class="text-right"><?= $formatValue($patient['representative_name'] ?? null) ?></dd>
                     </div>
-                    <div class="flex justify-between gap-4 pb-1">
+                    <div class="flex justify-between gap-4 border-b border-slate-200/60 pb-3">
                         <dt class="font-medium text-slate-700">Documento:</dt>
                         <dd class="text-right"><?= $formatValue($patient['representative_document'] ?? null) ?></dd>
                     </div>
@@ -904,19 +1152,19 @@ if (!empty($patient['birth_date'])) {
         <div class="rounded-2xl border border-slate-200/80 bg-white p-6 xl:col-span-2">
             <h3 class="mb-6 text-xs font-semibold uppercase tracking-wide text-slate-600">Información administrativa</h3>
             <dl class="space-y-3 text-sm text-slate-600">
-                <div class="flex justify-between gap-4 pb-2">
+                <div class="flex justify-between gap-4 border-b border-slate-200/60 pb-3">
                     <dt class="font-medium text-slate-700">Referido por:</dt>
                     <dd class="text-right"><?= $formatValue($patient['referred_by'] ?? null) ?></dd>
                 </div>
-                <div class="flex justify-between gap-4 pb-2">
+                <div class="flex justify-between gap-4 border-b border-slate-200/60 pb-3">
                     <dt class="font-medium text-slate-700">Médico tratante:</dt>
                     <dd class="text-right"><?= $formatValue($patient['primary_physician'] ?? null) ?></dd>
                 </div>
-                <div class="flex justify-between gap-4 pb-2">
+                <div class="flex justify-between gap-4 border-b border-slate-200/60 pb-3">
                     <dt class="font-medium text-slate-700">Tel. del médico:</dt>
                     <dd class="text-right"><?= $formatValue($patient['primary_physician_phone'] ?? null) ?></dd>
                 </div>
-                <div class="flex justify-between gap-4 pb-2">
+                <div class="flex justify-between gap-4 border-b border-slate-200/60 pb-3">
                     <dt class="font-medium text-slate-700">Aseguradora:</dt>
                     <dd class="text-right"><?= $formatValue($patient['insurance_provider'] ?? null) ?></dd>
                 </div>
@@ -999,7 +1247,7 @@ if (!empty($patient['birth_date'])) {
             <h2 class="text-2xl font-semibold text-slate-900">Historia clínica</h2>
             <p class="text-sm text-slate-500">Revisa los antecedentes registrados y actualízalos cuando sea necesario.</p>
         </div>
-        <a class="inline-flex items-center justify-center gap-2 rounded-full bg-brand-600 px-4 py-2 text-xs font-semibold text-white shadow-soft transition hover:-translate-y-0.5 hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500" href="patient_history.php?id=<?= $patientId ?>">
+        <a class="inline-flex items-center justify-center gap-2 rounded-full bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-soft transition hover:-translate-y-0.5 hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500" href="patient_history.php?id=<?= $patientId ?>">
             Editar historia clínica
         </a>
     </div>
@@ -1030,110 +1278,125 @@ if (!empty($patient['birth_date'])) {
     <?php if (!$profile): ?>
         <p class="text-sm text-slate-500">Aún no se ha registrado la historia clínica de este paciente.</p>
     <?php else: ?>
-        <div class="grid gap-6 lg:grid-cols-2">
-            <div class="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-5">
-                <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-600">Motivo y alertas</h3>
-                <dl class="mt-3 space-y-3 text-sm text-slate-600">
-                    <div>
-                        <dt class="font-medium text-slate-700">Motivo principal</dt>
-                        <dd><?= $profile['consultation_reason'] ? nl2br(htmlspecialchars($profile['consultation_reason'])) : '—' ?></dd>
+        <div class="grid gap-5 lg:grid-cols-2">
+            <div class="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4">
+                <h3 class="mb-3 flex items-center gap-2 rounded-lg border-l-4 border-slate-400 bg-slate-100/60 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-700 shadow-sm">
+                    <span class="h-1.5 w-1.5 rounded-full bg-slate-400"></span>
+                    Motivo y alertas
+                </h3>
+                <dl class="space-y-3 text-sm text-slate-600">
+                    <div class="border-b border-slate-200/60 pb-2">
+                        <dt class="mb-1 text-xs font-semibold text-slate-700">Motivo principal</dt>
+                        <dd class="text-slate-600"><?= $profile['consultation_reason'] ? nl2br(htmlspecialchars($profile['consultation_reason'])) : '—' ?></dd>
                     </div>
-                    <div>
-                        <dt class="font-medium text-slate-700">Evolución / enfermedad actual</dt>
-                        <dd><?= $profile['current_condition'] ? nl2br(htmlspecialchars($profile['current_condition'])) : '—' ?></dd>
+                    <div class="border-b border-slate-200/60 pb-2">
+                        <dt class="mb-1 text-xs font-semibold text-slate-700">Evolución / enfermedad actual</dt>
+                        <dd class="text-slate-600"><?= $profile['current_condition'] ? nl2br(htmlspecialchars($profile['current_condition'])) : '—' ?></dd>
                     </div>
-                    <div>
-                        <dt class="font-medium text-slate-700">Alertas clínicas</dt>
-                        <dd><?= $profile['medical_alerts'] ? nl2br(htmlspecialchars($profile['medical_alerts'])) : '—' ?></dd>
+                    <div class="border-b border-slate-200/60 pb-2">
+                        <dt class="mb-1 text-xs font-semibold text-slate-700">Alertas clínicas</dt>
+                        <dd class="text-slate-600"><?= $profile['medical_alerts'] ? nl2br(htmlspecialchars($profile['medical_alerts'])) : '—' ?></dd>
                     </div>
-                    <div>
-                        <dt class="font-medium text-slate-700">Medicación actual</dt>
-                        <dd><?= $profile['medications'] ? nl2br(htmlspecialchars($profile['medications'])) : '—' ?></dd>
+                    <div class="border-b border-slate-200/60 pb-2">
+                        <dt class="mb-1 text-xs font-semibold text-slate-700">Medicación actual</dt>
+                        <dd class="text-slate-600"><?= $profile['medications'] ? nl2br(htmlspecialchars($profile['medications'])) : '—' ?></dd>
                     </div>
-                    <div>
-                        <dt class="font-medium text-slate-700">Hospitalizaciones / procedimientos</dt>
-                        <dd><?= $profile['hospitalizations'] ? nl2br(htmlspecialchars($profile['hospitalizations'])) : '—' ?></dd>
+                    <div class="border-b border-slate-200/60 pb-2">
+                        <dt class="mb-1 text-xs font-semibold text-slate-700">Hospitalizaciones / procedimientos</dt>
+                        <dd class="text-slate-600"><?= $profile['hospitalizations'] ? nl2br(htmlspecialchars($profile['hospitalizations'])) : '—' ?></dd>
                     </div>
                 </dl>
             </div>
-            <div class="rounded-2xl border border-slate-200/80 bg-white p-5">
-                <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-600">Antecedentes personales</h3>
+            <div class="rounded-2xl border border-slate-200/80 bg-white p-4">
+                <h3 class="mb-3 flex items-center gap-2 rounded-lg border-l-4 border-blue-400 bg-blue-50/60 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-blue-700 shadow-sm">
+                    <span class="h-1.5 w-1.5 rounded-full bg-blue-400"></span>
+                    Antecedentes personales
+                </h3>
                 <?php if ($activeAntecedents): ?>
-                    <ul class="mt-3 list-disc space-y-1 pl-5 text-sm text-slate-600">
+                    <ul class="list-disc space-y-0.5 pl-5 text-sm text-slate-600">
                         <?php foreach ($activeAntecedents as $item): ?>
                             <li><?= htmlspecialchars($item) ?></li>
                         <?php endforeach; ?>
                     </ul>
                 <?php else: ?>
-                    <p class="mt-3 text-sm text-slate-500">Sin antecedentes personales registrados.</p>
+                    <p class="text-sm text-slate-500">Sin antecedentes personales registrados.</p>
                 <?php endif; ?>
-                <div class="mt-4 grid gap-3 text-sm text-slate-600">
-                    <div>
-                        <h4 class="font-medium text-slate-700">Antecedentes familiares</h4>
-                        <p><?= $profile['family_history'] ? nl2br(htmlspecialchars($profile['family_history'])) : '—' ?></p>
+                <div class="mt-3 space-y-3 text-sm text-slate-600">
+                    <div class="border-b border-slate-200/60 pb-2">
+                        <h4 class="mb-1 text-xs font-semibold text-slate-700">Antecedentes familiares</h4>
+                        <p class="text-slate-600"><?= $profile['family_history'] ? nl2br(htmlspecialchars($profile['family_history'])) : '—' ?></p>
                     </div>
-                    <div>
-                        <h4 class="font-medium text-slate-700">Hábitos</h4>
-                        <p><?= $profile['habits'] ? nl2br(htmlspecialchars($profile['habits'])) : '—' ?></p>
+                    <div class="border-b border-slate-200/60 pb-2">
+                        <h4 class="mb-1 text-xs font-semibold text-slate-700">Hábitos</h4>
+                        <p class="text-slate-600"><?= $profile['habits'] ? nl2br(htmlspecialchars($profile['habits'])) : '—' ?></p>
                     </div>
                 </div>
             </div>
-            <div class="rounded-2xl border border-slate-200/80 bg-white p-5">
-                <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-600">Examen clínico</h3>
-                <dl class="mt-3 space-y-3 text-sm text-slate-600">
-                    <div>
-                        <dt class="font-medium text-slate-700">Examen extraoral</dt>
-                        <dd><?= $profile['extraoral_exam'] ? nl2br(htmlspecialchars($profile['extraoral_exam'])) : '—' ?></dd>
+            <div class="rounded-2xl border border-slate-200/80 bg-white p-4">
+                <h3 class="mb-3 flex items-center gap-2 rounded-lg border-l-4 border-emerald-400 bg-emerald-50/60 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-emerald-700 shadow-sm">
+                    <span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+                    Examen clínico
+                </h3>
+                <dl class="space-y-3 text-sm text-slate-600">
+                    <div class="border-b border-slate-200/60 pb-2">
+                        <dt class="mb-1 text-xs font-semibold text-slate-700">Examen extraoral</dt>
+                        <dd class="text-slate-600"><?= $profile['extraoral_exam'] ? nl2br(htmlspecialchars($profile['extraoral_exam'])) : '—' ?></dd>
                     </div>
-                    <div>
-                        <dt class="font-medium text-slate-700">Examen intraoral</dt>
-                        <dd><?= $profile['intraoral_exam'] ? nl2br(htmlspecialchars($profile['intraoral_exam'])) : '—' ?></dd>
+                    <div class="border-b border-slate-200/60 pb-2">
+                        <dt class="mb-1 text-xs font-semibold text-slate-700">Examen intraoral</dt>
+                        <dd class="text-slate-600"><?= $profile['intraoral_exam'] ? nl2br(htmlspecialchars($profile['intraoral_exam'])) : '—' ?></dd>
                     </div>
-                    <div>
-                        <dt class="font-medium text-slate-700">Tejidos periodontales</dt>
-                        <dd><?= $profile['periodontal_status'] ? nl2br(htmlspecialchars($profile['periodontal_status'])) : '—' ?></dd>
+                    <div class="border-b border-slate-200/60 pb-2">
+                        <dt class="mb-1 text-xs font-semibold text-slate-700">Tejidos periodontales</dt>
+                        <dd class="text-slate-600"><?= $profile['periodontal_status'] ? nl2br(htmlspecialchars($profile['periodontal_status'])) : '—' ?></dd>
                     </div>
-                    <div>
-                        <dt class="font-medium text-slate-700">PA (mmHg)</dt>
-                        <dd><?= $profile['physical_exam_bp'] ? htmlspecialchars($profile['physical_exam_bp']) : '—' ?></dd>
+                    <div class="border-b border-slate-200/60 pb-2">
+                        <dt class="mb-1 text-xs font-semibold text-slate-700">PA (mmHg)</dt>
+                        <dd class="text-slate-600"><?= $profile['physical_exam_bp'] ? htmlspecialchars($profile['physical_exam_bp']) : '—' ?></dd>
                     </div>
-                    <div>
-                        <dt class="font-medium text-slate-700">Dolor (0-10)</dt>
-                        <dd><?= $profile['pain_level'] !== null ? (int) $profile['pain_level'] : '—' ?></dd>
+                    <div class="border-b border-slate-200/60 pb-2">
+                        <dt class="mb-1 text-xs font-semibold text-slate-700">Dolor (0-10)</dt>
+                        <dd class="text-slate-600"><?= $profile['pain_level'] !== null ? (int) $profile['pain_level'] : '—' ?></dd>
                     </div>
-                    <div>
-                        <dt class="font-medium text-slate-700">Evaluación de riesgo</dt>
-                        <dd><?= $profile['risk_assessment'] ? nl2br(htmlspecialchars($profile['risk_assessment'])) : '—' ?></dd>
-                    </div>
-                </dl>
-            </div>
-            <div class="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-5">
-                <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-600">Diagnóstico y plan</h3>
-                <dl class="mt-3 space-y-3 text-sm text-slate-600">
-                    <div>
-                        <dt class="font-medium text-slate-700">Diagnóstico</dt>
-                        <dd><?= $profile['diagnosis'] ? nl2br(htmlspecialchars($profile['diagnosis'])) : '—' ?></dd>
-                    </div>
-                    <div>
-                        <dt class="font-medium text-slate-700">Plan de tratamiento</dt>
-                        <dd><?= $profile['treatment_plan'] ? nl2br(htmlspecialchars($profile['treatment_plan'])) : '—' ?></dd>
+                    <div class="border-b border-slate-200/60 pb-2">
+                        <dt class="mb-1 text-xs font-semibold text-slate-700">Evaluación de riesgo</dt>
+                        <dd class="text-slate-600"><?= $profile['risk_assessment'] ? nl2br(htmlspecialchars($profile['risk_assessment'])) : '—' ?></dd>
                     </div>
                 </dl>
             </div>
-            <div class="rounded-2xl border border-slate-200/80 bg-white p-5">
-                <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-600">Consentimiento informado</h3>
-                <dl class="mt-3 space-y-3 text-sm text-slate-600">
-                    <div>
-                        <dt class="font-medium text-slate-700">Estado</dt>
-                        <dd><?= !empty($profile['consent_signed']) ? 'Firmado' : 'Pendiente' ?></dd>
+            <div class="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4">
+                <h3 class="mb-3 flex items-center gap-2 rounded-lg border-l-4 border-purple-400 bg-purple-50/60 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-purple-700 shadow-sm">
+                    <span class="h-1.5 w-1.5 rounded-full bg-purple-400"></span>
+                    Diagnóstico y plan
+                </h3>
+                <dl class="space-y-3 text-sm text-slate-600">
+                    <div class="border-b border-slate-200/60 pb-2">
+                        <dt class="mb-1 text-xs font-semibold text-slate-700">Diagnóstico</dt>
+                        <dd class="text-slate-600"><?= $profile['diagnosis'] ? nl2br(htmlspecialchars($profile['diagnosis'])) : '—' ?></dd>
                     </div>
-                    <div>
-                        <dt class="font-medium text-slate-700">Fecha de firma</dt>
-                        <dd><?= $profile['consent_signed_at'] ? htmlspecialchars($profile['consent_signed_at']) : '—' ?></dd>
+                    <div class="border-b border-slate-200/60 pb-2">
+                        <dt class="mb-1 text-xs font-semibold text-slate-700">Plan de tratamiento</dt>
+                        <dd class="text-slate-600"><?= $profile['treatment_plan'] ? nl2br(htmlspecialchars($profile['treatment_plan'])) : '—' ?></dd>
                     </div>
-                    <div>
-                        <dt class="font-medium text-slate-700">Observaciones</dt>
-                        <dd><?= $profile['consent_notes'] ? nl2br(htmlspecialchars($profile['consent_notes'])) : '—' ?></dd>
+                </dl>
+            </div>
+            <div class="rounded-2xl border border-slate-200/80 bg-white p-4">
+                <h3 class="mb-3 flex items-center gap-2 rounded-lg border-l-4 border-amber-400 bg-amber-50/60 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-amber-700 shadow-sm">
+                    <span class="h-1.5 w-1.5 rounded-full bg-amber-400"></span>
+                    Consentimiento informado
+                </h3>
+                <dl class="space-y-3 text-sm text-slate-600">
+                    <div class="border-b border-slate-200/60 pb-2">
+                        <dt class="mb-1 text-xs font-semibold text-slate-700">Estado</dt>
+                        <dd class="text-slate-600"><?= !empty($profile['consent_signed']) ? 'Firmado' : 'Pendiente' ?></dd>
+                    </div>
+                    <div class="border-b border-slate-200/60 pb-2">
+                        <dt class="mb-1 text-xs font-semibold text-slate-700">Fecha de firma</dt>
+                        <dd class="text-slate-600"><?= $profile['consent_signed_at'] ? htmlspecialchars($profile['consent_signed_at']) : '—' ?></dd>
+                    </div>
+                    <div class="border-b border-slate-200/60 pb-2">
+                        <dt class="mb-1 text-xs font-semibold text-slate-700">Observaciones</dt>
+                        <dd class="text-slate-600"><?= $profile['consent_notes'] ? nl2br(htmlspecialchars($profile['consent_notes'])) : '—' ?></dd>
                     </div>
                 </dl>
             </div>
@@ -1146,58 +1409,72 @@ if (!empty($patient['birth_date'])) {
         <p class="text-sm text-slate-500">Registra consultas con formato SOAP y monitorea próximos seguimientos.</p>
     </div>
     <div class="grid gap-6 lg:grid-cols-[minmax(0,420px)_1fr]">
+        <?php $isEditingVisit = post('action') === 'update_visit'; ?>
         <form
             method="post"
-            id="activity-form"
+            id="visit-form"
             class="space-y-4 rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4 shadow-inner"
-            data-previous-outstanding="<?= htmlspecialchars(number_format($latestOutstanding, 2, '.', '')) ?>"
         >
-            <input type="hidden" name="action" value="create_visit">
+            <input type="hidden" name="action" value="<?= $isEditingVisit ? 'update_visit' : 'create_visit' ?>">
+            <input type="hidden" name="visit_id" value="<?= htmlspecialchars((string) post('visit_id', '')) ?>">
             <label class="flex flex-col gap-2 text-sm text-slate-600">
                 <span class="font-medium text-slate-700">Fecha de la consulta *</span>
                 <input type="date" name="visit_date" value="<?= htmlspecialchars(post('visit_date', $today) ?: $today) ?>" required class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
             </label>
             <label class="flex flex-col gap-2 text-sm text-slate-600">
                 <span class="font-medium text-slate-700">Motivo / síntomas (S)</span>
-                <textarea name="subjective_notes" rows="2" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"></textarea>
+                <textarea name="subjective_notes" rows="2" data-capitalize-initial class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"><?= htmlspecialchars(capitalizeInitial(post('subjective_notes', '')) ?? '') ?></textarea>
             </label>
             <label class="flex flex-col gap-2 text-sm text-slate-600">
                 <span class="font-medium text-slate-700">Hallazgos clínicos (O)</span>
-                <textarea name="objective_notes" rows="2" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"></textarea>
+                <textarea name="objective_notes" rows="2" data-capitalize-initial class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"><?= htmlspecialchars(capitalizeInitial(post('objective_notes', '')) ?? '') ?></textarea>
             </label>
             <label class="flex flex-col gap-2 text-sm text-slate-600">
                 <span class="font-medium text-slate-700">Evaluación / diagnósticos (A)</span>
-                <textarea name="assessment" rows="2" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"></textarea>
+                <textarea name="assessment" rows="2" data-capitalize-initial class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"><?= htmlspecialchars(capitalizeInitial(post('assessment', '')) ?? '') ?></textarea>
             </label>
             <label class="flex flex-col gap-2 text-sm text-slate-600">
                 <span class="font-medium text-slate-700">Plan inmediato / recomendaciones (P)</span>
-                <textarea name="plan" rows="2" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"></textarea>
+                <textarea name="plan" rows="2" data-capitalize-initial class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"><?= htmlspecialchars(capitalizeInitial(post('plan', '')) ?? '') ?></textarea>
             </label>
             <div class="grid gap-3 sm:grid-cols-2">
                 <label class="flex flex-col gap-2 text-sm text-slate-600">
                     <span class="font-medium text-slate-700">TA / PA</span>
-                    <input type="text" name="vitals_bp" placeholder="Ej: 120/80" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
+                    <input type="text" name="vitals_bp" value="<?= htmlspecialchars(capitalizeInitial(post('vitals_bp', '')) ?? '') ?>" placeholder="Ej: 120/80" data-capitalize-initial class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
                 </label>
                 <label class="flex flex-col gap-2 text-sm text-slate-600">
                     <span class="font-medium text-slate-700">FC</span>
-                    <input type="text" name="vitals_hr" placeholder="lat/min" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
+                    <input type="text" name="vitals_hr" value="<?= htmlspecialchars(capitalizeInitial(post('vitals_hr', '')) ?? '') ?>" placeholder="lat/min" data-capitalize-initial class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
                 </label>
                 <label class="flex flex-col gap-2 text-sm text-slate-600">
                     <span class="font-medium text-slate-700">Temp</span>
-                    <input type="text" name="vitals_temp" placeholder="°C" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
+                    <input type="text" name="vitals_temp" value="<?= htmlspecialchars(capitalizeInitial(post('vitals_temp', '')) ?? '') ?>" placeholder="°C" data-capitalize-initial class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
                 </label>
                 <label class="flex flex-col gap-2 text-sm text-slate-600">
                     <span class="font-medium text-slate-700">SpO₂</span>
-                    <input type="text" name="vitals_oxygen" placeholder="%" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
+                    <input type="text" name="vitals_oxygen" value="<?= htmlspecialchars(capitalizeInitial(post('vitals_oxygen', '')) ?? '') ?>" placeholder="%" data-capitalize-initial class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
                 </label>
             </div>
             <label class="flex flex-col gap-2 text-sm text-slate-600">
                 <span class="font-medium text-slate-700">Próxima cita</span>
-                <input type="date" name="next_appointment" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
+                <input type="date" name="next_appointment" value="<?= htmlspecialchars((string) post('next_appointment', '')) ?>" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
             </label>
-            <div class="flex justify-end">
-                <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-full bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-soft transition hover:-translate-y-0.5 hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500">
-                    Registrar visita
+            <div class="flex items-center justify-between gap-3">
+                <button
+                    type="button"
+                    class="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 shadow-soft transition hover:-translate-y-0.5 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400<?= $isEditingVisit ? '' : ' hidden' ?>"
+                    data-visit-cancel
+                >
+                    Cancelar
+                </button>
+                <button
+                    type="submit"
+                    class="inline-flex items-center justify-center gap-2 rounded-full bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-soft transition hover:-translate-y-0.5 hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+                    data-visit-submit
+                    data-label-create="Registrar visita"
+                    data-label-update="Actualizar visita"
+                >
+                    <?= $isEditingVisit ? 'Actualizar visita' : 'Registrar visita' ?>
                 </button>
             </div>
         </form>
@@ -1213,10 +1490,6 @@ if (!empty($patient['birth_date'])) {
             if (!feeInput || !paymentInput || !balanceInput) {
                 return;
             }
-            var previousOutstanding = Number.parseFloat(form.dataset.previousOutstanding || '0');
-            if (!Number.isFinite(previousOutstanding) || previousOutstanding < 0) {
-                previousOutstanding = 0;
-            }
             var formatAmount = function (value) {
                 return Number.isFinite(value) ? value.toFixed(2) : '';
             };
@@ -1227,6 +1500,10 @@ if (!empty($patient['birth_date'])) {
                 return Number.parseFloat(input.value.replace(',', '.'));
             };
             var updateBalance = function () {
+                var previousOutstanding = Number.parseFloat(form.dataset.previousOutstanding || '0');
+                if (!Number.isFinite(previousOutstanding) || previousOutstanding < 0) {
+                    previousOutstanding = 0;
+                }
                 var fee = parseAmount(feeInput);
                 var payment = parseAmount(paymentInput);
                 if (Number.isNaN(fee) && Number.isNaN(payment)) {
@@ -1243,7 +1520,11 @@ if (!empty($patient['birth_date'])) {
                 balanceInput.value = result > 0 ? formatAmount(result) : '0.00';
             };
             if (balanceInput.value.trim() === '') {
-                balanceInput.value = previousOutstanding > 0 ? formatAmount(previousOutstanding) : '';
+                var initialPrevious = Number.parseFloat(form.dataset.previousOutstanding || '0');
+                if (!Number.isFinite(initialPrevious) || initialPrevious < 0) {
+                    initialPrevious = 0;
+                }
+                balanceInput.value = initialPrevious > 0 ? formatAmount(initialPrevious) : '';
             }
             feeInput.addEventListener('input', updateBalance);
             paymentInput.addEventListener('input', updateBalance);
@@ -1265,13 +1546,40 @@ if (!empty($patient['birth_date'])) {
                                         <p class="text-xs font-medium text-brand-600">Próxima cita: <?= date('d/m/Y', strtotime($visit['next_appointment'])) ?></p>
                                     <?php endif; ?>
                                 </div>
-                                <form method="post" class="inline-flex" onsubmit="return confirm('¿Eliminar esta consulta?');">
-                                    <input type="hidden" name="action" value="delete_visit">
-                                    <input type="hidden" name="visit_id" value="<?= (int) $visit['id'] ?>">
-                                    <button type="submit" class="inline-flex items-center rounded-full border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500">
-                                        Eliminar
+                                <div class="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        class="inline-flex items-center rounded-full border border-brand-200 px-3 py-1.5 text-xs font-semibold text-brand-700 transition hover:bg-brand-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+                                        data-edit-visit
+                                        data-visit-id="<?= (int) $visit['id'] ?>"
+                                        data-visit-date="<?= htmlspecialchars((string) $visit['visit_date']) ?>"
+                                        data-visit-next="<?= htmlspecialchars((string) ($visit['next_appointment'] ?? '')) ?>"
+                                        data-subjective="<?= htmlspecialchars((string) ($visit['subjective_notes'] ?? ''), ENT_QUOTES) ?>"
+                                        data-objective="<?= htmlspecialchars((string) ($visit['objective_notes'] ?? ''), ENT_QUOTES) ?>"
+                                        data-assessment="<?= htmlspecialchars((string) ($visit['assessment'] ?? ''), ENT_QUOTES) ?>"
+                                        data-plan="<?= htmlspecialchars((string) ($visit['plan'] ?? ''), ENT_QUOTES) ?>"
+                                        data-vitals-bp="<?= htmlspecialchars((string) ($visit['vitals_bp'] ?? ''), ENT_QUOTES) ?>"
+                                        data-vitals-hr="<?= htmlspecialchars((string) ($visit['vitals_hr'] ?? ''), ENT_QUOTES) ?>"
+                                        data-vitals-temp="<?= htmlspecialchars((string) ($visit['vitals_temp'] ?? ''), ENT_QUOTES) ?>"
+                                        data-vitals-oxygen="<?= htmlspecialchars((string) ($visit['vitals_oxygen'] ?? ''), ENT_QUOTES) ?>"
+                                    >
+                                        Editar
                                     </button>
-                                </form>
+                                    <button
+                                        type="button"
+                                        class="inline-flex items-center rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400 hidden"
+                                        data-visit-cancel-row="<?= (int) $visit['id'] ?>"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <form method="post" class="inline-flex" onsubmit="return confirm('¿Eliminar esta consulta?');">
+                                        <input type="hidden" name="action" value="delete_visit">
+                                        <input type="hidden" name="visit_id" value="<?= (int) $visit['id'] ?>">
+                                        <button type="submit" class="inline-flex items-center rounded-full border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500">
+                                            Eliminar
+                                        </button>
+                                    </form>
+                                </div>
                             </div>
                             <div class="mt-3 space-y-2 text-sm text-slate-600">
                                 <?php if ($visit['subjective_notes']): ?>
@@ -1310,6 +1618,146 @@ if (!empty($patient['birth_date'])) {
                 </ul>
             <?php endif; ?>
         </div>
+        <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var visitForm = document.getElementById('visit-form');
+            if (!visitForm) {
+                return;
+            }
+            var actionInput = visitForm.querySelector('input[name="action"]');
+            var visitIdInput = visitForm.querySelector('input[name="visit_id"]');
+            var cancelButton = visitForm.querySelector('[data-visit-cancel]');
+            var submitButton = visitForm.querySelector('[data-visit-submit]');
+            var submitLabelCreate = submitButton ? submitButton.dataset.labelCreate || submitButton.textContent.trim() : 'Registrar visita';
+            var submitLabelUpdate = submitButton ? submitButton.dataset.labelUpdate || 'Actualizar visita' : 'Actualizar visita';
+            var visitFields = {
+                visit_date: visitForm.querySelector('input[name="visit_date"]'),
+                subjective_notes: visitForm.querySelector('textarea[name="subjective_notes"]'),
+                objective_notes: visitForm.querySelector('textarea[name="objective_notes"]'),
+                assessment: visitForm.querySelector('textarea[name="assessment"]'),
+                plan: visitForm.querySelector('textarea[name="plan"]'),
+                vitals_bp: visitForm.querySelector('input[name="vitals_bp"]'),
+                vitals_hr: visitForm.querySelector('input[name="vitals_hr"]'),
+                vitals_temp: visitForm.querySelector('input[name="vitals_temp"]'),
+                vitals_oxygen: visitForm.querySelector('input[name="vitals_oxygen"]'),
+                next_appointment: visitForm.querySelector('input[name="next_appointment"]'),
+            };
+            var visitRowCancelButtons = Array.prototype.slice.call(document.querySelectorAll('[data-visit-cancel-row]'));
+            var currentVisitId = null;
+            var initialValues = {};
+            Object.keys(visitFields).forEach(function (fieldName) {
+                var field = visitFields[fieldName];
+                initialValues[fieldName] = field ? field.value : '';
+            });
+
+            var setModeCreate = function () {
+                if (actionInput) {
+                    actionInput.value = 'create_visit';
+                }
+                if (visitIdInput) {
+                    visitIdInput.value = '';
+                }
+                currentVisitId = null;
+                visitRowCancelButtons.forEach(function (button) {
+                    button.classList.add('hidden');
+                });
+                if (submitButton) {
+                    submitButton.textContent = submitLabelCreate;
+                }
+                if (cancelButton) {
+                    cancelButton.classList.add('hidden');
+                }
+                Object.keys(initialValues).forEach(function (fieldName) {
+                    var field = visitFields[fieldName];
+                    if (field) {
+                        field.value = initialValues[fieldName];
+                    }
+                });
+            };
+
+            var setModeEdit = function (dataset) {
+                if (actionInput) {
+                    actionInput.value = 'update_visit';
+                }
+                if (visitIdInput) {
+                    visitIdInput.value = dataset.visitId || '';
+                }
+                currentVisitId = dataset.visitId || null;
+                visitRowCancelButtons.forEach(function (button) {
+                    if (button.dataset.visitCancelRow === currentVisitId) {
+                        button.classList.remove('hidden');
+                    } else {
+                        button.classList.add('hidden');
+                    }
+                });
+                if (submitButton) {
+                    submitButton.textContent = submitLabelUpdate;
+                }
+                if (cancelButton) {
+                    cancelButton.classList.remove('hidden');
+                }
+                var fieldMappings = {
+                    visit_date: dataset.visitDate || '',
+                    subjective_notes: dataset.subjective || '',
+                    objective_notes: dataset.objective || '',
+                    assessment: dataset.assessment || '',
+                    plan: dataset.plan || '',
+                    vitals_bp: dataset.vitalsBp || '',
+                    vitals_hr: dataset.vitalsHr || '',
+                    vitals_temp: dataset.vitalsTemp || '',
+                    vitals_oxygen: dataset.vitalsOxygen || '',
+                    next_appointment: dataset.visitNext || '',
+                };
+                Object.keys(fieldMappings).forEach(function (fieldName) {
+                    var field = visitFields[fieldName];
+                    if (field) {
+                        field.value = fieldMappings[fieldName];
+                    }
+                });
+            };
+
+            document.querySelectorAll('[data-edit-visit]').forEach(function (button) {
+                button.addEventListener('click', function () {
+                    setModeEdit(button.dataset);
+                    if (visitFields.visit_date) {
+                        visitFields.visit_date.focus();
+                    }
+                });
+            });
+
+            if (cancelButton) {
+                cancelButton.addEventListener('click', function () {
+                    setModeCreate();
+                });
+            }
+
+            visitRowCancelButtons.forEach(function (button) {
+                button.addEventListener('click', function () {
+                    setModeCreate();
+                    if (visitFields.visit_date) {
+                        visitFields.visit_date.focus();
+                    }
+                });
+            });
+
+            if (actionInput && actionInput.value === 'update_visit') {
+                if (cancelButton) {
+                    cancelButton.classList.remove('hidden');
+                }
+                if (submitButton) {
+                    submitButton.textContent = submitLabelUpdate;
+                }
+                if (visitIdInput && visitIdInput.value) {
+                    currentVisitId = visitIdInput.value;
+                    visitRowCancelButtons.forEach(function (button) {
+                        if (button.dataset.visitCancelRow === currentVisitId) {
+                            button.classList.remove('hidden');
+                        }
+                    });
+                }
+            }
+        });
+        </script>
     </div>
 </section>
 
@@ -1319,27 +1767,36 @@ if (!empty($patient['birth_date'])) {
         <p class="text-sm text-slate-500">Registra procedimientos, cobros y abonos asociados al tratamiento.</p>
     </div>
     <div class="grid gap-6 lg:grid-cols-[minmax(0,420px)_1fr]">
+        <?php
+        $isEditingActivity = post('action') === 'update_activity';
+        $activityFormPrevOutstanding = (string) post('previous_outstanding', number_format($latestOutstanding, 2, '.', ''));
+        ?>
         <form
             method="post"
             id="activity-form"
             class="space-y-4 rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4 shadow-inner"
-            data-previous-outstanding="<?= htmlspecialchars(number_format($latestOutstanding, 2, '.', '')) ?>"
+            data-previous-outstanding="<?= htmlspecialchars($activityFormPrevOutstanding) ?>"
+            data-default-previous-outstanding="<?= htmlspecialchars(number_format($latestOutstanding, 2, '.', '')) ?>"
         >
-            <input type="hidden" name="action" value="create_activity">
+            <input type="hidden" name="action" value="<?= $isEditingActivity ? 'update_activity' : 'create_activity' ?>">
+            <input type="hidden" name="activity_id" value="<?= htmlspecialchars((string) post('activity_id', '')) ?>">
+            <input type="hidden" name="previous_outstanding" value="<?= htmlspecialchars($activityFormPrevOutstanding) ?>">
             <label class="flex flex-col gap-2 text-sm text-slate-600">
                 <span class="font-medium text-slate-700">Fecha *</span>
                 <input type="date" name="activity_date" value="<?= htmlspecialchars(post('activity_date', $today) ?: $today) ?>" required class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
             </label>
             <label class="flex flex-col gap-2 text-sm text-slate-600">
                 <span class="font-medium text-slate-700">Descripción *</span>
-                <textarea name="description" rows="2" required class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"></textarea>
+                <textarea name="description" rows="2" required data-capitalize-initial class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"><?= htmlspecialchars(capitalizeInitial(post('description', '')) ?? '') ?></textarea>
             </label>
             <label class="flex flex-col gap-2 text-sm text-slate-600">
                 <span class="font-medium text-slate-700">Visita asociada</span>
                 <select name="related_visit" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 focus:border-brand-400 focus:ring-brand-400">
                     <option value="">(Opcional)</option>
                     <?php foreach ($visits as $visit): ?>
-                        <option value="<?= (int) $visit['id'] ?>"><?= date('d/m/Y', strtotime($visit['visit_date'])) ?></option>
+                        <option value="<?= (int) $visit['id'] ?>"<?= (string) post('related_visit', '') === (string) $visit['id'] ? ' selected' : '' ?>>
+                            <?= date('d/m/Y', strtotime($visit['visit_date'])) ?>
+                        </option>
                     <?php endforeach; ?>
                 </select>
             </label>
@@ -1359,11 +1816,24 @@ if (!empty($patient['birth_date'])) {
             </div>
             <label class="flex flex-col gap-2 text-sm text-slate-600">
                 <span class="font-medium text-slate-700">Notas</span>
-                <textarea name="activity_notes" rows="2" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"></textarea>
+                <textarea name="activity_notes" rows="2" data-capitalize-initial class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"><?= htmlspecialchars(capitalizeInitial(post('activity_notes', '')) ?? '') ?></textarea>
             </label>
-            <div class="flex justify-end">
-                <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-full bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-soft transition hover:-translate-y-0.5 hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500">
-                    Agregar actividad
+            <div class="flex items-center justify-between gap-3">
+                <button
+                    type="button"
+                    class="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 shadow-soft transition hover:-translate-y-0.5 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400<?= $isEditingActivity ? '' : ' hidden' ?>"
+                    data-activity-cancel
+                >
+                    Cancelar
+                </button>
+                <button
+                    type="submit"
+                    class="inline-flex items-center justify-center gap-2 rounded-full bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-soft transition hover:-translate-y-0.5 hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+                    data-activity-submit
+                    data-label-create="Agregar actividad"
+                    data-label-update="Actualizar actividad"
+                >
+                    <?= $isEditingActivity ? 'Actualizar actividad' : 'Agregar actividad' ?>
                 </button>
             </div>
         </form>
@@ -1381,7 +1851,7 @@ if (!empty($patient['birth_date'])) {
                                 <th class="px-4 py-3 text-right font-semibold">Honorarios</th>
                                 <th class="px-4 py-3 text-right font-semibold">Abono</th>
                                 <th class="px-4 py-3 text-right font-semibold">Resta</th>
-                                <th class="px-4 py-3 text-right font-semibold">Acciones</th>
+                                <th class="px-4 py-3 text-center font-semibold">Acciones</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100 bg-white">
@@ -1397,14 +1867,39 @@ if (!empty($patient['birth_date'])) {
                                     <td class="px-4 py-4 text-right text-sm font-semibold text-slate-700"><?= number_format((float) $activity['fee'], 2, ',', '.') ?></td>
                                     <td class="px-4 py-4 text-right text-sm font-semibold text-emerald-600"><?= number_format((float) $activity['payment'], 2, ',', '.') ?></td>
                                     <td class="px-4 py-4 text-right text-sm font-semibold text-amber-600"><?= number_format((float) $activity['balance'], 2, ',', '.') ?></td>
-                                    <td class="px-4 py-4 text-right">
-                                        <form method="post" class="inline-flex" onsubmit="return confirm('¿Eliminar esta actividad?');">
-                                            <input type="hidden" name="action" value="delete_activity">
-                                            <input type="hidden" name="activity_id" value="<?= (int) $activity['id'] ?>">
-                                            <button class="inline-flex items-center rounded-full border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500" type="submit">
-                                                Eliminar
+                                    <td class="px-4 py-4 text-center">
+                                        <div class="inline-flex items-center gap-2">
+                                            <button
+                                                type="button"
+                                                class="inline-flex items-center rounded-full border border-brand-200 px-3 py-1.5 text-xs font-semibold text-brand-700 transition hover:bg-brand-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+                                                data-edit-activity
+                                                data-activity-id="<?= (int) $activity['id'] ?>"
+                                                data-activity-date="<?= htmlspecialchars((string) $activity['activity_date']) ?>"
+                                                data-description="<?= htmlspecialchars((string) $activity['description'], ENT_QUOTES) ?>"
+                                                data-related-visit="<?= $activity['visit_id'] ? (int) $activity['visit_id'] : '' ?>"
+                                                data-fee="<?= htmlspecialchars(number_format((float) $activity['fee'], 2, '.', ''), ENT_QUOTES) ?>"
+                                                data-payment="<?= htmlspecialchars(number_format((float) $activity['payment'], 2, '.', ''), ENT_QUOTES) ?>"
+                                                data-balance="<?= htmlspecialchars(number_format((float) $activity['balance'], 2, '.', ''), ENT_QUOTES) ?>"
+                                                data-notes="<?= htmlspecialchars((string) ($activity['notes'] ?? ''), ENT_QUOTES) ?>"
+                                                data-previous-outstanding="<?= htmlspecialchars(number_format($activityPreviousOutstanding[(int) $activity['id']] ?? 0.0, 2, '.', ''), ENT_QUOTES) ?>"
+                                            >
+                                                Editar
                                             </button>
-                                        </form>
+                                            <button
+                                                type="button"
+                                                class="inline-flex items-center rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400 hidden"
+                                                data-activity-cancel-row="<?= (int) $activity['id'] ?>"
+                                            >
+                                                Cancelar
+                                            </button>
+                                            <form method="post" class="inline-flex" onsubmit="return confirm('¿Eliminar esta actividad?');">
+                                                <input type="hidden" name="action" value="delete_activity">
+                                                <input type="hidden" name="activity_id" value="<?= (int) $activity['id'] ?>">
+                                                <button class="inline-flex items-center rounded-full border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500" type="submit">
+                                                    Eliminar
+                                                </button>
+                                            </form>
+                                        </div>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -1413,7 +1908,243 @@ if (!empty($patient['birth_date'])) {
                 </div>
             <?php endif; ?>
         </div>
+        <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var activityForm = document.getElementById('activity-form');
+            if (!activityForm) {
+                return;
+            }
+            var actionInput = activityForm.querySelector('input[name="action"]');
+            var activityIdInput = activityForm.querySelector('input[name="activity_id"]');
+            var previousOutstandingInput = activityForm.querySelector('input[name="previous_outstanding"]');
+            var cancelButton = activityForm.querySelector('[data-activity-cancel]');
+            var submitButton = activityForm.querySelector('[data-activity-submit]');
+            var submitLabelCreate = submitButton ? submitButton.dataset.labelCreate || submitButton.textContent.trim() : 'Agregar actividad';
+            var submitLabelUpdate = submitButton ? submitButton.dataset.labelUpdate || 'Actualizar actividad' : 'Actualizar actividad';
+            var activityFields = {
+                activity_date: activityForm.querySelector('input[name="activity_date"]'),
+                description: activityForm.querySelector('textarea[name="description"]'),
+                related_visit: activityForm.querySelector('select[name="related_visit"]'),
+                fee: activityForm.querySelector('input[name="fee"]'),
+                payment: activityForm.querySelector('input[name="payment"]'),
+                balance: activityForm.querySelector('input[name="balance"]'),
+                activity_notes: activityForm.querySelector('textarea[name="activity_notes"]'),
+            };
+            var activityRowCancelButtons = Array.prototype.slice.call(document.querySelectorAll('[data-activity-cancel-row]'));
+            var currentActivityId = null;
+            var defaultPreviousOutstanding = activityForm.dataset.defaultPreviousOutstanding || activityForm.dataset.previousOutstanding || '0';
+            var initialValues = {};
+            Object.keys(activityFields).forEach(function (fieldName) {
+                var field = activityFields[fieldName];
+                initialValues[fieldName] = field ? field.value : '';
+            });
+
+            var normalizeAmount = function (value) {
+                if (typeof value !== 'string') {
+                    return '';
+                }
+                return value.replace(',', '.');
+            };
+            var updateBalanceField = function () {
+                if (!activityFields.balance || !activityFields.fee || !activityFields.payment) {
+                    return;
+                }
+                var previousOutstanding = Number.parseFloat(activityForm.dataset.previousOutstanding || '0');
+                if (!Number.isFinite(previousOutstanding) || previousOutstanding < 0) {
+                    previousOutstanding = 0;
+                }
+                var fee = Number.parseFloat(normalizeAmount(activityFields.fee.value));
+                if (!Number.isFinite(fee)) {
+                    fee = 0;
+                }
+                var payment = Number.parseFloat(normalizeAmount(activityFields.payment.value));
+                if (!Number.isFinite(payment)) {
+                    payment = 0;
+                }
+                var result = previousOutstanding + fee - payment;
+                activityFields.balance.value = result > 0 ? result.toFixed(2) : '0.00';
+            };
+
+            var setActivityCreateMode = function () {
+                if (actionInput) {
+                    actionInput.value = 'create_activity';
+                }
+                if (activityIdInput) {
+                    activityIdInput.value = '';
+                }
+                currentActivityId = null;
+                activityRowCancelButtons.forEach(function (button) {
+                    button.classList.add('hidden');
+                });
+                activityForm.dataset.previousOutstanding = defaultPreviousOutstanding;
+                if (previousOutstandingInput) {
+                    previousOutstandingInput.value = defaultPreviousOutstanding;
+                }
+                if (submitButton) {
+                    submitButton.textContent = submitLabelCreate;
+                }
+                if (cancelButton) {
+                    cancelButton.classList.add('hidden');
+                }
+                Object.keys(activityFields).forEach(function (fieldName) {
+                    var field = activityFields[fieldName];
+                    if (!field) {
+                        return;
+                    }
+                    var resetValue = initialValues[fieldName] || '';
+                    if (field.tagName === 'SELECT') {
+                        field.value = resetValue;
+                    } else {
+                        field.value = resetValue;
+                    }
+                });
+                updateBalanceField();
+            };
+
+            var setActivityEditMode = function (dataset) {
+                if (actionInput) {
+                    actionInput.value = 'update_activity';
+                }
+                if (activityIdInput) {
+                    activityIdInput.value = dataset.activityId || '';
+                }
+                currentActivityId = dataset.activityId || null;
+                activityRowCancelButtons.forEach(function (button) {
+                    if (button.dataset.activityCancelRow === currentActivityId) {
+                        button.classList.remove('hidden');
+                    } else {
+                        button.classList.add('hidden');
+                    }
+                });
+                activityForm.dataset.previousOutstanding = dataset.previousOutstanding || '0';
+                if (previousOutstandingInput) {
+                    previousOutstandingInput.value = dataset.previousOutstanding || '0';
+                }
+                if (submitButton) {
+                    submitButton.textContent = submitLabelUpdate;
+                }
+                if (cancelButton) {
+                    cancelButton.classList.remove('hidden');
+                }
+                if (activityFields.activity_date) {
+                    activityFields.activity_date.value = dataset.activityDate || '';
+                }
+                if (activityFields.description) {
+                    activityFields.description.value = dataset.description || '';
+                }
+                if (activityFields.related_visit) {
+                    activityFields.related_visit.value = dataset.relatedVisit || '';
+                }
+                if (activityFields.fee) {
+                    activityFields.fee.value = dataset.fee || '';
+                }
+                if (activityFields.payment) {
+                    activityFields.payment.value = dataset.payment || '';
+                }
+                if (activityFields.activity_notes) {
+                    activityFields.activity_notes.value = dataset.notes || '';
+                }
+                if (activityFields.balance) {
+                    activityFields.balance.value = dataset.balance || '';
+                }
+                updateBalanceField();
+                if (activityFields.activity_date) {
+                    activityFields.activity_date.focus();
+                }
+            };
+
+            document.querySelectorAll('[data-edit-activity]').forEach(function (button) {
+                button.addEventListener('click', function () {
+                    setActivityEditMode(button.dataset);
+                });
+            });
+
+            if (cancelButton) {
+                cancelButton.addEventListener('click', function () {
+                    setActivityCreateMode();
+                });
+            }
+
+            activityRowCancelButtons.forEach(function (button) {
+                button.addEventListener('click', function () {
+                    setActivityCreateMode();
+                    if (activityFields.activity_date) {
+                        activityFields.activity_date.focus();
+                    }
+                });
+            });
+
+            if (actionInput && actionInput.value === 'update_activity') {
+                if (submitButton) {
+                    submitButton.textContent = submitLabelUpdate;
+                }
+                if (cancelButton) {
+                    cancelButton.classList.remove('hidden');
+                }
+                if (activityIdInput && activityIdInput.value) {
+                    currentActivityId = activityIdInput.value;
+                    activityRowCancelButtons.forEach(function (button) {
+                        if (button.dataset.activityCancelRow === currentActivityId) {
+                            button.classList.remove('hidden');
+                        }
+                    });
+                }
+            }
+        });
+        </script>
     </div>
 </section>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var capitalizeInitialValue = function (value) {
+        if (typeof value !== 'string') {
+            return '';
+        }
+        if (value === '') {
+            return '';
+        }
+        var leadingMatch = value.match(/^\s*/);
+        var leadingWhitespace = leadingMatch ? leadingMatch[0] : '';
+        var withoutLeading = value.slice(leadingWhitespace.length);
+        if (withoutLeading === '') {
+            return leadingWhitespace;
+        }
+        var firstChar = withoutLeading.charAt(0).toLocaleUpperCase('es-ES');
+        return leadingWhitespace + firstChar + withoutLeading.slice(1);
+    };
+
+    var fields = document.querySelectorAll('[data-capitalize-initial]');
+    fields.forEach(function (field) {
+        var applyCapitalization = function () {
+            var originalSelectionStart = field.selectionStart;
+            var originalSelectionEnd = field.selectionEnd;
+            var newValue = capitalizeInitialValue(field.value);
+            if (field.value !== newValue) {
+                field.value = newValue;
+                if (typeof originalSelectionStart === 'number' && typeof originalSelectionEnd === 'number') {
+                    field.selectionStart = originalSelectionStart;
+                    field.selectionEnd = originalSelectionEnd;
+                }
+            }
+        };
+
+        field.addEventListener('blur', applyCapitalization);
+        field.addEventListener('change', applyCapitalization);
+        field.addEventListener('input', function () {
+            var trimmed = field.value.trimStart();
+            if (trimmed.length === 0) {
+                return;
+            }
+            var firstChar = trimmed.charAt(0);
+            if (firstChar !== firstChar.toLocaleUpperCase('es-ES')) {
+                applyCapitalization();
+            }
+        });
+
+        applyCapitalization();
+    });
+});
+</script>
 
 <?php require __DIR__ . '/templates/footer.php'; ?>
