@@ -33,38 +33,55 @@ function calculateAge(?string $birthDate): ?int
     }
 }
 
+function capitalizeInitial($value): ?string
+{
+    if ($value === null) {
+        return null;
+    }
+    if (is_array($value)) {
+        return null;
+    }
+    $trimmed = trim((string) $value);
+    if ($trimmed === '') {
+        return null;
+    }
+    $firstChar = mb_substr($trimmed, 0, 1, 'UTF-8');
+    $rest = mb_substr($trimmed, 1, null, 'UTF-8');
+    return mb_strtoupper($firstChar, 'UTF-8') . $rest;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $fullName = trim((string) post('full_name'));
-    if ($fullName === '') {
+    $fullName = capitalizeInitial(post('full_name'));
+    if ($fullName === null) {
         $errors[] = 'El nombre del paciente es obligatorio.';
     }
 
     $birthDate = normalizeDate(post('birth_date'));
     $payload = [
         'full_name' => $fullName,
-        'preferred_name' => trim((string) post('preferred_name')) ?: null,
-        'document_id' => trim((string) post('document_id')) ?: null,
+        'preferred_name' => capitalizeInitial(post('preferred_name')),
+        'document_id' => capitalizeInitial(post('document_id')),
         'birth_date' => $birthDate,
         'age' => calculateAge($birthDate),
         'gender' => post('gender') ?: null,
         'marital_status' => post('marital_status') ?: null,
-        'occupation' => trim((string) post('occupation')) ?: null,
-        'address' => trim((string) post('address')) ?: null,
+        'occupation' => capitalizeInitial(post('occupation')),
+        'address' => capitalizeInitial(post('address')),
         'email' => trim((string) post('email')) ?: null,
         'phone_primary' => trim((string) post('phone_primary')) ?: null,
         'phone_secondary' => trim((string) post('phone_secondary')) ?: null,
-        'referred_by' => trim((string) post('referred_by')) ?: null,
-        'primary_physician' => trim((string) post('primary_physician')) ?: null,
+        'referred_by' => capitalizeInitial(post('referred_by')),
+        'primary_physician' => capitalizeInitial(post('primary_physician')),
         'primary_physician_phone' => trim((string) post('primary_physician_phone')) ?: null,
-        'insurance_provider' => trim((string) post('insurance_provider')) ?: null,
-        'insurance_policy_number' => trim((string) post('insurance_policy_number')) ?: null,
-        'representative_name' => trim((string) post('representative_name')) ?: null,
-        'representative_document' => trim((string) post('representative_document')) ?: null,
+        'insurance_provider' => capitalizeInitial(post('insurance_provider')),
+        'insurance_policy_number' => capitalizeInitial(post('insurance_policy_number')),
+        'representative_name' => capitalizeInitial(post('representative_name')),
+        'representative_document' => capitalizeInitial(post('representative_document')),
         'representative_phone' => trim((string) post('representative_phone')) ?: null,
-        'emergency_contact' => trim((string) post('emergency_contact')) ?: null,
-        'emergency_contact_relationship' => trim((string) post('emergency_contact_relationship')) ?: null,
+        'emergency_contact' => capitalizeInitial(post('emergency_contact')),
+        'emergency_contact_relationship' => capitalizeInitial(post('emergency_contact_relationship')),
         'emergency_contact_phone' => trim((string) post('emergency_contact_phone')) ?: null,
-        'notes' => trim((string) post('notes')) ?: null,
+        'notes' => capitalizeInitial(post('notes')),
     ];
 
     if (empty($errors)) {
@@ -115,7 +132,7 @@ require __DIR__ . '/templates/header.php';
         </div>
     <?php endif; ?>
 
-    <form method="post" class="space-y-6">
+    <form method="post" class="space-y-6" data-capitalize-initial-form>
         <?php
         $genders = ['Femenino', 'Masculino', 'No binario', 'Prefiere no indicarlo'];
         $maritalStatuses = ['Soltero(a)', 'Casado(a)', 'Unión estable', 'Divorciado(a)', 'Viudo(a)', 'Prefiere no indicarlo'];
@@ -289,5 +306,59 @@ require __DIR__ . '/templates/header.php';
         </div>
     </form>
 </section>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var capitalizeInitialValue = function (value) {
+        if (typeof value !== 'string') {
+            return '';
+        }
+        if (value === '') {
+            return '';
+        }
+        var leadingMatch = value.match(/^\s*/);
+        var leadingWhitespace = leadingMatch ? leadingMatch[0] : '';
+        var withoutLeading = value.slice(leadingWhitespace.length);
+        if (withoutLeading === '') {
+            return leadingWhitespace;
+        }
+        var firstChar = withoutLeading.charAt(0).toLocaleUpperCase('es-ES');
+        return leadingWhitespace + firstChar + withoutLeading.slice(1);
+    };
+
+    document.querySelectorAll('[data-capitalize-initial-form]').forEach(function (form) {
+        var fields = form.querySelectorAll('input[type="text"], input[type="tel"], textarea');
+        fields.forEach(function (field) {
+            var applyCapitalization = function () {
+                var start = field.selectionStart;
+                var end = field.selectionEnd;
+                var formatted = capitalizeInitialValue(field.value);
+                if (field.value !== formatted) {
+                    field.value = formatted;
+                    if (typeof start === 'number' && typeof end === 'number') {
+                        field.selectionStart = start;
+                        field.selectionEnd = end;
+                    }
+                }
+            };
+
+            field.addEventListener('blur', applyCapitalization);
+            field.addEventListener('change', applyCapitalization);
+            field.addEventListener('input', function () {
+                var trimmed = field.value.trimStart();
+                if (trimmed.length === 0) {
+                    return;
+                }
+                var firstChar = trimmed.charAt(0);
+                if (firstChar !== firstChar.toLocaleUpperCase('es-ES')) {
+                    applyCapitalization();
+                }
+            });
+
+            applyCapitalization();
+        });
+    });
+});
+</script>
 
 <?php require __DIR__ . '/templates/footer.php'; ?>
