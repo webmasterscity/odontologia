@@ -43,6 +43,12 @@ function setupOdontogram() {
     }
 
     const payloadInput = form.querySelector('input[name="odontogram_payload"]');
+    const baseDirtyInput = form.querySelector('input[name="odontogram_base_dirty"]');
+    form.dataset.odontogramDirty = form.dataset.odontogramDirty || 'false';
+    form.dataset.odontogramBaseDirty = 'false';
+    if (baseDirtyInput) {
+        baseDirtyInput.value = '0';
+    }
     let state = {
         odontodiagrama: {},
         evolucion: {},
@@ -65,6 +71,9 @@ function setupOdontogram() {
     if (!wrappers.length) {
         return;
     }
+
+    const wrapperControllers = new Map();
+    const toggleLabelUpdaters = new Map();
 
     const allowedColors = ['blue', 'red'];
     const strokePalette = {
@@ -659,16 +668,35 @@ function setupOdontogram() {
         const normalized = cellState ? normalizeCellState(cellState) : null;
         if (normalized) {
             entry.surfaces[surface] = { ...normalized };
+            if (entry.__empty) {
+                delete entry.__empty;
+            }
         } else {
             delete entry.surfaces[surface];
         }
 
         const remainingSurfaces = Object.keys(entry.surfaces);
-        if (!remainingSurfaces.length && !entry.status && !entry.notes) {
-            delete state[diagram][tooth];
-        } else {
-            state[diagram][tooth] = entry;
+        const hasMetadata = Boolean(entry.status || entry.notes);
+        if (!remainingSurfaces.length) {
+            if (diagram === 'evolucion') {
+                entry.surfaces = {};
+                entry.__empty = true;
+                state[diagram][tooth] = entry;
+            } else if (hasMetadata) {
+                entry.surfaces = {};
+                if (entry.__empty) {
+                    delete entry.__empty;
+                }
+                state[diagram][tooth] = entry;
+            } else {
+                delete state[diagram][tooth];
+            }
+            return;
         }
+        if (entry.__empty) {
+            delete entry.__empty;
+        }
+        state[diagram][tooth] = entry;
     };
 
     const setActiveButton = (buttons, activeButton) => {
@@ -685,13 +713,52 @@ function setupOdontogram() {
             state[diagram] = {};
         }
 
+        const initialLocked = (wrapper.dataset.locked || 'false') === 'true';
+        const isLocked = () => wrapper.dataset.locked === 'true';
+
+        const rememberOriginalTabIndex = (element) => {
+            if (!element.dataset.originalTabindexStored) {
+                element.dataset.originalTabindexStored = 'true';
+                element.dataset.originalTabindex = element.getAttribute('tabindex') ?? '';
+            }
+        };
+
         const colorButtons = Array.from(wrapper.querySelectorAll('.color-option'));
         const modeButtons = Array.from(wrapper.querySelectorAll('.mode-option'));
         const markButtons = Array.from(wrapper.querySelectorAll('.mark-option'));
         const cells = Array.from(wrapper.querySelectorAll('.tooth-cell'));
+        cells.forEach(rememberOriginalTabIndex);
         const cellLookup = new Map();
         const makeCellKey = (tooth, surfaceKey) => `${tooth}::${surfaceKey}`;
         const symbolElements = new Map();
+        const disableButtonGroup = (buttons, disabled) => {
+            buttons.forEach((button) => {
+                button.disabled = disabled;
+                button.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+            });
+        };
+        const setWrapperLocked = (locked) => {
+            const lockedValue = locked ? 'true' : 'false';
+            wrapper.dataset.locked = lockedValue;
+            wrapper.classList.toggle('is-locked', locked);
+            disableButtonGroup(colorButtons, locked);
+            disableButtonGroup(modeButtons, locked);
+            disableButtonGroup(markButtons, locked);
+            cells.forEach((cell) => {
+                rememberOriginalTabIndex(cell);
+                if (locked) {
+                    cell.setAttribute('tabindex', '-1');
+                } else {
+                    const original = cell.dataset.originalTabindex || '';
+                    if (original !== '') {
+                        cell.setAttribute('tabindex', original);
+                    } else {
+                        cell.removeAttribute('tabindex');
+                    }
+                }
+            });
+            refreshSymbolInteractivity();
+        };
         const dragState = {
             symbolElement: null,
             pointerId: null,
@@ -799,9 +866,12 @@ function setupOdontogram() {
             };
             setCellState(ctxDiagram, toothCode, surface, nextState);
             form.dataset.odontogramDirty = 'true';
+            if (ctxDiagram === 'odontodiagrama') {
+                form.dataset.odontogramBaseDirty = 'true';
+            }
         };
         const handlePointerDown = (event) => {
-            if (currentMode !== 'move') {
+            if (currentMode !== 'move' || isLocked()) {
                 return;
             }
             const symbolElement = event.currentTarget;
@@ -848,6 +918,9 @@ function setupOdontogram() {
             symbolElement.classList.add('is-dragging');
         };
         const handlePointerMove = (event) => {
+            if (isLocked()) {
+                return;
+            }
             if (!dragState.symbolElement || dragState.pointerId !== event.pointerId) {
                 return;
             }
@@ -902,7 +975,7 @@ function setupOdontogram() {
             finishPointerInteraction(event, true);
         };
         const handleSymbolKeydown = (event) => {
-            if (currentMode !== 'move') {
+            if (currentMode !== 'move' || isLocked()) {
                 return;
             }
             const { key } = event;
@@ -945,8 +1018,8 @@ function setupOdontogram() {
             dragState.sector = restriction.sector;
             dragState.shape = restriction.shape;
         };
-        const refreshSymbolInteractivity = () => {
-            const isMoveMode = currentMode === 'move';
+        function refreshSymbolInteractivity() {
+            const isMoveMode = currentMode === 'move' && !isLocked();
             symbolElements.forEach((symbolElement) => {
                 if (!symbolElement) {
                     return;
@@ -956,7 +1029,7 @@ function setupOdontogram() {
                 symbolElement.setAttribute('tabindex', isMoveMode ? '0' : '-1');
                 symbolElement.style.touchAction = 'none';
             });
-        };
+        }
         const initializeSymbolElement = (symbolElement) => {
             if (!symbolElement) {
                 return;
@@ -974,7 +1047,7 @@ function setupOdontogram() {
             symbolElement.addEventListener('pointercancel', handlePointerCancel);
             symbolElement.addEventListener('keydown', handleSymbolKeydown);
             symbolElement.addEventListener('focus', () => {
-                if (currentMode === 'move') {
+                if (currentMode === 'move' && !isLocked()) {
                     symbolElement.style.cursor = 'grab';
                 }
             });
@@ -1069,6 +1142,9 @@ function setupOdontogram() {
 
         colorButtons.forEach((button) => {
             button.addEventListener('click', () => {
+                if (isLocked()) {
+                    return;
+                }
                 if (button === currentColorButton) {
                     return;
                 }
@@ -1082,6 +1158,9 @@ function setupOdontogram() {
 
         modeButtons.forEach((button) => {
             button.addEventListener('click', () => {
+                if (isLocked()) {
+                    return;
+                }
                 if (button === currentModeButton) {
                     return;
                 }
@@ -1093,6 +1172,9 @@ function setupOdontogram() {
 
         markButtons.forEach((button) => {
             button.addEventListener('click', () => {
+                if (isLocked()) {
+                    return;
+                }
                 if (button === currentMarkButton) {
                     setMarkButton(null);
                     return;
@@ -1189,6 +1271,9 @@ function setupOdontogram() {
                 if (!toothCode || !surface) {
                     return;
                 }
+                if (isLocked()) {
+                    return;
+                }
                 if (currentMode === 'move') {
                     return;
                 }
@@ -1214,6 +1299,9 @@ function setupOdontogram() {
                         syncSymbolElement(cellKey, symbolElement);
                     }
                     form.dataset.odontogramDirty = 'true';
+                    if (diagram === 'odontodiagrama') {
+                        form.dataset.odontogramBaseDirty = 'true';
+                    }
                     return;
                 }
 
@@ -1251,6 +1339,9 @@ function setupOdontogram() {
                         syncSymbolElement(cellKey, symbolElement);
                     }
                     form.dataset.odontogramDirty = 'true';
+                    if (diagram === 'odontodiagrama') {
+                        form.dataset.odontogramBaseDirty = 'true';
+                    }
                     return;
                 }
 
@@ -1279,16 +1370,57 @@ function setupOdontogram() {
                     syncSymbolElement(cellKey, symbolElement);
                 }
                 form.dataset.odontogramDirty = 'true';
+                if (diagram === 'odontodiagrama') {
+                    form.dataset.odontogramBaseDirty = 'true';
+                }
             });
 
             if (cell.tagName !== 'BUTTON') {
                 cell.addEventListener('keydown', (event) => {
                     if (event.key === 'Enter' || event.key === ' ') {
+                        if (isLocked()) {
+                            return;
+                        }
                         event.preventDefault();
                         cell.dispatchEvent(new MouseEvent('click', { bubbles: true }));
                     }
                 });
             }
+        });
+
+        setWrapperLocked(initialLocked);
+
+        wrapperControllers.set(diagram, {
+            isLocked,
+            setLocked: (locked) => {
+                setWrapperLocked(Boolean(locked));
+            },
+        });
+    });
+
+    const toggleButtons = Array.from(form.querySelectorAll('[data-odontogram-toggle]'));
+    toggleButtons.forEach((button) => {
+        const targetDiagram = button.dataset.odontogramToggle || '';
+        const controller = wrapperControllers.get(targetDiagram);
+        if (!controller) {
+            return;
+        }
+        const updateLabel = () => {
+            const locked = controller.isLocked();
+            const nextLabel = locked
+                ? (button.dataset.labelLocked || button.textContent)
+                : (button.dataset.labelUnlocked || button.textContent);
+            button.textContent = nextLabel;
+            button.setAttribute('aria-pressed', locked ? 'false' : 'true');
+            button.classList.toggle('is-active', !locked);
+        };
+        button.type = 'button';
+        updateLabel();
+        toggleLabelUpdaters.set(targetDiagram, updateLabel);
+        button.addEventListener('click', () => {
+            const nextLocked = !controller.isLocked();
+            controller.setLocked(nextLocked);
+            updateLabel();
         });
     });
 
@@ -1296,7 +1428,18 @@ function setupOdontogram() {
         if (!payloadInput) {
             return;
         }
+        if (baseDirtyInput) {
+            baseDirtyInput.value = form.dataset.odontogramBaseDirty === 'true' ? '1' : '0';
+        }
         payloadInput.value = JSON.stringify(state);
+        const baseController = wrapperControllers.get('odontodiagrama');
+        if (baseController) {
+            baseController.setLocked(true);
+            const updateLabel = toggleLabelUpdaters.get('odontodiagrama');
+            if (updateLabel) {
+                updateLabel();
+            }
+        }
     });
 }
 

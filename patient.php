@@ -550,6 +550,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!is_array($decodedPayload)) {
             $errors[] = 'El formato del odontograma no es válido.';
         } else {
+            $baseDirty = (string) post('odontogram_base_dirty') === '1';
+            $submittedEvolutionTeeth = [];
+            if (!empty($decodedPayload['evolucion']) && is_array($decodedPayload['evolucion'])) {
+                foreach ($decodedPayload['evolucion'] as $submittedTooth => $submittedPayload) {
+                    $submittedToothKey = trim((string) $submittedTooth);
+                    if ($submittedToothKey === '') {
+                        continue;
+                    }
+                    if (is_array($submittedPayload)) {
+                        $submittedEvolutionTeeth[$submittedToothKey] = true;
+                    }
+                }
+            }
             $diagramKeys = ['odontodiagrama', 'evolucion'];
             $normalized = [];
             foreach ($diagramKeys as $diagramKey) {
@@ -566,7 +579,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         continue;
                     }
                     $surfaces = $toothPayload['surfaces'] ?? [];
-                    if (is_array($surfaces)) {
+                    $skipBaseSurfaces = $diagramKey === 'odontodiagrama' && !$baseDirty;
+                    if (is_array($surfaces) && !$skipBaseSurfaces) {
                         foreach ($surfaces as $surfaceKey => $surfaceData) {
                             if (!array_key_exists($surfaceKey, $allSurfaces) || !is_array($surfaceData)) {
                                 continue;
@@ -627,9 +641,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
 
+            foreach ($submittedEvolutionTeeth as $submittedToothKey => $_) {
+                if (!isset($normalized[$submittedToothKey])) {
+                    $normalized[$submittedToothKey] = [];
+                }
+                if (!isset($normalized[$submittedToothKey]['evolucion'])) {
+                    $normalized[$submittedToothKey]['evolucion'] = ['surfaces' => []];
+                } elseif (!isset($normalized[$submittedToothKey]['evolucion']['surfaces'])) {
+                    $normalized[$submittedToothKey]['evolucion']['surfaces'] = [];
+                }
+            }
+
             try {
                 $pdo->beginTransaction();
                 $existingEvolutionSurfaces = [];
+                $existingBaseSurfaces = [];
                 $existingStmt = $pdo->prepare('SELECT tooth_code, surface_data FROM odontogram_entries WHERE patient_id = :patient_id');
                 $existingStmt->execute([':patient_id' => $patientId]);
                 foreach ($existingStmt->fetchAll(PDO::FETCH_ASSOC) as $existingEntry) {
@@ -637,26 +663,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($existingTooth === '') {
                         continue;
                     }
+                    $existingEvolutionSurfaces[$existingTooth] = [];
+                    $existingBaseSurfaces[$existingTooth] = [];
                     if (empty($existingEntry['surface_data'])) {
-                        $existingEvolutionSurfaces[$existingTooth] = [];
                         continue;
                     }
                     $existingSurfaceData = json_decode((string) $existingEntry['surface_data'], true);
-                    if (!is_array($existingSurfaceData) || empty($existingSurfaceData['evolucion']) || !is_array($existingSurfaceData['evolucion'])) {
-                        $existingEvolutionSurfaces[$existingTooth] = [];
+                    if (!is_array($existingSurfaceData)) {
                         continue;
                     }
-                    foreach ($existingSurfaceData['evolucion'] as $surfaceKey => $surfacePayload) {
-                        if (!is_array($surfacePayload)) {
-                            continue;
+                    if (!empty($existingSurfaceData['odontodiagrama']) && is_array($existingSurfaceData['odontodiagrama'])) {
+                        $baseSurfaces = [];
+                        foreach ($existingSurfaceData['odontodiagrama'] as $surfaceKey => $surfacePayload) {
+                            if (!is_array($surfacePayload)) {
+                                continue;
+                            }
+                            $hasColor = isset($surfacePayload['color']) && trim((string) $surfacePayload['color']) !== '';
+                            $hasMark = isset($surfacePayload['mark']) && trim((string) $surfacePayload['mark']) !== '';
+                            if ($hasColor || $hasMark) {
+                                $baseSurfaces[$surfaceKey] = $surfacePayload;
+                            }
                         }
-                        $hasColor = isset($surfacePayload['color']) && trim((string) $surfacePayload['color']) !== '';
-                        $hasMark = isset($surfacePayload['mark']) && trim((string) $surfacePayload['mark']) !== '';
-                        if ($hasColor || $hasMark) {
-                            $existingEvolutionSurfaces[$existingTooth][$surfaceKey] = true;
+                        $existingBaseSurfaces[$existingTooth] = $baseSurfaces;
+                    }
+                    if (!empty($existingSurfaceData['evolucion']) && is_array($existingSurfaceData['evolucion'])) {
+                        foreach ($existingSurfaceData['evolucion'] as $surfaceKey => $surfacePayload) {
+                            if (!is_array($surfacePayload)) {
+                                continue;
+                            }
+                            $hasColor = isset($surfacePayload['color']) && trim((string) $surfacePayload['color']) !== '';
+                            $hasMark = isset($surfacePayload['mark']) && trim((string) $surfacePayload['mark']) !== '';
+                            if ($hasColor || $hasMark) {
+                                $existingEvolutionSurfaces[$existingTooth][$surfaceKey] = true;
+                            }
                         }
                     }
-                    $existingEvolutionSurfaces[$existingTooth] = $existingEvolutionSurfaces[$existingTooth] ?? [];
+                }
+
+                if (!$baseDirty) {
+                    foreach ($existingBaseSurfaces as $existingTooth => $baseSurfaces) {
+                        if (empty($baseSurfaces)) {
+                            continue;
+                        }
+                        if (!isset($normalized[$existingTooth])) {
+                            $normalized[$existingTooth] = [];
+                        }
+                        if (empty($normalized[$existingTooth]['odontodiagrama']['surfaces'])) {
+                            $normalized[$existingTooth]['odontodiagrama']['surfaces'] = $baseSurfaces;
+                        }
+                    }
                 }
 
                 $pdo->prepare('DELETE FROM odontogram_entries WHERE patient_id = :patient_id')
@@ -672,21 +727,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'evolucion' => $diagramData['evolucion']['surfaces'] ?? [],
                     ];
 
-                    if (!empty($surfacesPayload['odontodiagrama'])) {
+                    $baseSurfaces = $surfacesPayload['odontodiagrama'];
+                    $hasBaseSurfaces = !empty($baseSurfaces);
+                    $hasSubmittedEvolution = isset($submittedEvolutionTeeth[$toothCodeKey]);
+                    if ($hasBaseSurfaces) {
                         if (!is_array($surfacesPayload['evolucion'])) {
                             $surfacesPayload['evolucion'] = [];
                         }
-                        $existingEvolutionForTooth = $existingEvolutionSurfaces[$toothCodeKey] ?? [];
-                        if (empty($surfacesPayload['evolucion'])) {
-                            if (empty($existingEvolutionForTooth)) {
-                                $surfacesPayload['evolucion'] = $surfacesPayload['odontodiagrama'];
-                            }
-                        } else {
-                            foreach ($surfacesPayload['odontodiagrama'] as $surfaceKey => $surfaceState) {
-                                if (isset($surfacesPayload['evolucion'][$surfaceKey]) || isset($existingEvolutionForTooth[$surfaceKey])) {
-                                    continue;
-                                }
+                        if ($baseDirty) {
+                            foreach ($baseSurfaces as $surfaceKey => $surfaceState) {
                                 $surfacesPayload['evolucion'][$surfaceKey] = $surfaceState;
+                            }
+                        } elseif (!$hasSubmittedEvolution) {
+                            $existingEvolutionForTooth = $existingEvolutionSurfaces[$toothCodeKey] ?? [];
+                            if (empty($surfacesPayload['evolucion'])) {
+                                if (empty($existingEvolutionForTooth)) {
+                                    $surfacesPayload['evolucion'] = $baseSurfaces;
+                                }
+                            } else {
+                                foreach ($baseSurfaces as $surfaceKey => $surfaceState) {
+                                    if (isset($surfacesPayload['evolucion'][$surfaceKey]) || isset($existingEvolutionForTooth[$surfaceKey])) {
+                                        continue;
+                                    }
+                                    $surfacesPayload['evolucion'][$surfaceKey] = $surfaceState;
+                                }
                             }
                         }
                     }
@@ -923,6 +987,7 @@ $odontogramPayload = [
     'odontodiagrama' => [],
     'evolucion' => [],
 ];
+$evolutionHasRecord = [];
 foreach ($odontogramStmt->fetchAll(PDO::FETCH_ASSOC) as $entry) {
     $decodedSurfaces = [];
     if (!empty($entry['surface_data'])) {
@@ -931,8 +996,11 @@ foreach ($odontogramStmt->fetchAll(PDO::FETCH_ASSOC) as $entry) {
             $decodedSurfaces = $decoded;
         }
     }
+    if (array_key_exists('evolucion', $decodedSurfaces) && is_array($decodedSurfaces['evolucion'])) {
+        $evolutionHasRecord[$entry['tooth_code']] = true;
+    }
     foreach (['odontodiagrama', 'evolucion'] as $diagramKey) {
-        if (empty($decodedSurfaces[$diagramKey]) || !is_array($decodedSurfaces[$diagramKey])) {
+        if (!array_key_exists($diagramKey, $decodedSurfaces) || !is_array($decodedSurfaces[$diagramKey])) {
             continue;
         }
         $odontogramPayload[$diagramKey][$entry['tooth_code']] = [
@@ -962,6 +1030,9 @@ foreach ($odontogramPayload['odontodiagrama'] as $toothCode => $baseEntry) {
                 break;
             }
         }
+    }
+    if ($evolutionHasRecord[$toothCode] ?? false) {
+        continue;
     }
     if (!isset($odontogramPayload['evolucion'][$toothCode]) || empty($odontogramPayload['evolucion'][$toothCode]['surfaces'])) {
         $clone = [];
@@ -1216,6 +1287,7 @@ if (!empty($patient['birth_date'])) {
     <form method="post" class="space-y-6" data-odontogram-form>
         <input type="hidden" name="action" value="save_odontogram">
         <input type="hidden" name="odontogram_payload" value="<?= htmlspecialchars($odontogramInitialJson, ENT_QUOTES) ?>">
+        <input type="hidden" name="odontogram_base_dirty" value="0">
         <svg
             aria-hidden="true"
             focusable="false"
