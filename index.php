@@ -137,41 +137,41 @@ require __DIR__ . '/templates/header.php';
 <?php endif; ?>
 
 <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-    <article class="group rounded-2xl bg-white p-6 shadow-sm shadow-slate-200/70 ring-1 ring-slate-200/70 transition duration-200 hover:-translate-y-1 hover:shadow-lg">
+    <a href="#listado-pacientes" class="group block rounded-2xl bg-white p-6 shadow-sm shadow-slate-200/70 ring-1 ring-slate-200/70 transition duration-200 hover:-translate-y-1 hover:shadow-lg hover:ring-brand-300 cursor-pointer">
         <div class="flex items-center justify-between">
             <p class="text-sm font-medium text-slate-500">Total de pacientes</p>
             <span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand-50 text-lg">👥</span>
         </div>
         <p class="mt-4 text-3xl font-semibold text-slate-900"><?= number_format($totalPatients) ?></p>
         <p class="mt-2 text-xs uppercase tracking-wide text-slate-400">Registros activos</p>
-    </article>
-    <article class="group rounded-2xl bg-white p-6 shadow-sm shadow-slate-200/70 ring-1 ring-slate-200/70 transition duration-200 hover:-translate-y-1 hover:shadow-lg">
+    </a>
+    <a href="#listado-pacientes" class="group block rounded-2xl bg-white p-6 shadow-sm shadow-slate-200/70 ring-1 ring-slate-200/70 transition duration-200 hover:-translate-y-1 hover:shadow-lg hover:ring-brand-300 cursor-pointer">
         <div class="flex items-center justify-between">
             <p class="text-sm font-medium text-slate-500">Consultas en <?= htmlspecialchars(ucfirst($currentMonthLabel) . ' ' . date('Y')) ?></p>
             <span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand-50 text-lg">📅</span>
         </div>
         <p class="mt-4 text-3xl font-semibold text-slate-900"><?= number_format($totalVisitsThisMonth) ?></p>
         <p class="mt-2 text-xs uppercase tracking-wide text-slate-400">Control mensual</p>
-    </article>
-    <article class="group rounded-2xl bg-white p-6 shadow-sm shadow-slate-200/70 ring-1 ring-slate-200/70 transition duration-200 hover:-translate-y-1 hover:shadow-lg">
+    </a>
+    <a href="#listado-pacientes" class="group block rounded-2xl bg-white p-6 shadow-sm shadow-slate-200/70 ring-1 ring-slate-200/70 transition duration-200 hover:-translate-y-1 hover:shadow-lg hover:ring-brand-300 cursor-pointer">
         <div class="flex items-center justify-between">
             <p class="text-sm font-medium text-slate-500">Saldo pendiente</p>
             <span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand-50 text-lg">💳</span>
         </div>
         <p class="mt-4 text-3xl font-semibold text-slate-900">Bs <?= number_format($pendingBalance, 2, ',', '.') ?></p>
         <p class="mt-2 text-xs uppercase tracking-wide text-slate-400">Cuentas por cobrar</p>
-    </article>
-    <article class="group rounded-2xl bg-white p-6 shadow-sm shadow-slate-200/70 ring-1 ring-slate-200/70 transition duration-200 hover:-translate-y-1 hover:shadow-lg">
+    </a>
+    <a href="#citas" class="group block rounded-2xl bg-white p-6 shadow-sm shadow-slate-200/70 ring-1 ring-slate-200/70 transition duration-200 hover:-translate-y-1 hover:shadow-lg hover:ring-brand-300 cursor-pointer">
         <div class="flex items-center justify-between">
             <p class="text-sm font-medium text-slate-500">Próximas citas</p>
             <span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand-50 text-lg">⏰</span>
         </div>
         <p class="mt-4 text-3xl font-semibold text-slate-900"><?= count($upcomingAppointments) ?></p>
         <p class="mt-2 text-xs uppercase tracking-wide text-slate-400">Seguimiento inmediato</p>
-    </article>
+    </a>
 </section>
 
-<section class="rounded-3xl bg-white/90 p-6 shadow-sm shadow-slate-200/60 ring-1 ring-slate-200/70 sm:p-8">
+<section class="rounded-3xl bg-white/90 p-6 shadow-sm shadow-slate-200/60 ring-1 ring-slate-200/70 sm:p-8" id="listado-pacientes">
     <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
             <h2 class="text-xl font-semibold text-slate-900">Listado de pacientes</h2>
@@ -185,10 +185,6 @@ require __DIR__ . '/templates/header.php';
                     Buscar
                 </button>
             </form>
-            <a class="inline-flex items-center justify-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-soft transition hover:-translate-y-0.5 hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900" href="patient_form.php">
-                <span class="text-base">➕</span>
-                Nuevo paciente
-            </a>
         </div>
     </div>
 

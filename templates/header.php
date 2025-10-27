@@ -58,20 +58,23 @@ $currentScript = basename($_SERVER['SCRIPT_NAME']);
                 <p class="text-sm text-slate-500">Historia clínica digital y evolución de pacientes</p>
             </div>
         </div>
-        <nav class="flex flex-wrap items-center gap-2 text-sm font-medium text-slate-500">
+        <nav class="flex flex-wrap items-center gap-3 text-sm font-medium">
             <?php
             $links = [
-                ['href' => 'index.php', 'label' => 'Pacientes', 'match' => ['index.php']],
-                ['href' => 'patient_form.php', 'label' => 'Registrar paciente', 'match' => ['patient_form.php']],
-                ['href' => 'index.php#respaldo', 'label' => 'Respaldo y copias', 'match' => ['index.php']],
+                ['href' => 'index.php', 'label' => 'Pacientes', 'match' => ['index.php'], 'icon' => '👥'],
+                ['href' => 'patient_form.php', 'label' => 'Registrar paciente', 'match' => ['patient_form.php'], 'icon' => '➕'],
+                ['href' => 'index.php#respaldo', 'label' => 'Respaldo y copias', 'match' => ['index.php'], 'icon' => '💾'],
             ];
             foreach ($links as $link) {
                 $isActive = in_array($currentScript, $link['match'], true);
-                $classes = 'rounded-full px-3 py-2 transition-colors duration-200';
+                $classes = 'inline-flex items-center gap-2 rounded-xl px-4 py-2.5 transition-all duration-200 font-semibold';
                 $classes .= $isActive
-                    ? ' bg-brand-100 text-brand-700 shadow-sm ring-1 ring-brand-300/70'
-                    : ' text-slate-600 hover:text-brand-600 hover:bg-brand-50';
-                echo '<a href="' . htmlspecialchars($link['href']) . '" class="' . $classes . '">' . htmlspecialchars($link['label']) . '</a>';
+                    ? ' bg-gradient-to-r from-brand-600 to-brand-500 text-white shadow-lg shadow-brand-500/30 hover:shadow-xl hover:shadow-brand-500/40 hover:scale-105'
+                    : ' bg-white text-slate-700 shadow-sm ring-1 ring-slate-200 hover:ring-brand-300 hover:text-brand-600 hover:shadow-md hover:scale-105';
+                echo '<a href="' . htmlspecialchars($link['href']) . '" class="' . $classes . '">';
+                echo '<span class="text-base">' . $link['icon'] . '</span>';
+                echo '<span>' . htmlspecialchars($link['label']) . '</span>';
+                echo '</a>';
             }
             ?>
         </nav>

@@ -22,6 +22,7 @@ if (!$patient) {
 
 $messages = [];
 $errors = [];
+$today = date('Y-m-d');
 
 $formatValue = static function ($value, string $default = '—'): string {
     if ($value === null) {
@@ -665,7 +666,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$errors) {
             $fee = is_numeric(post('fee')) ? (float) post('fee') : 0.0;
             $payment = is_numeric(post('payment')) ? (float) post('payment') : 0.0;
-            $balance = is_numeric(post('balance')) ? (float) post('balance') : $fee - $payment;
+
+            $balanceQuery = $pdo->prepare('SELECT balance FROM treatment_activities WHERE patient_id = :id ORDER BY date(activity_date) DESC, id DESC LIMIT 1');
+            $balanceQuery->execute([':id' => $patientId]);
+            $previousOutstanding = (float) $balanceQuery->fetchColumn();
+            if ($previousOutstanding < 0) {
+                $previousOutstanding = 0.0;
+            }
+
+            $balance = $previousOutstanding + $fee - $payment;
+            if ($balance < 0) {
+                $balance = 0.0;
+            }
+
             insertRow($pdo, 'treatment_activities', [
                 'patient_id' => $patientId,
                 'visit_id' => post('related_visit') ? (int) post('related_visit') : null,
@@ -734,7 +747,11 @@ $activitiesStmt = $pdo->prepare('SELECT * FROM treatment_activities WHERE patien
 $activitiesStmt->execute([':id' => $patientId]);
 $activities = $activitiesStmt->fetchAll(PDO::FETCH_ASSOC);
 
-$totalBalance = array_sum(array_map(fn($row) => (float) $row['balance'], $activities));
+$latestOutstanding = $activities ? (float) $activities[0]['balance'] : 0.0;
+if ($latestOutstanding < 0) {
+    $latestOutstanding = 0.0;
+}
+$totalBalance = $latestOutstanding;
 
 $pageTitle = 'Ficha de ' . $patient['full_name'];
 require __DIR__ . '/templates/header.php';
@@ -781,8 +798,8 @@ if (!empty($patient['birth_date'])) {
             <a class="inline-flex items-center justify-center gap-2 rounded-full border border-brand-200 bg-brand-50 px-4 py-2 text-xs font-semibold text-brand-700 transition hover:-translate-y-0.5 hover:bg-brand-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500" href="patient_history.php?id=<?= $patientId ?>">
                 Historia clínica
             </a>
-            <a class="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 transition hover:border-brand-200 hover:text-brand-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500" href="patient_form.php?id=<?= $patientId ?>">
-                Editar datos
+            <a class="inline-flex items-center rounded-full border border-slate-200 px-3.5 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-brand-200 hover:text-brand-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500" href="patient_form.php?id=<?= $patientId ?>">
+                Editar paciente
             </a>
             <a class="inline-flex items-center justify-center gap-2 rounded-full bg-brand-600 px-4 py-2 text-xs font-semibold text-white shadow-soft transition hover:-translate-y-0.5 hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500" href="index.php">
                 Volver al listado
@@ -790,130 +807,130 @@ if (!empty($patient['birth_date'])) {
         </div>
     </div>
     <div class="grid gap-6 lg:grid-cols-2 xl:grid-cols-4">
-        <div class="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-5 shadow-inner xl:col-span-2">
-            <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-600">Información general</h3>
-            <dl class="mt-3 space-y-2 text-sm text-slate-600">
-                <div class="flex justify-between gap-2">
-                    <dt class="font-medium text-slate-700">Nombre y apellidos</dt>
-                    <dd class="text-right"><?= $formatValue($patient['full_name'] ?? null) ?></dd>
+        <div class="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-6 shadow-inner xl:col-span-2">
+            <h3 class="mb-6 text-xs font-semibold uppercase tracking-wide text-slate-600">Información general</h3>
+            <dl class="space-y-4 text-sm text-slate-600">
+                <div class="flex justify-between gap-4 border-b border-slate-200/60 pb-3 mb-3">
+                    <dt class="font-semibold text-slate-700">Nombres y apellidos:</dt>
+                    <dd class="text-right font-medium text-slate-900"><?= $formatValue($patient['full_name'] ?? null) ?></dd>
                 </div>
-                <div class="flex justify-between gap-2">
-                    <dt class="font-medium text-slate-700">Nombre preferido</dt>
+                <div class="flex justify-between gap-4 pb-2">
+                    <dt class="font-medium text-slate-700">Nombre preferido:</dt>
                     <dd class="text-right"><?= $formatValue($patient['preferred_name'] ?? null) ?></dd>
                 </div>
-                <div class="flex justify-between gap-2">
-                    <dt class="font-medium text-slate-700">Documento</dt>
+                <div class="flex justify-between gap-4 pb-2">
+                    <dt class="font-medium text-slate-700">Documento:</dt>
                     <dd class="text-right"><?= $formatValue($patient['document_id'] ?? null) ?></dd>
                 </div>
-                <div class="flex justify-between gap-2">
-                    <dt class="font-medium text-slate-700">Fecha de nacimiento</dt>
+                <div class="flex justify-between gap-4 pb-2">
+                    <dt class="font-medium text-slate-700">Fecha de nacimiento:</dt>
                     <dd class="text-right"><?= htmlspecialchars($birthDateDisplay) ?></dd>
                 </div>
-                <div class="flex justify-between gap-2">
-                    <dt class="font-medium text-slate-700">Edad</dt>
+                <div class="flex justify-between gap-4 pb-2">
+                    <dt class="font-medium text-slate-700">Edad:</dt>
                     <dd class="text-right"><?= $patient['age'] ? (int) $patient['age'] . ' años' : '—' ?></dd>
                 </div>
-                <div class="flex justify-between gap-2">
-                    <dt class="font-medium text-slate-700">Género</dt>
+                <div class="flex justify-between gap-4 pb-2">
+                    <dt class="font-medium text-slate-700">Género:</dt>
                     <dd class="text-right"><?= $formatValue($patient['gender'] ?? null) ?></dd>
                 </div>
-                <div class="flex justify-between gap-2">
-                    <dt class="font-medium text-slate-700">Estado civil</dt>
+                <div class="flex justify-between gap-4 pb-2">
+                    <dt class="font-medium text-slate-700">Estado civil:</dt>
                     <dd class="text-right"><?= $formatValue($patient['marital_status'] ?? null) ?></dd>
                 </div>
-                <div class="space-y-1">
-                    <dt class="font-medium text-slate-700">Ocupación</dt>
-                    <dd><?= $formatValue($patient['occupation'] ?? null) ?></dd>
+                <div class="flex justify-between gap-4 pb-2">
+                    <dt class="font-medium text-slate-700">Ocupación:</dt>
+                    <dd class="text-right"><?= $formatValue($patient['occupation'] ?? null) ?></dd>
                 </div>
-                <div class="space-y-1">
-                    <dt class="font-medium text-slate-700">Dirección</dt>
-                    <dd><?= $formatMultiline($patient['address'] ?? null) ?></dd>
+                <div class="flex justify-between gap-4 pb-2">
+                    <dt class="font-medium text-slate-700">Dirección:</dt>
+                    <dd class="text-right"><?= $formatValue($patient['address'] ?? null) ?></dd>
                 </div>
             </dl>
         </div>
-        <div class="rounded-2xl border border-slate-200/80 bg-white p-5 xl:col-span-2 space-y-4">
+        <div class="rounded-2xl border border-slate-200/80 bg-white p-6 xl:col-span-2 space-y-5">
             <div>
-                <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-600">Red de contacto</h3>
-                <dl class="mt-3 space-y-2 text-sm text-slate-600">
-                    <div class="flex justify-between gap-2">
-                        <dt class="font-medium text-slate-700">Correo</dt>
+                <h3 class="mb-6 text-xs font-semibold uppercase tracking-wide text-slate-600">Red de contacto</h3>
+                <dl class="space-y-3 text-sm text-slate-600">
+                    <div class="flex justify-between gap-4 pb-2">
+                        <dt class="font-medium text-slate-700">Correo:</dt>
                         <dd class="text-right break-words"><?= $formatValue($patient['email'] ?? null) ?></dd>
                     </div>
-                    <div class="flex justify-between gap-2">
-                        <dt class="font-medium text-slate-700">Tel. principal</dt>
+                    <div class="flex justify-between gap-4 pb-2">
+                        <dt class="font-medium text-slate-700">Tel. principal:</dt>
                         <dd class="text-right"><?= $formatValue($patient['phone_primary'] ?? null) ?></dd>
                     </div>
-                    <div class="flex justify-between gap-2">
-                        <dt class="font-medium text-slate-700">Tel. alterno</dt>
+                    <div class="flex justify-between gap-4 pb-2">
+                        <dt class="font-medium text-slate-700">Tel. alterno:</dt>
                         <dd class="text-right"><?= $formatValue($patient['phone_secondary'] ?? null) ?></dd>
                     </div>
                 </dl>
             </div>
-            <div class="rounded-xl border border-brand-100/70 bg-brand-50/50 p-4">
-                <h4 class="text-xs font-semibold uppercase tracking-wide text-brand-700">Contacto de emergencia</h4>
-                <dl class="mt-2 space-y-1 text-sm text-brand-800">
-                    <div class="flex justify-between gap-2">
-                        <dt class="font-medium">Nombre</dt>
+            <div class="rounded-xl border border-brand-100/70 bg-brand-50/50 p-5">
+                <h4 class="mb-5 text-xs font-semibold uppercase tracking-wide text-brand-700">Contacto de emergencia</h4>
+                <dl class="space-y-3 text-sm text-brand-800">
+                    <div class="flex justify-between gap-4 pb-1">
+                        <dt class="font-medium">Nombres:</dt>
                         <dd class="text-right"><?= $formatValue($patient['emergency_contact'] ?? null) ?></dd>
                     </div>
-                    <div class="flex justify-between gap-2">
-                        <dt class="font-medium">Parentesco</dt>
+                    <div class="flex justify-between gap-4 pb-1">
+                        <dt class="font-medium">Parentesco:</dt>
                         <dd class="text-right"><?= $formatValue($patient['emergency_contact_relationship'] ?? null) ?></dd>
                     </div>
-                    <div class="flex justify-between gap-2">
-                        <dt class="font-medium">Teléfono</dt>
+                    <div class="flex justify-between gap-4 pb-1">
+                        <dt class="font-medium">Teléfono:</dt>
                         <dd class="text-right"><?= $formatValue($patient['emergency_contact_phone'] ?? null) ?></dd>
                     </div>
                 </dl>
             </div>
-            <div class="rounded-xl border border-slate-200/70 bg-slate-50/80 p-4">
-                <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-600">Responsable legal</h4>
-                <dl class="mt-2 space-y-1 text-sm text-slate-600">
-                    <div class="space-y-1">
-                        <dt class="font-medium text-slate-700">Nombre</dt>
-                        <dd><?= $formatValue($patient['representative_name'] ?? null) ?></dd>
+            <div class="rounded-xl border border-slate-200/70 bg-slate-50/80 p-5">
+                <h4 class="mb-5 text-xs font-semibold uppercase tracking-wide text-slate-600">Responsable legal</h4>
+                <dl class="space-y-3 text-sm text-slate-600">
+                    <div class="flex justify-between gap-4 pb-1">
+                        <dt class="font-medium text-slate-700">Nombres:</dt>
+                        <dd class="text-right"><?= $formatValue($patient['representative_name'] ?? null) ?></dd>
                     </div>
-                    <div class="flex justify-between gap-2">
-                        <dt class="font-medium text-slate-700">Documento</dt>
+                    <div class="flex justify-between gap-4 pb-1">
+                        <dt class="font-medium text-slate-700">Documento:</dt>
                         <dd class="text-right"><?= $formatValue($patient['representative_document'] ?? null) ?></dd>
                     </div>
-                    <div class="flex justify-between gap-2">
-                        <dt class="font-medium text-slate-700">Teléfono</dt>
+                    <div class="flex justify-between gap-4 pb-1">
+                        <dt class="font-medium text-slate-700">Teléfono:</dt>
                         <dd class="text-right"><?= $formatValue($patient['representative_phone'] ?? null) ?></dd>
                     </div>
                 </dl>
             </div>
         </div>
-        <div class="rounded-2xl border border-slate-200/80 bg-white p-5 xl:col-span-2">
-            <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-600">Información administrativa</h3>
-            <dl class="mt-3 space-y-2 text-sm text-slate-600">
-                <div class="space-y-1">
-                    <dt class="font-medium text-slate-700">Referido por</dt>
-                    <dd><?= $formatValue($patient['referred_by'] ?? null) ?></dd>
+        <div class="rounded-2xl border border-slate-200/80 bg-white p-6 xl:col-span-2">
+            <h3 class="mb-6 text-xs font-semibold uppercase tracking-wide text-slate-600">Información administrativa</h3>
+            <dl class="space-y-3 text-sm text-slate-600">
+                <div class="flex justify-between gap-4 pb-2">
+                    <dt class="font-medium text-slate-700">Referido por:</dt>
+                    <dd class="text-right"><?= $formatValue($patient['referred_by'] ?? null) ?></dd>
                 </div>
-                <div class="space-y-1">
-                    <dt class="font-medium text-slate-700">Médico tratante</dt>
-                    <dd><?= $formatValue($patient['primary_physician'] ?? null) ?></dd>
+                <div class="flex justify-between gap-4 pb-2">
+                    <dt class="font-medium text-slate-700">Médico tratante:</dt>
+                    <dd class="text-right"><?= $formatValue($patient['primary_physician'] ?? null) ?></dd>
                 </div>
-                <div class="flex justify-between gap-2">
-                    <dt class="font-medium text-slate-700">Tel. del médico</dt>
+                <div class="flex justify-between gap-4 pb-2">
+                    <dt class="font-medium text-slate-700">Tel. del médico:</dt>
                     <dd class="text-right"><?= $formatValue($patient['primary_physician_phone'] ?? null) ?></dd>
                 </div>
-                <div class="space-y-1">
-                    <dt class="font-medium text-slate-700">Aseguradora</dt>
-                    <dd><?= $formatValue($patient['insurance_provider'] ?? null) ?></dd>
+                <div class="flex justify-between gap-4 pb-2">
+                    <dt class="font-medium text-slate-700">Aseguradora:</dt>
+                    <dd class="text-right"><?= $formatValue($patient['insurance_provider'] ?? null) ?></dd>
                 </div>
-                <div class="flex justify-between gap-2">
-                    <dt class="font-medium text-slate-700">N.º de póliza</dt>
+                <div class="flex justify-between gap-4 pb-2">
+                    <dt class="font-medium text-slate-700">N.º de póliza:</dt>
                     <dd class="text-right"><?= $formatValue($patient['insurance_policy_number'] ?? null) ?></dd>
                 </div>
             </dl>
         </div>
-        <div class="rounded-2xl border <?= $hasAlert ? 'border-amber-200/70 bg-amber-50/80' : 'border-emerald-200/70 bg-emerald-50/80' ?> p-5 xl:col-span-2">
-            <h3 class="text-xs font-semibold uppercase tracking-wide <?= $hasAlert ? 'text-amber-700' : 'text-emerald-700' ?>">Alertas y saldo</h3>
-            <div class="mt-3 space-y-3 text-sm <?= $hasAlert ? 'text-amber-700' : 'text-emerald-700' ?>">
-                <p><?= $hasAlert ? nl2br(htmlspecialchars((string) $alertText)) : 'Sin alertas registradas.' ?></p>
-                <div class="inline-flex items-center gap-2 rounded-full bg-white/80 px-4 py-2 text-sm font-semibold <?= $hasAlert ? 'text-amber-700' : 'text-emerald-700' ?>">
+        <div class="rounded-2xl border <?= $hasAlert ? 'border-amber-200/70 bg-amber-50/80' : 'border-emerald-200/70 bg-emerald-50/80' ?> p-6 xl:col-span-2">
+            <h3 class="mb-6 text-xs font-semibold uppercase tracking-wide <?= $hasAlert ? 'text-amber-700' : 'text-emerald-700' ?>">Alertas y saldo</h3>
+            <div class="space-y-4 text-sm <?= $hasAlert ? 'text-amber-700' : 'text-emerald-700' ?>">
+                <p class="leading-relaxed"><?= $hasAlert ? nl2br(htmlspecialchars((string) $alertText)) : 'Sin alertas registradas.' ?></p>
+                <div class="inline-flex items-center gap-2 rounded-full bg-white/80 px-5 py-2.5 text-sm font-semibold shadow-sm <?= $hasAlert ? 'text-amber-700' : 'text-emerald-700' ?>">
                     Saldo pendiente: Bs <?= number_format(max($totalBalance, 0), 2, ',', '.') ?>
                 </div>
             </div>
@@ -991,7 +1008,7 @@ if (!empty($patient['birth_date'])) {
         'antecedent_ent' => 'Oído, nariz y garganta',
         'antecedent_respiratory' => 'Respiratorio',
         'antecedent_allergy' => 'Alergia',
-        'antecedent_cardiovascular' => 'Cardio vascular',
+        'antecedent_cardiovascular' => 'Cardiovascular',
         'antecedent_gastrointestinal' => 'Gastrointestinal',
         'antecedent_endocrine' => 'Endocrino',
         'antecedent_renal' => 'Renal',
@@ -1129,11 +1146,16 @@ if (!empty($patient['birth_date'])) {
         <p class="text-sm text-slate-500">Registra consultas con formato SOAP y monitorea próximos seguimientos.</p>
     </div>
     <div class="grid gap-6 lg:grid-cols-[minmax(0,420px)_1fr]">
-        <form method="post" class="space-y-4 rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4 shadow-inner">
+        <form
+            method="post"
+            id="activity-form"
+            class="space-y-4 rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4 shadow-inner"
+            data-previous-outstanding="<?= htmlspecialchars(number_format($latestOutstanding, 2, '.', '')) ?>"
+        >
             <input type="hidden" name="action" value="create_visit">
             <label class="flex flex-col gap-2 text-sm text-slate-600">
                 <span class="font-medium text-slate-700">Fecha de la consulta *</span>
-                <input type="date" name="visit_date" required class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
+                <input type="date" name="visit_date" value="<?= htmlspecialchars(post('visit_date', $today) ?: $today) ?>" required class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
             </label>
             <label class="flex flex-col gap-2 text-sm text-slate-600">
                 <span class="font-medium text-slate-700">Motivo / síntomas (S)</span>
@@ -1179,6 +1201,55 @@ if (!empty($patient['birth_date'])) {
                 </button>
             </div>
         </form>
+        <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var form = document.getElementById('activity-form');
+            if (!form) {
+                return;
+            }
+            var feeInput = form.querySelector('input[name="fee"]');
+            var paymentInput = form.querySelector('input[name="payment"]');
+            var balanceInput = form.querySelector('input[name="balance"]');
+            if (!feeInput || !paymentInput || !balanceInput) {
+                return;
+            }
+            var previousOutstanding = Number.parseFloat(form.dataset.previousOutstanding || '0');
+            if (!Number.isFinite(previousOutstanding) || previousOutstanding < 0) {
+                previousOutstanding = 0;
+            }
+            var formatAmount = function (value) {
+                return Number.isFinite(value) ? value.toFixed(2) : '';
+            };
+            var parseAmount = function (input) {
+                if (!input || input.value.trim() === '') {
+                    return NaN;
+                }
+                return Number.parseFloat(input.value.replace(',', '.'));
+            };
+            var updateBalance = function () {
+                var fee = parseAmount(feeInput);
+                var payment = parseAmount(paymentInput);
+                if (Number.isNaN(fee) && Number.isNaN(payment)) {
+                    balanceInput.value = previousOutstanding > 0 ? formatAmount(previousOutstanding) : '';
+                    return;
+                }
+                if (Number.isNaN(fee)) {
+                    fee = 0;
+                }
+                if (Number.isNaN(payment)) {
+                    payment = 0;
+                }
+                var result = previousOutstanding + fee - payment;
+                balanceInput.value = result > 0 ? formatAmount(result) : '0.00';
+            };
+            if (balanceInput.value.trim() === '') {
+                balanceInput.value = previousOutstanding > 0 ? formatAmount(previousOutstanding) : '';
+            }
+            feeInput.addEventListener('input', updateBalance);
+            paymentInput.addEventListener('input', updateBalance);
+            form.addEventListener('submit', updateBalance);
+        });
+        </script>
 
         <div class="space-y-4 rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-6 shadow-sm">
             <?php if (!$visits): ?>
@@ -1248,11 +1319,16 @@ if (!empty($patient['birth_date'])) {
         <p class="text-sm text-slate-500">Registra procedimientos, cobros y abonos asociados al tratamiento.</p>
     </div>
     <div class="grid gap-6 lg:grid-cols-[minmax(0,420px)_1fr]">
-        <form method="post" class="space-y-4 rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4 shadow-inner">
+        <form
+            method="post"
+            id="activity-form"
+            class="space-y-4 rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4 shadow-inner"
+            data-previous-outstanding="<?= htmlspecialchars(number_format($latestOutstanding, 2, '.', '')) ?>"
+        >
             <input type="hidden" name="action" value="create_activity">
             <label class="flex flex-col gap-2 text-sm text-slate-600">
                 <span class="font-medium text-slate-700">Fecha *</span>
-                <input type="date" name="activity_date" required class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
+                <input type="date" name="activity_date" value="<?= htmlspecialchars(post('activity_date', $today) ?: $today) ?>" required class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
             </label>
             <label class="flex flex-col gap-2 text-sm text-slate-600">
                 <span class="font-medium text-slate-700">Descripción *</span>
@@ -1270,15 +1346,15 @@ if (!empty($patient['birth_date'])) {
             <div class="grid gap-3 sm:grid-cols-3">
                 <label class="flex flex-col gap-2 text-sm text-slate-600">
                     <span class="font-medium text-slate-700">Honorarios (Bs)</span>
-                    <input type="number" step="0.01" name="fee" value="0" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
+                    <input type="number" step="0.01" min="0" name="fee" value="<?= htmlspecialchars((string) post('fee', '')) ?>" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400" inputmode="decimal">
                 </label>
                 <label class="flex flex-col gap-2 text-sm text-slate-600">
                     <span class="font-medium text-slate-700">Abono (Bs)</span>
-                    <input type="number" step="0.01" name="payment" value="0" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
+                    <input type="number" step="0.01" min="0" name="payment" value="<?= htmlspecialchars((string) post('payment', '')) ?>" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400" inputmode="decimal">
                 </label>
                 <label class="flex flex-col gap-2 text-sm text-slate-600">
                     <span class="font-medium text-slate-700">Resta (Bs)</span>
-                    <input type="number" step="0.01" name="balance" value="0" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
+                    <input type="number" step="0.01" min="0" name="balance" value="<?= htmlspecialchars((string) post('balance', $latestOutstanding > 0 ? number_format($latestOutstanding, 2, '.', '') : '')) ?>" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400" inputmode="decimal" readonly aria-readonly="true">
                 </label>
             </div>
             <label class="flex flex-col gap-2 text-sm text-slate-600">

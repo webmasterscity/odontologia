@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+date_default_timezone_set('America/La_Paz');
+
 $dataDir = __DIR__ . '/../data';
 if (!is_dir($dataDir)) {
     mkdir($dataDir, 0775, true);
@@ -43,18 +45,28 @@ function bootstrapSchema(PDO $pdo): void
         'CREATE TABLE IF NOT EXISTS patients (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             full_name TEXT NOT NULL,
+            preferred_name TEXT,
             document_id TEXT,
             birth_date TEXT,
             age INTEGER,
             gender TEXT,
+            marital_status TEXT,
+            occupation TEXT,
             address TEXT,
             email TEXT,
             phone_primary TEXT,
             phone_secondary TEXT,
+            referred_by TEXT,
+            primary_physician TEXT,
+            primary_physician_phone TEXT,
+            insurance_provider TEXT,
+            insurance_policy_number TEXT,
             representative_name TEXT,
             representative_document TEXT,
             representative_phone TEXT,
             emergency_contact TEXT,
+            emergency_contact_relationship TEXT,
+            emergency_contact_phone TEXT,
             notes TEXT,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -158,8 +170,73 @@ function bootstrapSchema(PDO $pdo): void
 function ensureSchemaUpgrades(PDO $pdo): void
 {
     $patientColumns = tableColumns($pdo, 'patients');
+    if (!isset($patientColumns['preferred_name'])) {
+        $pdo->exec('ALTER TABLE patients ADD COLUMN preferred_name TEXT');
+    }
+    if (!isset($patientColumns['marital_status'])) {
+        $pdo->exec('ALTER TABLE patients ADD COLUMN marital_status TEXT');
+    }
+    if (!isset($patientColumns['occupation'])) {
+        $pdo->exec('ALTER TABLE patients ADD COLUMN occupation TEXT');
+    }
+    if (!isset($patientColumns['referred_by'])) {
+        $pdo->exec('ALTER TABLE patients ADD COLUMN referred_by TEXT');
+    }
+    if (!isset($patientColumns['primary_physician'])) {
+        $pdo->exec('ALTER TABLE patients ADD COLUMN primary_physician TEXT');
+    }
+    if (!isset($patientColumns['primary_physician_phone'])) {
+        $pdo->exec('ALTER TABLE patients ADD COLUMN primary_physician_phone TEXT');
+    }
+    if (!isset($patientColumns['insurance_provider'])) {
+        $pdo->exec('ALTER TABLE patients ADD COLUMN insurance_provider TEXT');
+    }
+    if (!isset($patientColumns['insurance_policy_number'])) {
+        $pdo->exec('ALTER TABLE patients ADD COLUMN insurance_policy_number TEXT');
+    }
     if (!isset($patientColumns['representative_document'])) {
         $pdo->exec('ALTER TABLE patients ADD COLUMN representative_document TEXT');
+    }
+    if (!isset($patientColumns['emergency_contact_relationship'])) {
+        $pdo->exec('ALTER TABLE patients ADD COLUMN emergency_contact_relationship TEXT');
+    }
+    if (!isset($patientColumns['emergency_contact_phone'])) {
+        $pdo->exec('ALTER TABLE patients ADD COLUMN emergency_contact_phone TEXT');
+    }
+
+    // Attempt to normalize legacy emergency contact values to the new structured fields.
+    $needsContactNormalization = $pdo->query(
+        'SELECT COUNT(*) AS total FROM patients WHERE emergency_contact IS NOT NULL
+            AND TRIM(emergency_contact) != \'\'
+            AND (emergency_contact_phone IS NULL OR TRIM(emergency_contact_phone) = \'\')'
+    )->fetchColumn();
+    if ($needsContactNormalization) {
+        $stmt = $pdo->query('SELECT id, emergency_contact, emergency_contact_phone FROM patients');
+        $update = $pdo->prepare(
+            'UPDATE patients
+             SET emergency_contact = :contact_name,
+                 emergency_contact_phone = COALESCE(emergency_contact_phone, :contact_phone),
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = :id'
+        );
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $contact = $row['emergency_contact'] !== null ? trim((string) $row['emergency_contact']) : '';
+            $existingPhone = $row['emergency_contact_phone'] !== null ? trim((string) $row['emergency_contact_phone']) : '';
+            if ($contact === '' || $existingPhone !== '') {
+                continue;
+            }
+            $parts = preg_split('/\s*[-–—]\s*/u', $contact, 2);
+            $contactName = trim($parts[0] ?? '');
+            $contactPhone = trim($parts[1] ?? '');
+            if ($contactName === '') {
+                continue;
+            }
+            $update->execute([
+                ':contact_name' => $contactName,
+                ':contact_phone' => $contactPhone !== '' ? $contactPhone : null,
+                ':id' => $row['id'],
+            ]);
+        }
     }
 
     $profileColumns = tableColumns($pdo, 'clinical_profiles');
