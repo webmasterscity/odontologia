@@ -70,9 +70,14 @@ function capitalizeInitial($value): ?string
     if ($trimmed === '') {
         return null;
     }
-    $firstChar = mb_substr($trimmed, 0, 1, 'UTF-8');
-    $rest = mb_substr($trimmed, 1, null, 'UTF-8');
-    return mb_strtoupper($firstChar, 'UTF-8') . $rest;
+    if (function_exists('mb_substr') && function_exists('mb_strtoupper')) {
+        $firstChar = mb_substr($trimmed, 0, 1, 'UTF-8');
+        $rest = mb_substr($trimmed, 1, null, 'UTF-8');
+        return mb_strtoupper($firstChar, 'UTF-8') . $rest;
+    }
+    $firstChar = substr($trimmed, 0, 1);
+    $rest = substr($trimmed, 1);
+    return strtoupper($firstChar) . $rest;
 }
 
 /**
@@ -892,6 +897,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$errors) {
             $fee = is_numeric(post('fee')) ? (float) post('fee') : 0.0;
             $payment = is_numeric(post('payment')) ? (float) post('payment') : 0.0;
+            $paymentMethod = normalizePaymentMethodValue(post('payment_method'));
 
             $balanceQuery = $pdo->prepare('SELECT balance FROM treatment_activities WHERE patient_id = :id ORDER BY date(activity_date) DESC, id DESC LIMIT 1');
             $balanceQuery->execute([':id' => $patientId]);
@@ -913,6 +919,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'fee' => $fee,
                 'payment' => $payment,
                 'balance' => $balance,
+                'payment_method' => $paymentMethod,
                 'notes' => capitalizeInitial(post('activity_notes')),
             ]);
             recalculateActivityBalances($pdo, $patientId);
@@ -946,8 +953,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$errors) {
             $fee = is_numeric(post('fee')) ? (float) post('fee') : 0.0;
             $payment = is_numeric(post('payment')) ? (float) post('payment') : 0.0;
+            $paymentMethod = normalizePaymentMethodValue(post('payment_method'));
             $updateStmt = $pdo->prepare(
-                'UPDATE treatment_activities SET visit_id = :visit_id, activity_date = :activity_date, description = :description, fee = :fee, payment = :payment, notes = :notes WHERE id = :id AND patient_id = :patient_id'
+                'UPDATE treatment_activities SET visit_id = :visit_id, activity_date = :activity_date, description = :description, fee = :fee, payment = :payment, payment_method = :payment_method, notes = :notes WHERE id = :id AND patient_id = :patient_id'
             );
             $updateStmt->execute([
                 ':visit_id' => post('related_visit') ? (int) post('related_visit') : null,
@@ -955,6 +963,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ':description' => capitalizeInitial($description),
                 ':fee' => $fee,
                 ':payment' => $payment,
+                ':payment_method' => $paymentMethod,
                 ':notes' => capitalizeInitial(post('activity_notes')),
                 ':id' => $activityId,
                 ':patient_id' => $patientId,
@@ -1891,6 +1900,17 @@ if (!empty($patient['birth_date'])) {
                     <?php endforeach; ?>
                 </select>
             </label>
+            <label class="flex flex-col gap-2 text-sm text-slate-600">
+                <span class="font-medium text-slate-700">Medio de pago</span>
+                <input
+                    type="text"
+                    name="payment_method"
+                    value="<?= htmlspecialchars((string) post('payment_method', '')) ?>"
+                    placeholder="Efectivo, transferencia, tarjeta…"
+                    class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 focus:border-brand-400 focus:ring-brand-400 capitalize"
+                    data-capitalize-initial
+                >
+            </label>
             <div class="grid gap-3 sm:grid-cols-3">
                 <label class="flex flex-col gap-2 text-sm text-slate-600">
                     <span class="font-medium text-slate-700">Honorarios (Bs)</span>
@@ -1939,6 +1959,7 @@ if (!empty($patient['birth_date'])) {
                             <tr>
                                 <th class="px-4 py-3 text-left font-semibold">Fecha</th>
                                 <th class="px-4 py-3 text-left font-semibold">Descripción</th>
+                                <th class="px-4 py-3 text-center font-semibold">Medio de pago</th>
                                 <th class="px-4 py-3 text-right font-semibold">Honorarios</th>
                                 <th class="px-4 py-3 text-right font-semibold">Abono</th>
                                 <th class="px-4 py-3 text-right font-semibold">Resta</th>
@@ -1947,13 +1968,21 @@ if (!empty($patient['birth_date'])) {
                         </thead>
                         <tbody class="divide-y divide-slate-100 bg-white">
                             <?php foreach ($activities as $activity): ?>
+                                <?php
+                                $activityDescription = (string) ($activity['description'] ?? '');
+                                $activityNotes = (string) ($activity['notes'] ?? '');
+                                $paymentMethodLabel = normalizePaymentMethodValue($activity['payment_method'] ?? null) ?? '';
+                                ?>
                                 <tr class="hover:bg-slate-50/80">
                                     <td class="px-4 py-4 text-sm text-slate-600"><?= date('d/m/Y', strtotime($activity['activity_date'])) ?></td>
                                     <td class="px-4 py-4 text-sm text-slate-700">
-                                        <?= nl2br(htmlspecialchars($activity['description'])) ?>
-                                        <?php if ($activity['notes']): ?>
-                                            <p class="mt-2 text-xs text-slate-500"><?= nl2br(htmlspecialchars($activity['notes'])) ?></p>
+                                        <?= nl2br(htmlspecialchars($activityDescription)) ?>
+                                        <?php if ($activityNotes !== ''): ?>
+                                            <p class="mt-2 text-xs text-slate-500"><?= nl2br(htmlspecialchars($activityNotes)) ?></p>
                                         <?php endif; ?>
+                                    </td>
+                                    <td class="px-4 py-4 text-center text-sm font-semibold text-slate-600">
+                                        <?= $paymentMethodLabel !== '' ? htmlspecialchars($paymentMethodLabel) : '—' ?>
                                     </td>
                                     <td class="px-4 py-4 text-right text-sm font-semibold text-slate-700"><?= number_format((float) $activity['fee'], 2, ',', '.') ?></td>
                                     <td class="px-4 py-4 text-right text-sm font-semibold text-emerald-600"><?= number_format((float) $activity['payment'], 2, ',', '.') ?></td>
@@ -1966,12 +1995,13 @@ if (!empty($patient['birth_date'])) {
                                                 data-edit-activity
                                                 data-activity-id="<?= (int) $activity['id'] ?>"
                                                 data-activity-date="<?= htmlspecialchars((string) $activity['activity_date']) ?>"
-                                                data-description="<?= htmlspecialchars((string) $activity['description'], ENT_QUOTES) ?>"
+                                                data-description="<?= htmlspecialchars($activityDescription, ENT_QUOTES) ?>"
                                                 data-related-visit="<?= $activity['visit_id'] ? (int) $activity['visit_id'] : '' ?>"
                                                 data-fee="<?= htmlspecialchars(number_format((float) $activity['fee'], 2, '.', ''), ENT_QUOTES) ?>"
                                                 data-payment="<?= htmlspecialchars(number_format((float) $activity['payment'], 2, '.', ''), ENT_QUOTES) ?>"
                                                 data-balance="<?= htmlspecialchars(number_format((float) $activity['balance'], 2, '.', ''), ENT_QUOTES) ?>"
-                                                data-notes="<?= htmlspecialchars((string) ($activity['notes'] ?? ''), ENT_QUOTES) ?>"
+                                                data-notes="<?= htmlspecialchars($activityNotes, ENT_QUOTES) ?>"
+                                                data-payment-method="<?= htmlspecialchars($paymentMethodLabel, ENT_QUOTES) ?>"
                                                 data-previous-outstanding="<?= htmlspecialchars(number_format($activityPreviousOutstanding[(int) $activity['id']] ?? 0.0, 2, '.', ''), ENT_QUOTES) ?>"
                                             >
                                                 Editar
@@ -2016,6 +2046,7 @@ if (!empty($patient['birth_date'])) {
                 activity_date: activityForm.querySelector('input[name="activity_date"]'),
                 description: activityForm.querySelector('textarea[name="description"]'),
                 related_visit: activityForm.querySelector('select[name="related_visit"]'),
+                payment_method: activityForm.querySelector('input[name="payment_method"]'),
                 fee: activityForm.querySelector('input[name="fee"]'),
                 payment: activityForm.querySelector('input[name="payment"]'),
                 balance: activityForm.querySelector('input[name="balance"]'),
@@ -2125,6 +2156,9 @@ if (!empty($patient['birth_date'])) {
                 }
                 if (activityFields.related_visit) {
                     activityFields.related_visit.value = dataset.relatedVisit || '';
+                }
+                if (activityFields.payment_method) {
+                    activityFields.payment_method.value = dataset.paymentMethod || '';
                 }
                 if (activityFields.fee) {
                     activityFields.fee.value = dataset.fee || '';

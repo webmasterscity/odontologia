@@ -152,6 +152,7 @@ function bootstrapSchema(PDO $pdo): void
             fee REAL DEFAULT 0,
             payment REAL DEFAULT 0,
             balance REAL DEFAULT 0,
+            payment_method TEXT,
             notes TEXT,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY(patient_id) REFERENCES patients(id) ON DELETE CASCADE,
@@ -239,6 +240,11 @@ function ensureSchemaUpgrades(PDO $pdo): void
         }
     }
 
+    $activityColumns = tableColumns($pdo, 'treatment_activities');
+    if (!isset($activityColumns['payment_method'])) {
+        $pdo->exec('ALTER TABLE treatment_activities ADD COLUMN payment_method TEXT');
+    }
+
     $profileColumns = tableColumns($pdo, 'clinical_profiles');
     if (!isset($profileColumns['antecedent_ent'])) {
         $pdo->exec('ALTER TABLE clinical_profiles ADD COLUMN antecedent_ent INTEGER DEFAULT 0');
@@ -253,6 +259,36 @@ function ensureSchemaUpgrades(PDO $pdo): void
     $odontogramColumns = tableColumns($pdo, 'odontogram_entries');
     if (!isset($odontogramColumns['surface_data'])) {
         $pdo->exec('ALTER TABLE odontogram_entries ADD COLUMN surface_data TEXT');
+    }
+
+    $financeColumns = tableColumns($pdo, 'finance_entries');
+    if ($financeColumns === []) {
+        $pdo->exec(
+            'CREATE TABLE IF NOT EXISTS finance_entries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                entry_date TEXT NOT NULL,
+                type TEXT NOT NULL,
+                category TEXT,
+                description TEXT NOT NULL,
+                amount REAL NOT NULL DEFAULT 0,
+                payment_method TEXT,
+                notes TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )'
+        );
+        $pdo->exec('CREATE INDEX IF NOT EXISTS finance_entries_entry_date_idx ON finance_entries(entry_date)');
+        $pdo->exec('CREATE INDEX IF NOT EXISTS finance_entries_type_idx ON finance_entries(type)');
+    } else {
+        if (!isset($financeColumns['payment_method'])) {
+            $pdo->exec('ALTER TABLE finance_entries ADD COLUMN payment_method TEXT');
+        }
+        if (!isset($financeColumns['notes'])) {
+            $pdo->exec('ALTER TABLE finance_entries ADD COLUMN notes TEXT');
+        }
+        if (!isset($financeColumns['updated_at'])) {
+            $pdo->exec('ALTER TABLE finance_entries ADD COLUMN updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP');
+        }
     }
 }
 
@@ -365,4 +401,62 @@ function normalizeDate(?string $value): ?string
         return null;
     }
     return date('Y-m-d', $timestamp);
+}
+
+/**
+ * Returns the supported payment method keys mapped to display labels.
+ *
+ * @return array<string,string>
+ */
+function getPaymentMethodOptions(): array
+{
+    return [
+        'cash' => 'Efectivo',
+        'transfer' => 'Transferencia bancaria',
+        'card' => 'Tarjeta',
+        'mobile' => 'Pago móvil',
+        'other' => 'Otro',
+    ];
+}
+
+/**
+ * Normalizes a payment method string to a consistent display label.
+ *
+ * @param mixed $value Raw payment method value from input or storage.
+ */
+function normalizePaymentMethodValue($value): ?string
+{
+    if ($value === null) {
+        return null;
+    }
+    if (is_array($value)) {
+        return null;
+    }
+    $trimmed = trim((string) $value);
+    if ($trimmed === '') {
+        return null;
+    }
+
+    $options = getPaymentMethodOptions();
+    $lowerValue = function_exists('mb_strtolower')
+        ? mb_strtolower($trimmed, 'UTF-8')
+        : strtolower($trimmed);
+
+    foreach ($options as $key => $label) {
+        $keyLower = function_exists('mb_strtolower') ? mb_strtolower($key, 'UTF-8') : strtolower($key);
+        $labelLower = function_exists('mb_strtolower') ? mb_strtolower($label, 'UTF-8') : strtolower($label);
+        if ($lowerValue === $keyLower || $lowerValue === $labelLower) {
+            return $label;
+        }
+    }
+
+    if (function_exists('mb_substr') && function_exists('mb_strtoupper')) {
+        $firstChar = mb_substr($trimmed, 0, 1, 'UTF-8');
+        $rest = mb_substr($trimmed, 1, null, 'UTF-8');
+        return mb_strtoupper($firstChar, 'UTF-8') . $rest;
+    }
+
+    $firstChar = substr($trimmed, 0, 1);
+    $rest = substr($trimmed, 1);
+    return strtoupper($firstChar) . $rest;
 }
