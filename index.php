@@ -112,6 +112,40 @@ $upcomingStmt = $pdo->prepare(
 $upcomingStmt->execute();
 $upcomingAppointments = $upcomingStmt->fetchAll(PDO::FETCH_ASSOC);
 
+$financeMonthStart = date('Y-m-01');
+$financeMonthEnd = date('Y-m-d', strtotime($financeMonthStart . ' +1 month'));
+$monthlyFinance = [
+    'income' => 0.0,
+    'expense' => 0.0,
+    'count' => 0,
+    'net' => 0.0,
+];
+$financeSummaryStmt = $pdo->prepare(
+    'SELECT type, SUM(amount) AS total
+     FROM finance_entries
+     WHERE entry_date >= :start AND entry_date < :end
+     GROUP BY type'
+);
+$financeSummaryStmt->execute([
+    ':start' => $financeMonthStart,
+    ':end' => $financeMonthEnd,
+]);
+foreach ($financeSummaryStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+    $type = $row['type'];
+    if (isset($monthlyFinance[$type])) {
+        $monthlyFinance[$type] = (float) $row['total'];
+    }
+}
+$financeCountStmt = $pdo->prepare(
+    'SELECT COUNT(*) FROM finance_entries WHERE entry_date >= :start AND entry_date < :end'
+);
+$financeCountStmt->execute([
+    ':start' => $financeMonthStart,
+    ':end' => $financeMonthEnd,
+]);
+$monthlyFinance['count'] = (int) $financeCountStmt->fetchColumn();
+$monthlyFinance['net'] = $monthlyFinance['income'] - $monthlyFinance['expense'];
+
 $pageTitle = 'Pacientes · Consultorio Odontológico';
 require __DIR__ . '/templates/header.php';
 ?>
@@ -136,7 +170,7 @@ require __DIR__ . '/templates/header.php';
     </div>
 <?php endif; ?>
 
-<section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+<section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
     <a href="#listado-pacientes" class="group block rounded-2xl bg-white p-6 shadow-sm shadow-slate-200/70 ring-1 ring-slate-200/70 transition duration-200 hover:-translate-y-1 hover:shadow-lg hover:ring-brand-300 cursor-pointer">
         <div class="flex items-center justify-between">
             <p class="text-sm font-medium text-slate-500">Total de pacientes</p>
@@ -160,6 +194,15 @@ require __DIR__ . '/templates/header.php';
         </div>
         <p class="mt-4 text-3xl font-semibold text-slate-900">Bs <?= number_format($pendingBalance, 2, ',', '.') ?></p>
         <p class="mt-2 text-xs uppercase tracking-wide text-slate-400">Cuentas por cobrar</p>
+    </a>
+    <a href="finances.php" class="group block rounded-2xl bg-white p-6 shadow-sm shadow-slate-200/70 ring-1 ring-slate-200/70 transition duration-200 hover:-translate-y-1 hover:shadow-lg hover:ring-brand-300 cursor-pointer">
+        <div class="flex items-center justify-between">
+            <p class="text-sm font-medium text-slate-500">Finanzas <?= htmlspecialchars(ucfirst($currentMonthLabel) . ' ' . date('Y')) ?></p>
+            <span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand-50 text-lg">💰</span>
+        </div>
+        <p class="mt-4 text-3xl font-semibold text-slate-900">Bs <?= number_format($monthlyFinance['net'], 2, ',', '.') ?></p>
+        <p class="mt-2 text-xs uppercase tracking-wide text-slate-400">Balance neto mensual</p>
+        <p class="mt-2 text-xs text-slate-400">Ingresos: Bs <?= number_format($monthlyFinance['income'], 2, ',', '.') ?> · Gastos: Bs <?= number_format($monthlyFinance['expense'], 2, ',', '.') ?></p>
     </a>
     <a href="#citas" class="group block rounded-2xl bg-white p-6 shadow-sm shadow-slate-200/70 ring-1 ring-slate-200/70 transition duration-200 hover:-translate-y-1 hover:shadow-lg hover:ring-brand-300 cursor-pointer">
         <div class="flex items-center justify-between">

@@ -17,6 +17,13 @@ const { chromium } = require('playwright');
   const odontogramSection = page.locator('[data-odontogram-section="odontodiagrama"]');
   await odontogramSection.scrollIntoViewIfNeeded();
 
+  // Desbloquear odontograma base antes de editar
+  const baseToggle = page.locator('[data-odontogram-toggle="odontodiagrama"]').first();
+  if (await baseToggle.count()) {
+    await baseToggle.click();
+    console.log('✓ Odontograma base desbloqueado');
+  }
+
   // Test 1: Seleccionar color azul y trazo "dot"
   console.log('\nTest 1: Marcando una sección con color azul y trazo "dot"...');
   const wrapper = page.locator('[data-diagram="odontodiagrama"]').first();
@@ -28,7 +35,7 @@ const { chromium } = require('playwright');
 
   // Pintar la sección central del diente 55 en modo color
   const tooth55 = page.locator('[data-odontogram-section="odontodiagrama"] [data-tooth="55"]').first();
-  const centerCell = tooth55.locator('[data-surface="center"]');
+  const centerCell = tooth55.locator('[data-surface="center"]').first();
   await centerCell.click();
   console.log('✓ Sección central del diente 55 pintada en azul');
 
@@ -91,7 +98,7 @@ const { chromium } = require('playwright');
   const colorModeButton = wrapper.locator('[data-mode="color"]');
   const markModeButton = wrapper.locator('[data-mode="mark"]');
 
-  const upperLeftCell = tooth54.locator('[data-surface="upper_left"]');
+  const upperLeftCell = tooth54.locator('[data-surface="upper_left"]').first();
   await colorModeButton.click();
   await upperLeftCell.click();
   await page.waitForTimeout(200);
@@ -110,7 +117,7 @@ const { chromium } = require('playwright');
   await horizontalButton.click();
   console.log('✓ Trazo "horizontal" seleccionado');
 
-  const lowerRightCell = tooth54.locator('[data-surface="lower_right"]');
+  const lowerRightCell = tooth54.locator('[data-surface="lower_right"]').first();
   await colorModeButton.click();
   await lowerRightCell.click();
   await page.waitForTimeout(200);

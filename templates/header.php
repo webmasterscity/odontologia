@@ -63,6 +63,7 @@ $currentScript = basename($_SERVER['SCRIPT_NAME']);
             $links = [
                 ['href' => 'index.php', 'label' => 'Pacientes', 'match' => ['index.php'], 'icon' => '👥'],
                 ['href' => 'patient_form.php', 'label' => 'Registrar paciente', 'match' => ['patient_form.php'], 'icon' => '➕'],
+                ['href' => 'finances.php', 'label' => 'Finanzas', 'match' => ['finances.php'], 'icon' => '💰'],
                 ['href' => 'index.php#respaldo', 'label' => 'Respaldo y copias', 'match' => ['index.php'], 'icon' => '💾'],
             ];
             foreach ($links as $link) {
