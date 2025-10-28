@@ -82,9 +82,11 @@ $patientStmt = $pdo->prepare(
             WHERE v.patient_id = p.id
         ) AS last_visit,
         (
-            SELECT SUM(fee - payment)
+            SELECT balance
             FROM treatment_activities ta
             WHERE ta.patient_id = p.id
+            ORDER BY date(ta.activity_date) DESC, ta.id DESC
+            LIMIT 1
         ) AS pending_balance
      FROM patients p
      $searchSql
@@ -92,13 +94,21 @@ $patientStmt = $pdo->prepare(
 );
 $patientStmt->execute($params);
 $patients = $patientStmt->fetchAll(PDO::FETCH_ASSOC);
+$pendingBalance = 0.0;
+foreach ($patients as &$patientRow) {
+    $rawBalance = $patientRow['pending_balance'] ?? null;
+    $normalizedBalance = is_numeric($rawBalance) ? (float) $rawBalance : 0.0;
+    if ($normalizedBalance < 0) {
+        $normalizedBalance = 0.0;
+    }
+    $patientRow['pending_balance'] = $normalizedBalance;
+    $pendingBalance += $normalizedBalance;
+}
+unset($patientRow);
 
 $totalPatients = (int) $pdo->query('SELECT COUNT(*) FROM patients')->fetchColumn();
 $totalVisitsThisMonth = (int) $pdo->query(
     "SELECT COUNT(*) FROM visits WHERE strftime('%Y-%m', visit_date) = strftime('%Y-%m', 'now', 'localtime')"
-)->fetchColumn();
-$pendingBalance = (float) $pdo->query(
-    'SELECT COALESCE(SUM(fee - payment), 0) FROM treatment_activities'
 )->fetchColumn();
 $upcomingStmt = $pdo->prepare(
     "SELECT v.*, p.full_name
@@ -136,6 +146,20 @@ foreach ($financeSummaryStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
         $monthlyFinance[$type] = (float) $row['total'];
     }
 }
+$activityIncomeStmt = $pdo->prepare(
+    'SELECT SUM(payment) AS total
+     FROM treatment_activities
+     WHERE payment > 0
+       AND activity_date >= :start
+       AND activity_date < :end'
+);
+$activityIncomeStmt->execute([
+    ':start' => $financeMonthStart,
+    ':end' => $financeMonthEnd,
+]);
+$activityIncome = (float) $activityIncomeStmt->fetchColumn();
+$monthlyFinance['income'] += $activityIncome;
+$monthlyFinance['net'] = $monthlyFinance['income'] - $monthlyFinance['expense'];
 $financeCountStmt = $pdo->prepare(
     'SELECT COUNT(*) FROM finance_entries WHERE entry_date >= :start AND entry_date < :end'
 );
