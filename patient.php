@@ -1181,10 +1181,6 @@ if (!empty($patient['registered_at'])) {
                     <dd class="text-right"><?= htmlspecialchars($birthDateDisplay) ?></dd>
                 </div>
                 <div class="flex justify-between gap-4 border-b border-slate-200/60 pb-3">
-                    <dt class="font-medium text-slate-700">Registro inicial:</dt>
-                    <dd class="text-right"><?= htmlspecialchars($registeredAtDisplay) ?></dd>
-                </div>
-                <div class="flex justify-between gap-4 border-b border-slate-200/60 pb-3">
                     <dt class="font-medium text-slate-700">Edad:</dt>
                     <dd class="text-right"><?= $patient['age'] ? (int) $patient['age'] . ' años' : '—' ?></dd>
                 </div>
@@ -1203,6 +1199,10 @@ if (!empty($patient['registered_at'])) {
                 <div class="flex justify-between gap-4 pb-2">
                     <dt class="font-medium text-slate-700">Dirección:</dt>
                     <dd class="text-right"><?= $formatValue($patient['address'] ?? null) ?></dd>
+                </div>
+                <div class="flex justify-between gap-4 border-t border-slate-200/60 pt-3">
+                    <dt class="font-medium text-slate-700">Registro inicial:</dt>
+                    <dd class="text-right text-slate-500"><?= htmlspecialchars($registeredAtDisplay) ?></dd>
                 </div>
             </dl>
         </div>
