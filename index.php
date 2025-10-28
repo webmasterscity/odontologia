@@ -98,9 +98,6 @@ $pendingBalance = 0.0;
 foreach ($patients as &$patientRow) {
     $rawBalance = $patientRow['pending_balance'] ?? null;
     $normalizedBalance = is_numeric($rawBalance) ? (float) $rawBalance : 0.0;
-    if ($normalizedBalance < 0) {
-        $normalizedBalance = 0.0;
-    }
     $patientRow['pending_balance'] = $normalizedBalance;
     $pendingBalance += $normalizedBalance;
 }
@@ -216,7 +213,8 @@ require __DIR__ . '/templates/header.php';
             <p class="text-sm font-medium text-slate-500">Saldo pendiente</p>
             <span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand-50 text-lg">💳</span>
         </div>
-        <p class="mt-4 text-3xl font-semibold text-slate-900">Bs <?= number_format($pendingBalance, 2, ',', '.') ?></p>
+        <?php $pendingBalanceDisplay = $pendingBalance > 0 ? -$pendingBalance : 0.0; ?>
+        <p class="mt-4 text-3xl font-semibold text-slate-900">Bs <?= number_format($pendingBalanceDisplay, 2, ',', '.') ?></p>
         <p class="mt-2 text-xs uppercase tracking-wide text-slate-400">Cuentas por cobrar</p>
     </a>
     <a href="finances.php" class="group block rounded-2xl bg-white p-6 shadow-sm shadow-slate-200/70 ring-1 ring-slate-200/70 transition duration-200 hover:-translate-y-1 hover:shadow-lg hover:ring-brand-300 cursor-pointer">
@@ -275,7 +273,10 @@ require __DIR__ . '/templates/header.php';
                 </thead>
                 <tbody class="divide-y divide-slate-100 bg-white">
                     <?php foreach ($patients as $patient): ?>
-                        <?php $balance = (float) ($patient['pending_balance'] ?? 0); ?>
+                        <?php
+                        $balance = (float) ($patient['pending_balance'] ?? 0);
+                        $balanceDisplay = $balance > 0 ? -$balance : 0.0;
+                        ?>
                         <tr class="transition hover:bg-slate-50/80">
                             <td class="px-4 py-4">
                                 <p class="font-semibold text-slate-900"><?= htmlspecialchars($patient['full_name']) ?></p>
@@ -299,7 +300,7 @@ require __DIR__ . '/templates/header.php';
                                 <?= $patient['last_visit'] ? date('d/m/Y', strtotime($patient['last_visit'])) : '—' ?>
                             </td>
                             <td class="px-4 py-4 text-sm font-semibold <?= $balance > 0 ? 'text-amber-600' : 'text-slate-700' ?>">
-                                <?= number_format($balance, 2, ',', '.') ?>
+                                <?= number_format($balanceDisplay, 2, ',', '.') ?>
                             </td>
                             <td class="px-4 py-4 text-right">
                                 <div class="flex flex-wrap justify-end gap-2">
