@@ -204,6 +204,10 @@ function ensureSchemaUpgrades(PDO $pdo): void
     if (!isset($patientColumns['emergency_contact_phone'])) {
         $pdo->exec('ALTER TABLE patients ADD COLUMN emergency_contact_phone TEXT');
     }
+    if (!isset($patientColumns['registered_at'])) {
+        $pdo->exec('ALTER TABLE patients ADD COLUMN registered_at TEXT');
+        $pdo->exec('UPDATE patients SET registered_at = created_at WHERE registered_at IS NULL');
+    }
 
     // Attempt to normalize legacy emergency contact values to the new structured fields.
     $needsContactNormalization = $pdo->query(

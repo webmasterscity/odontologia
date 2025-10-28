@@ -1134,6 +1134,13 @@ if (!empty($patient['birth_date'])) {
         $birthDateDisplay = date('d/m/Y', $timestamp);
     }
 }
+$registeredAtDisplay = '—';
+if (!empty($patient['registered_at'])) {
+    $registeredTimestamp = strtotime((string) $patient['registered_at']);
+    if ($registeredTimestamp !== false) {
+        $registeredAtDisplay = date('d/m/Y H:i', $registeredTimestamp);
+    }
+}
 ?>
 <section class="rounded-3xl bg-white/95 p-6 shadow-sm shadow-slate-200/60 ring-1 ring-slate-200/70 sm:p-8 space-y-6">
     <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -1172,6 +1179,10 @@ if (!empty($patient['birth_date'])) {
                 <div class="flex justify-between gap-4 border-b border-slate-200/60 pb-3">
                     <dt class="font-medium text-slate-700">Fecha de nacimiento:</dt>
                     <dd class="text-right"><?= htmlspecialchars($birthDateDisplay) ?></dd>
+                </div>
+                <div class="flex justify-between gap-4 border-b border-slate-200/60 pb-3">
+                    <dt class="font-medium text-slate-700">Registro inicial:</dt>
+                    <dd class="text-right"><?= htmlspecialchars($registeredAtDisplay) ?></dd>
                 </div>
                 <div class="flex justify-between gap-4 border-b border-slate-200/60 pb-3">
                     <dt class="font-medium text-slate-700">Edad:</dt>

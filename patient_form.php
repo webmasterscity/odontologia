@@ -91,6 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $targetId = $patientId;
             $redirectTarget = 'patient.php?id=' . $targetId;
         } else {
+            $payload['registered_at'] = date('Y-m-d H:i:s');
             $targetId = insertRow($pdo, 'patients', $payload);
             $redirectTarget = 'patient_history.php?id=' . $targetId;
         }
