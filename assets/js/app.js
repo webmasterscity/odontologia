@@ -713,8 +713,7 @@ function setupOdontogram() {
             state[diagram] = {};
         }
 
-        const initialLocked = (wrapper.dataset.locked || 'false') === 'true';
-        const isLocked = () => wrapper.dataset.locked === 'true';
+        const isLocked = () => false;
 
         const rememberOriginalTabIndex = (element) => {
             if (!element.dataset.originalTabindexStored) {
@@ -737,24 +736,19 @@ function setupOdontogram() {
                 button.setAttribute('aria-disabled', disabled ? 'true' : 'false');
             });
         };
-        const setWrapperLocked = (locked) => {
-            const lockedValue = locked ? 'true' : 'false';
-            wrapper.dataset.locked = lockedValue;
-            wrapper.classList.toggle('is-locked', locked);
-            disableButtonGroup(colorButtons, locked);
-            disableButtonGroup(modeButtons, locked);
-            disableButtonGroup(markButtons, locked);
+        const setWrapperUnlocked = () => {
+            wrapper.dataset.locked = 'false';
+            wrapper.classList.remove('is-locked');
+            disableButtonGroup(colorButtons, false);
+            disableButtonGroup(modeButtons, false);
+            disableButtonGroup(markButtons, false);
             cells.forEach((cell) => {
                 rememberOriginalTabIndex(cell);
-                if (locked) {
-                    cell.setAttribute('tabindex', '-1');
+                const original = cell.dataset.originalTabindex || '';
+                if (original !== '') {
+                    cell.setAttribute('tabindex', original);
                 } else {
-                    const original = cell.dataset.originalTabindex || '';
-                    if (original !== '') {
-                        cell.setAttribute('tabindex', original);
-                    } else {
-                        cell.removeAttribute('tabindex');
-                    }
+                    cell.removeAttribute('tabindex');
                 }
             });
             refreshSymbolInteractivity();
@@ -1388,13 +1382,11 @@ function setupOdontogram() {
             }
         });
 
-        setWrapperLocked(initialLocked);
+        setWrapperUnlocked();
 
         wrapperControllers.set(diagram, {
             isLocked,
-            setLocked: (locked) => {
-                setWrapperLocked(Boolean(locked));
-            },
+            setLocked: () => {},
         });
     });
 
@@ -1418,8 +1410,7 @@ function setupOdontogram() {
         updateLabel();
         toggleLabelUpdaters.set(targetDiagram, updateLabel);
         button.addEventListener('click', () => {
-            const nextLocked = !controller.isLocked();
-            controller.setLocked(nextLocked);
+            controller.setLocked(false);
             updateLabel();
         });
     });
@@ -1432,14 +1423,6 @@ function setupOdontogram() {
             baseDirtyInput.value = form.dataset.odontogramBaseDirty === 'true' ? '1' : '0';
         }
         payloadInput.value = JSON.stringify(state);
-        const baseController = wrapperControllers.get('odontodiagrama');
-        if (baseController) {
-            baseController.setLocked(true);
-            const updateLabel = toggleLabelUpdaters.get('odontodiagrama');
-            if (updateLabel) {
-                updateLabel();
-            }
-        }
     });
 }
 

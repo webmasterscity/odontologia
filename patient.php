@@ -444,8 +444,6 @@ $renderToothCard = static function (
     <?php
 };
 
-$hasBaseOdontogram = false;
-
 $renderOdontogramSection = static function (
     string $diagramKey,
     string $title,
@@ -454,32 +452,18 @@ $renderOdontogramSection = static function (
     $renderToothCard,
     $odontogramGroups,
     $permanentSurfaces,
-    $deciduousSurfaces,
-    &$hasBaseOdontogram
+    $deciduousSurfaces
 ): void {
-    $isBaseDiagram = $diagramKey === 'odontodiagrama';
-    $baseIsLocked = $isBaseDiagram && $hasBaseOdontogram;
     ?>
     <fieldset class="space-y-6 rounded-2xl border border-slate-200/80 bg-white/90 p-4 sm:p-6 shadow-sm" data-odontogram-section="<?= htmlspecialchars($diagramKey) ?>">
         <legend class="px-3 text-xs font-semibold uppercase tracking-wide text-brand-700"><?= htmlspecialchars($title) ?></legend>
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p class="text-sm text-slate-500"><?= htmlspecialchars($summary) ?></p>
-            <?php if ($isBaseDiagram && $hasBaseOdontogram): ?>
-                <button
-                    type="button"
-                    class="odontogram-toggle-button inline-flex items-center justify-center gap-2 rounded-full bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-soft transition hover:-translate-y-0.5 hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 self-start sm:self-start"
-                    data-odontogram-toggle="odontodiagrama"
-                    data-label-locked="Editar odontograma base"
-                    data-label-unlocked="Bloquear odontograma base"
-                >
-                    Editar odontograma base
-                </button>
-            <?php endif; ?>
         </div>
         <div
-            class="odontogram-wrapper space-y-6<?= $baseIsLocked ? ' is-locked' : '' ?>"
+            class="odontogram-wrapper space-y-6"
             data-diagram="<?= htmlspecialchars($diagramKey) ?>"
-            data-locked="<?= $baseIsLocked ? 'true' : 'false' ?>"
+            data-locked="false"
         >
             <div class="odontogram-toolbar flex flex-wrap items-center justify-between gap-6 rounded-2xl border border-slate-200/80 bg-white/95 p-4 shadow-sm">
                 <div class="toolbar-group color-group flex items-center gap-3" role="radiogroup" aria-label="Seleccionar color">
@@ -659,7 +643,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             try {
                 $pdo->beginTransaction();
-                $existingEvolutionSurfaces = [];
                 $existingBaseSurfaces = [];
                 $existingStmt = $pdo->prepare('SELECT tooth_code, surface_data FROM odontogram_entries WHERE patient_id = :patient_id');
                 $existingStmt->execute([':patient_id' => $patientId]);
@@ -668,7 +651,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($existingTooth === '') {
                         continue;
                     }
-                    $existingEvolutionSurfaces[$existingTooth] = [];
                     $existingBaseSurfaces[$existingTooth] = [];
                     if (empty($existingEntry['surface_data'])) {
                         continue;
@@ -690,18 +672,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             }
                         }
                         $existingBaseSurfaces[$existingTooth] = $baseSurfaces;
-                    }
-                    if (!empty($existingSurfaceData['evolucion']) && is_array($existingSurfaceData['evolucion'])) {
-                        foreach ($existingSurfaceData['evolucion'] as $surfaceKey => $surfacePayload) {
-                            if (!is_array($surfacePayload)) {
-                                continue;
-                            }
-                            $hasColor = isset($surfacePayload['color']) && trim((string) $surfacePayload['color']) !== '';
-                            $hasMark = isset($surfacePayload['mark']) && trim((string) $surfacePayload['mark']) !== '';
-                            if ($hasColor || $hasMark) {
-                                $existingEvolutionSurfaces[$existingTooth][$surfaceKey] = true;
-                            }
-                        }
                     }
                 }
 
@@ -733,31 +703,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ];
 
                     $baseSurfaces = $surfacesPayload['odontodiagrama'];
-                    $hasBaseSurfaces = !empty($baseSurfaces);
-                    $hasSubmittedEvolution = isset($submittedEvolutionTeeth[$toothCodeKey]);
-                    if ($hasBaseSurfaces) {
-                        if (!is_array($surfacesPayload['evolucion'])) {
-                            $surfacesPayload['evolucion'] = [];
-                        }
-                        if ($baseDirty) {
-                            foreach ($baseSurfaces as $surfaceKey => $surfaceState) {
-                                $surfacesPayload['evolucion'][$surfaceKey] = $surfaceState;
-                            }
-                        } elseif (!$hasSubmittedEvolution) {
-                            $existingEvolutionForTooth = $existingEvolutionSurfaces[$toothCodeKey] ?? [];
-                            if (empty($surfacesPayload['evolucion'])) {
-                                if (empty($existingEvolutionForTooth)) {
-                                    $surfacesPayload['evolucion'] = $baseSurfaces;
-                                }
-                            } else {
-                                foreach ($baseSurfaces as $surfaceKey => $surfaceState) {
-                                    if (isset($surfacesPayload['evolucion'][$surfaceKey]) || isset($existingEvolutionForTooth[$surfaceKey])) {
-                                        continue;
-                                    }
-                                    $surfacesPayload['evolucion'][$surfaceKey] = $surfaceState;
-                                }
-                            }
-                        }
+                    if (!is_array($surfacesPayload['evolucion'])) {
+                        $surfacesPayload['evolucion'] = [];
                     }
 
                     if (empty($surfacesPayload['odontodiagrama']) && empty($surfacesPayload['evolucion'])) {
@@ -996,7 +943,6 @@ $odontogramPayload = [
     'odontodiagrama' => [],
     'evolucion' => [],
 ];
-$evolutionHasRecord = [];
 foreach ($odontogramStmt->fetchAll(PDO::FETCH_ASSOC) as $entry) {
     $decodedSurfaces = [];
     if (!empty($entry['surface_data'])) {
@@ -1004,9 +950,6 @@ foreach ($odontogramStmt->fetchAll(PDO::FETCH_ASSOC) as $entry) {
         if (is_array($decoded)) {
             $decodedSurfaces = $decoded;
         }
-    }
-    if (array_key_exists('evolucion', $decodedSurfaces) && is_array($decodedSurfaces['evolucion'])) {
-        $evolutionHasRecord[$entry['tooth_code']] = true;
     }
     foreach (['odontodiagrama', 'evolucion'] as $diagramKey) {
         if (!array_key_exists($diagramKey, $decodedSurfaces) || !is_array($decodedSurfaces[$diagramKey])) {
@@ -1016,45 +959,6 @@ foreach ($odontogramStmt->fetchAll(PDO::FETCH_ASSOC) as $entry) {
             'surfaces' => $decodedSurfaces[$diagramKey],
             'status' => $entry['status'],
             'notes' => $entry['notes'],
-        ];
-    }
-}
-
-// Ensure evolution diagram starts with the base odontogram when empty so clinicians can adjust it.
-$hasBaseOdontogram = false;
-foreach ($odontogramPayload['odontodiagrama'] as $toothCode => $baseEntry) {
-    $baseSurfaces = $baseEntry['surfaces'] ?? [];
-    if (!$baseSurfaces) {
-        continue;
-    }
-    if (!$hasBaseOdontogram) {
-        foreach ($baseSurfaces as $surfaceState) {
-            if (!is_array($surfaceState)) {
-                continue;
-            }
-            $color = isset($surfaceState['color']) ? trim((string) $surfaceState['color']) : '';
-            $mark = isset($surfaceState['mark']) ? trim((string) $surfaceState['mark']) : '';
-            if ($color !== '' || $mark !== '') {
-                $hasBaseOdontogram = true;
-                break;
-            }
-        }
-    }
-    if ($evolutionHasRecord[$toothCode] ?? false) {
-        continue;
-    }
-    if (!isset($odontogramPayload['evolucion'][$toothCode]) || empty($odontogramPayload['evolucion'][$toothCode]['surfaces'])) {
-        $clone = [];
-        foreach ($baseSurfaces as $surfaceKey => $surfaceState) {
-            if (!is_array($surfaceState)) {
-                continue;
-            }
-            $clone[$surfaceKey] = $surfaceState;
-        }
-        $odontogramPayload['evolucion'][$toothCode] = [
-            'surfaces' => $clone,
-            'status' => $baseEntry['status'] ?? 'sin_registro',
-            'notes' => $baseEntry['notes'] ?? null,
         ];
     }
 }
