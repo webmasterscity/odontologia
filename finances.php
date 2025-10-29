@@ -459,7 +459,7 @@ require __DIR__ . '/templates/header.php';
             <div class="grid gap-4 sm:grid-cols-2">
                 <label class="flex flex-col text-sm font-medium text-slate-600">
                     Categoría
-                    <input type="text" name="category" placeholder="Ej. Tratamientos, Insumos" value="<?= htmlspecialchars($formCategory) ?>" class="mt-1 rounded-xl border-slate-300 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500 capitalize">
+                    <input type="text" name="category" placeholder="Ej. Tratamientos, Insumos" value="<?= htmlspecialchars($formCategory) ?>" class="mt-1 rounded-xl border-slate-300 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500" data-capitalize-first>
                 </label>
                 <label class="flex flex-col text-sm font-medium text-slate-600">
                     Monto (Bs)
@@ -468,15 +468,15 @@ require __DIR__ . '/templates/header.php';
             </div>
             <label class="flex flex-col text-sm font-medium text-slate-600">
                 Medio de pago
-                <input type="text" name="payment_method" placeholder="Efectivo, transferencia, tarjeta…" value="<?= htmlspecialchars($formPaymentMethod) ?>" class="mt-1 rounded-xl border-slate-300 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500 capitalize">
+                <input type="text" name="payment_method" placeholder="Efectivo, transferencia, tarjeta…" value="<?= htmlspecialchars($formPaymentMethod) ?>" class="mt-1 rounded-xl border-slate-300 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500" data-capitalize-first>
             </label>
             <label class="flex flex-col text-sm font-medium text-slate-600">
                 Descripción
-                <textarea name="description" rows="2" class="mt-1 rounded-xl border-slate-300 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500 capitalize" placeholder="Detalle del movimiento" required><?= htmlspecialchars($formDescription) ?></textarea>
+                <textarea name="description" rows="2" class="mt-1 rounded-xl border-slate-300 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500" placeholder="Detalle del movimiento" data-capitalize-first required><?= htmlspecialchars($formDescription) ?></textarea>
             </label>
             <label class="flex flex-col text-sm font-medium text-slate-600">
                 Notas adicionales
-                <textarea name="notes" rows="2" class="mt-1 rounded-xl border-slate-300 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500 capitalize" placeholder="Observaciones opcionales"><?= htmlspecialchars($formNotes) ?></textarea>
+                <textarea name="notes" rows="2" class="mt-1 rounded-xl border-slate-300 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500" placeholder="Observaciones opcionales" data-capitalize-first><?= htmlspecialchars($formNotes) ?></textarea>
             </label>
             <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <button type="submit" class="inline-flex w-full items-center justify-center rounded-full bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-soft transition hover:-translate-y-0.5 hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 sm:w-auto">

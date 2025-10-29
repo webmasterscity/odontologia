@@ -45,9 +45,14 @@ function capitalizeInitial($value): ?string
     if ($trimmed === '') {
         return null;
     }
-    $firstChar = mb_substr($trimmed, 0, 1, 'UTF-8');
-    $rest = mb_substr($trimmed, 1, null, 'UTF-8');
-    return mb_strtoupper($firstChar, 'UTF-8') . $rest;
+    if (function_exists('mb_substr') && function_exists('mb_strtoupper')) {
+        $firstChar = mb_substr($trimmed, 0, 1, 'UTF-8');
+        $rest = mb_substr($trimmed, 1, null, 'UTF-8');
+        return mb_strtoupper($firstChar, 'UTF-8') . $rest;
+    }
+    $firstChar = substr($trimmed, 0, 1);
+    $rest = substr($trimmed, 1);
+    return strtoupper($firstChar) . $rest;
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
