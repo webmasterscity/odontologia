@@ -55,6 +55,18 @@ $formatMultiline = static function ($value, string $default = '—') use ($forma
     return $default;
 };
 
+$formatDateTime = static function (?string $value, string $default = '—'): string {
+    if (!$value) {
+        return $default;
+    }
+    $timestamp = strtotime($value);
+    if ($timestamp === false) {
+        return $default;
+    }
+
+    return date('d/m/Y H:i', $timestamp);
+};
+
 /**
  * Capitalize the first character of a given value while trimming surrounding whitespace.
  */
@@ -175,6 +187,61 @@ $odontogramGroups = [
 ];
 
 $allSurfaces = $permanentSurfaces + $deciduousSurfaces;
+
+$colorLabels = [
+    'blue' => 'Azul',
+    'red' => 'Rojo',
+];
+
+$markLabels = [
+    'dot' => 'Punto',
+    'x' => 'Equis',
+    'vertical' => 'Línea vertical',
+    'horizontal' => 'Línea horizontal',
+];
+
+$describeSurfaces = static function (array $surfaces) use ($allSurfaces, $colorLabels, $markLabels): array {
+    $descriptions = [];
+    foreach ($surfaces as $surfaceKey => $surfaceState) {
+        if (!is_array($surfaceState)) {
+            continue;
+        }
+        $surfaceLabel = $allSurfaces[$surfaceKey] ?? $surfaceKey;
+        $parts = [];
+        if (!empty($surfaceState['color']) && isset($colorLabels[$surfaceState['color']])) {
+            $parts[] = $colorLabels[$surfaceState['color']];
+        }
+        if (!empty($surfaceState['mark']) && isset($markLabels[$surfaceState['mark']])) {
+            $markDescriptor = $markLabels[$surfaceState['mark']];
+            if (!empty($surfaceState['markColor']) && isset($colorLabels[$surfaceState['markColor']])) {
+                $markDescriptor .= ' (' . $colorLabels[$surfaceState['markColor']] . ')';
+            }
+            $parts[] = $markDescriptor;
+        }
+        $descriptions[] = $surfaceLabel . ($parts ? ' — ' . implode(', ', $parts) : '');
+    }
+
+    return $descriptions;
+};
+
+$formatOdontogramOrdinal = static function (int $position): string {
+    static $labels = [
+        1 => 'Primer odontograma',
+        2 => 'Segundo odontograma',
+        3 => 'Tercer odontograma',
+        4 => 'Cuarto odontograma',
+        5 => 'Quinto odontograma',
+        6 => 'Sexto odontograma',
+        7 => 'Septimo odontograma',
+        8 => 'Octavo odontograma',
+        9 => 'Noveno odontograma',
+        10 => 'Decimo odontograma',
+    ];
+    if (isset($labels[$position])) {
+        return $labels[$position];
+    }
+    return 'Odontograma ' . $position;
+};
 
 $renderToothCard = static function (
     string $code,
@@ -540,197 +607,184 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = 'El formato del odontograma no es válido.';
         } else {
             $baseDirty = (string) post('odontogram_base_dirty') === '1';
-            $submittedEvolutionTeeth = [];
-            if (!empty($decodedPayload['evolucion']) && is_array($decodedPayload['evolucion'])) {
-                foreach ($decodedPayload['evolucion'] as $submittedTooth => $submittedPayload) {
-                    $submittedToothKey = trim((string) $submittedTooth);
-                    if ($submittedToothKey === '') {
-                        continue;
-                    }
-                    if (is_array($submittedPayload)) {
-                        $submittedEvolutionTeeth[$submittedToothKey] = true;
-                    }
-                }
+            $snapshotOriginId = (int) post('snapshot_origin_id', '0');
+            $snapshotOnly = (string) post('snapshot_only', '0') === '1';
+            $diagramData = $decodedPayload['odontodiagrama'] ?? [];
+            if (!is_array($diagramData)) {
+                $diagramData = [];
             }
-            $diagramKeys = ['odontodiagrama', 'evolucion'];
+
             $normalized = [];
-            foreach ($diagramKeys as $diagramKey) {
-                if (empty($decodedPayload[$diagramKey]) || !is_array($decodedPayload[$diagramKey])) {
+            foreach ($diagramData as $toothCode => $toothPayload) {
+                if (!is_array($toothPayload)) {
                     continue;
                 }
-                foreach ($decodedPayload[$diagramKey] as $toothCode => $toothPayload) {
-                    if (!is_array($toothPayload)) {
-                        continue;
-                    }
 
-                    $toothCodeKey = trim((string) $toothCode);
-                    if ($toothCodeKey === '' || !in_array($toothCodeKey, $validToothCodes, true)) {
-                        continue;
-                    }
-                    $surfaces = $toothPayload['surfaces'] ?? [];
-                    $skipBaseSurfaces = $diagramKey === 'odontodiagrama' && !$baseDirty;
-                    if (is_array($surfaces) && !$skipBaseSurfaces) {
-                        foreach ($surfaces as $surfaceKey => $surfaceData) {
-                            if (!array_key_exists($surfaceKey, $allSurfaces) || !is_array($surfaceData)) {
-                                continue;
-                            }
-                            $color = $surfaceData['color'] ?? '';
-                            if ($color !== '' && !in_array($color, ['blue', 'red'], true)) {
-                                $color = '';
-                            }
-                            $mark = $surfaceData['mark'] ?? '';
-                            if (!in_array($mark, ['dot', 'x', 'vertical', 'horizontal'], true)) {
-                                $mark = '';
-                            }
-                            $markColor = $surfaceData['markColor'] ?? '';
-                            if ($mark !== '') {
-                                if (!in_array($markColor, ['blue', 'red'], true)) {
-                                    $markColor = $color !== '' ? $color : 'blue';
-                                }
-                                $position = null;
-                                if (isset($surfaceData['position']) && is_array($surfaceData['position'])) {
-                                    $posX = $surfaceData['position']['x'] ?? null;
-                                    $posY = $surfaceData['position']['y'] ?? null;
-                                    if (is_numeric($posX) && is_numeric($posY)) {
-                                        $posX = max(0, min(100, (float) $posX));
-                                        $posY = max(0, min(100, (float) $posY));
-                                        $position = [
-                                            'x' => round($posX, 2),
-                                            'y' => round($posY, 2),
-                                        ];
-                                    }
-                                }
-                            } else {
-                                $markColor = '';
-                                $position = null;
-                            }
-                            if ($color === '' && $mark === '') {
-                                continue;
-                            }
-                            $surfacePayload = [
-                                'color' => $color,
-                                'mark' => $mark,
-                            ];
-                            if ($mark !== '') {
-                                $surfacePayload['markColor'] = $markColor;
-                                if ($position !== null) {
-                                    $surfacePayload['position'] = $position;
-                                }
-                            }
-                            $normalized[$toothCodeKey][$diagramKey]['surfaces'][$surfaceKey] = $surfacePayload;
-                        }
-                    }
-                    if (isset($toothPayload['status']) && array_key_exists($toothPayload['status'], $odontogramStatuses)) {
-                        $normalized[$toothCodeKey]['status'] = $toothPayload['status'];
-                    }
-                    if (isset($toothPayload['notes']) && is_string($toothPayload['notes'])) {
-                        $note = trim($toothPayload['notes']);
-                        $normalized[$toothCodeKey]['notes'] = $note !== '' ? $note : null;
-                    }
-                }
-            }
-
-            foreach ($submittedEvolutionTeeth as $submittedToothKey => $_) {
-                if (!isset($normalized[$submittedToothKey])) {
-                    $normalized[$submittedToothKey] = [];
-                }
-                if (!isset($normalized[$submittedToothKey]['evolucion'])) {
-                    $normalized[$submittedToothKey]['evolucion'] = ['surfaces' => []];
-                } elseif (!isset($normalized[$submittedToothKey]['evolucion']['surfaces'])) {
-                    $normalized[$submittedToothKey]['evolucion']['surfaces'] = [];
-                }
-            }
-
-            try {
-                $pdo->beginTransaction();
-                $existingBaseSurfaces = [];
-                $existingStmt = $pdo->prepare('SELECT tooth_code, surface_data FROM odontogram_entries WHERE patient_id = :patient_id');
-                $existingStmt->execute([':patient_id' => $patientId]);
-                foreach ($existingStmt->fetchAll(PDO::FETCH_ASSOC) as $existingEntry) {
-                    $existingTooth = trim((string) ($existingEntry['tooth_code'] ?? ''));
-                    if ($existingTooth === '') {
-                        continue;
-                    }
-                    $existingBaseSurfaces[$existingTooth] = [];
-                    if (empty($existingEntry['surface_data'])) {
-                        continue;
-                    }
-                    $existingSurfaceData = json_decode((string) $existingEntry['surface_data'], true);
-                    if (!is_array($existingSurfaceData)) {
-                        continue;
-                    }
-                    if (!empty($existingSurfaceData['odontodiagrama']) && is_array($existingSurfaceData['odontodiagrama'])) {
-                        $baseSurfaces = [];
-                        foreach ($existingSurfaceData['odontodiagrama'] as $surfaceKey => $surfacePayload) {
-                            if (!is_array($surfacePayload)) {
-                                continue;
-                            }
-                            $hasColor = isset($surfacePayload['color']) && trim((string) $surfacePayload['color']) !== '';
-                            $hasMark = isset($surfacePayload['mark']) && trim((string) $surfacePayload['mark']) !== '';
-                            if ($hasColor || $hasMark) {
-                                $baseSurfaces[$surfaceKey] = $surfacePayload;
-                            }
-                        }
-                        $existingBaseSurfaces[$existingTooth] = $baseSurfaces;
-                    }
+                $toothCodeKey = trim((string) $toothCode);
+                if ($toothCodeKey === '' || !in_array($toothCodeKey, $validToothCodes, true)) {
+                    continue;
                 }
 
-                if (!$baseDirty) {
-                    foreach ($existingBaseSurfaces as $existingTooth => $baseSurfaces) {
-                        if (empty($baseSurfaces)) {
+                $sanitizedSurfaces = [];
+                $surfaces = $toothPayload['surfaces'] ?? [];
+                if (is_array($surfaces)) {
+                    foreach ($surfaces as $surfaceKey => $surfaceData) {
+                        if (!array_key_exists($surfaceKey, $allSurfaces) || !is_array($surfaceData)) {
                             continue;
                         }
-                        if (!isset($normalized[$existingTooth])) {
-                            $normalized[$existingTooth] = [];
+                        $color = $surfaceData['color'] ?? '';
+                        if ($color !== '' && !in_array($color, ['blue', 'red'], true)) {
+                            $color = '';
                         }
-                        if (empty($normalized[$existingTooth]['odontodiagrama']['surfaces'])) {
-                            $normalized[$existingTooth]['odontodiagrama']['surfaces'] = $baseSurfaces;
+                        $mark = $surfaceData['mark'] ?? '';
+                        if (!in_array($mark, ['dot', 'x', 'vertical', 'horizontal'], true)) {
+                            $mark = '';
+                        }
+                        $markColor = '';
+                        $position = null;
+                        if ($mark !== '') {
+                            $markColor = $surfaceData['markColor'] ?? '';
+                            if (!in_array($markColor, ['blue', 'red'], true)) {
+                                $markColor = $color !== '' ? $color : 'blue';
+                            }
+                            if (isset($surfaceData['position']) && is_array($surfaceData['position'])) {
+                                $posX = $surfaceData['position']['x'] ?? null;
+                                $posY = $surfaceData['position']['y'] ?? null;
+                                if (is_numeric($posX) && is_numeric($posY)) {
+                                    $posX = max(0, min(100, (float) $posX));
+                                    $posY = max(0, min(100, (float) $posY));
+                                    $position = [
+                                        'x' => round($posX, 2),
+                                        'y' => round($posY, 2),
+                                    ];
+                                }
+                            }
+                        }
+
+                        if ($color === '' && $mark === '') {
+                            continue;
+                        }
+
+                        $cellPayload = [];
+                        if ($color !== '') {
+                            $cellPayload['color'] = $color;
+                        }
+                        if ($mark !== '') {
+                            $cellPayload['mark'] = $mark;
+                            $cellPayload['markColor'] = $markColor;
+                            if ($position !== null) {
+                                $cellPayload['position'] = $position;
+                            }
+                        }
+
+                        if (!empty($cellPayload)) {
+                            $sanitizedSurfaces[$surfaceKey] = $cellPayload;
                         }
                     }
                 }
 
-                $pdo->prepare('DELETE FROM odontogram_entries WHERE patient_id = :patient_id')
-                    ->execute([':patient_id' => $patientId]);
-
-                foreach ($normalized as $toothCode => $diagramData) {
-                    $toothCodeKey = trim((string) $toothCode);
-                    if ($toothCodeKey === '') {
-                        continue;
+                $statusKey = null;
+                if (isset($toothPayload['status']) && array_key_exists($toothPayload['status'], $odontogramStatuses)) {
+                    $statusKey = (string) $toothPayload['status'];
+                    if ($statusKey === 'sin_registro') {
+                        $statusKey = null;
                     }
-                    $surfacesPayload = [
-                        'odontodiagrama' => $diagramData['odontodiagrama']['surfaces'] ?? [],
-                        'evolucion' => $diagramData['evolucion']['surfaces'] ?? [],
-                    ];
-
-                    $baseSurfaces = $surfacesPayload['odontodiagrama'];
-                    if (!is_array($surfacesPayload['evolucion'])) {
-                        $surfacesPayload['evolucion'] = [];
-                    }
-
-                    if (empty($surfacesPayload['odontodiagrama']) && empty($surfacesPayload['evolucion'])) {
-                        continue;
-                    }
-
-                    $surfaceJson = json_encode($surfacesPayload, JSON_UNESCAPED_UNICODE);
-                    if ($surfaceJson === false) {
-                        continue;
-                    }
-
-                    upsertOdontogramEntry($pdo, $patientId, $toothCodeKey, [
-                        'status' => $diagramData['status'] ?? 'sin_registro',
-                        'surface_data' => $surfaceJson,
-                        'notes' => $diagramData['notes'] ?? null,
-                    ]);
                 }
 
-                $pdo->commit();
-                $messages[] = 'Odontograma guardado correctamente.';
-                header('Location: patient.php?id=' . $patientId . '#odontograma');
-                exit;
-            } catch (Throwable $e) {
-                $pdo->rollBack();
-                error_log('Odontogram save failed: ' . $e->getMessage());
-                $errors[] = 'No se pudo guardar el odontograma. Inténtalo nuevamente.';
+                $toothData = [
+                    'surfaces' => $sanitizedSurfaces,
+                ];
+                if ($statusKey !== null) {
+                    $toothData['status'] = $statusKey;
+                }
+                if (isset($toothPayload['notes']) && is_string($toothPayload['notes'])) {
+                    $note = trim($toothPayload['notes']);
+                    if ($note !== '') {
+                        $toothData['notes'] = $note;
+                    }
+                }
+
+                if (!empty($toothData['surfaces']) || isset($toothData['status']) || !empty($toothData['notes'])) {
+                    $normalized[$toothCodeKey] = $toothData;
+                }
+            }
+
+            if (empty($normalized)) {
+                $errors[] = 'No puedes guardar un odontograma vacío.';
+            }
+
+            if (!$errors) {
+                $savedSnapshotId = null;
+                try {
+                    $pdo->beginTransaction();
+
+                    if (!$snapshotOnly) {
+                        $pdo->prepare('DELETE FROM odontogram_entries WHERE patient_id = :patient_id')
+                            ->execute([':patient_id' => $patientId]);
+                    }
+
+                    $snapshotPayload = ['teeth' => []];
+                    foreach ($normalized as $toothCode => $toothData) {
+                        $surfacesPayload = $toothData['surfaces'] ?? [];
+                        if (!is_array($surfacesPayload)) {
+                            $surfacesPayload = [];
+                        }
+                        $statusValue = trim((string) ($toothData['status'] ?? ''));
+                        if ($statusValue === '') {
+                            $statusValue = 'sin_registro';
+                        }
+                        $snapshotPayload['teeth'][$toothCode] = [
+                            'surfaces' => $surfacesPayload,
+                            'status' => $statusValue,
+                            'notes' => $toothData['notes'] ?? null,
+                        ];
+                    }
+
+                    $updatedExistingSnapshot = false;
+                    if ($snapshotOriginId > 0) {
+                        $snapshotExistsStmt = $pdo->prepare('SELECT 1 FROM odontogram_snapshots WHERE id = :id AND patient_id = :patient_id');
+                        $snapshotExistsStmt->execute([
+                            ':id' => $snapshotOriginId,
+                            ':patient_id' => $patientId,
+                        ]);
+                        if ($snapshotExistsStmt->fetchColumn()) {
+                            $snapshotPayloadJson = json_encode($snapshotPayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                            if ($snapshotPayloadJson === false) {
+                                throw new RuntimeException('No se pudo serializar el odontograma.');
+                            }
+                            $updateSnapshotStmt = $pdo->prepare(
+                                'UPDATE odontogram_snapshots
+                                 SET payload = :payload,
+                                     is_blank = 0
+                                 WHERE id = :id AND patient_id = :patient_id'
+                            );
+                            $updateSnapshotStmt->execute([
+                                ':payload' => $snapshotPayloadJson,
+                                ':id' => $snapshotOriginId,
+                                ':patient_id' => $patientId,
+                            ]);
+                            $updatedExistingSnapshot = true;
+                            $savedSnapshotId = $snapshotOriginId;
+                        }
+                    }
+
+                    if (!$updatedExistingSnapshot) {
+                        $savedSnapshotId = insertOdontogramSnapshot($pdo, $patientId, $snapshotPayload, false);
+                    }
+
+                    $pdo->commit();
+                    $messages[] = 'Odontograma guardado correctamente.';
+                    $redirectUrl = '/patient.php?id=' . $patientId . '#odontograma';
+                    if ($savedSnapshotId !== null) {
+                        $redirectUrl = '/odontogram_view.php?patient_id=' . $patientId . '&snapshot_id=' . $savedSnapshotId . '#odontograma-guardado';
+                    }
+                    header('Location: ' . $redirectUrl);
+                    exit;
+                } catch (Throwable $e) {
+                    $pdo->rollBack();
+                    error_log('Odontogram save failed: ' . $e->getMessage());
+                    $errors[] = 'No se pudo guardar el odontograma. Inténtalo nuevamente.';
+                }
             }
         }
     }
@@ -937,36 +991,7 @@ $profileStmt = $pdo->prepare('SELECT * FROM clinical_profiles WHERE patient_id =
 $profileStmt->execute([':id' => $patientId]);
 $profile = $profileStmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
-$odontogramStmt = $pdo->prepare('SELECT tooth_code, status, notes, surface_data FROM odontogram_entries WHERE patient_id = :id');
-$odontogramStmt->execute([':id' => $patientId]);
-$odontogramPayload = [
-    'odontodiagrama' => [],
-    'evolucion' => [],
-];
-foreach ($odontogramStmt->fetchAll(PDO::FETCH_ASSOC) as $entry) {
-    $decodedSurfaces = [];
-    if (!empty($entry['surface_data'])) {
-        $decoded = json_decode($entry['surface_data'], true);
-        if (is_array($decoded)) {
-            $decodedSurfaces = $decoded;
-        }
-    }
-    foreach (['odontodiagrama', 'evolucion'] as $diagramKey) {
-        if (!array_key_exists($diagramKey, $decodedSurfaces) || !is_array($decodedSurfaces[$diagramKey])) {
-            continue;
-        }
-        $odontogramPayload[$diagramKey][$entry['tooth_code']] = [
-            'surfaces' => $decodedSurfaces[$diagramKey],
-            'status' => $entry['status'],
-            'notes' => $entry['notes'],
-        ];
-    }
-}
-
-$odontogramInitialJson = json_encode($odontogramPayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-if ($odontogramInitialJson === false) {
-    $odontogramInitialJson = '{"odontodiagrama":{},"evolucion":{}}';
-}
+$odontogramInitialJson = '{"odontodiagrama":{}}';
 
 $visitsStmt = $pdo->prepare('SELECT * FROM visits WHERE patient_id = :id ORDER BY date(visit_date) DESC, id DESC');
 $visitsStmt->execute([':id' => $patientId]);
@@ -975,6 +1000,122 @@ $visits = $visitsStmt->fetchAll(PDO::FETCH_ASSOC);
 $activitiesStmt = $pdo->prepare('SELECT * FROM treatment_activities WHERE patient_id = :id ORDER BY date(activity_date) DESC, id DESC');
 $activitiesStmt->execute([':id' => $patientId]);
 $activities = $activitiesStmt->fetchAll(PDO::FETCH_ASSOC);
+
+$odontogramSearchQuery = isset($_GET['odontogram_query']) ? trim((string) $_GET['odontogram_query']) : '';
+$pdo->prepare('DELETE FROM odontogram_snapshots WHERE patient_id = :patient_id AND is_blank = 1')
+    ->execute([':patient_id' => $patientId]);
+$snapshotStmt = $pdo->prepare('SELECT id, payload, is_blank, created_at FROM odontogram_snapshots WHERE patient_id = :patient_id ORDER BY datetime(created_at) DESC, id DESC');
+$snapshotStmt->execute([':patient_id' => $patientId]);
+$snapshotsRaw = $snapshotStmt->fetchAll(PDO::FETCH_ASSOC);
+$snapshots = [];
+foreach ($snapshotsRaw as $row) {
+    if ((int) ($row['is_blank'] ?? 0) === 1) {
+        continue;
+    }
+    $decodedPayload = json_decode((string) ($row['payload'] ?? ''), true);
+    if (!is_array($decodedPayload) || !isset($decodedPayload['teeth']) || !is_array($decodedPayload['teeth'])) {
+        $decodedPayload = ['teeth' => []];
+    }
+    $snapshots[] = [
+        'id' => (int) $row['id'],
+        'created_at' => (string) $row['created_at'],
+        'payload' => $decodedPayload,
+    ];
+}
+unset($snapshotsRaw);
+
+$firstSnapshot = null;
+$snapshotOrdinalLabels = [];
+if ($snapshots) {
+    $chronologicalSnapshots = $snapshots;
+    usort(
+        $chronologicalSnapshots,
+        static function (array $a, array $b): int {
+            $createdAtA = isset($a['created_at']) ? (string) $a['created_at'] : '';
+            $createdAtB = isset($b['created_at']) ? (string) $b['created_at'] : '';
+            $dateComparison = strcmp($createdAtA, $createdAtB);
+            if ($dateComparison !== 0) {
+                return $dateComparison;
+            }
+            return ((int) $a['id']) <=> ((int) $b['id']);
+        }
+    );
+    foreach ($chronologicalSnapshots as $index => $snapshotRow) {
+        $position = $index + 1;
+        $snapshotOrdinalLabels[$snapshotRow['id']] = $formatOdontogramOrdinal($position);
+        if ($index === 0) {
+            $firstSnapshot = $snapshotRow;
+        }
+    }
+}
+
+$firstSnapshotTeeth = [];
+$firstSnapshotCreatedAt = $firstSnapshot ? $formatDateTime($firstSnapshot['created_at']) : null;
+$firstSnapshotOrdinalLabel = $firstSnapshot ? ($snapshotOrdinalLabels[$firstSnapshot['id']] ?? 'Primer odontograma') : null;
+if ($firstSnapshot) {
+    foreach ($firstSnapshot['payload']['teeth'] as $toothCode => $toothData) {
+        if (!is_array($toothData)) {
+            continue;
+        }
+        $statusKey = isset($toothData['status']) && is_string($toothData['status']) ? $toothData['status'] : null;
+        $statusLabel = $statusKey && isset($odontogramStatuses[$statusKey]) ? $odontogramStatuses[$statusKey] : 'Sin registro';
+        $notes = '';
+        if (isset($toothData['notes']) && is_string($toothData['notes'])) {
+            $notes = trim($toothData['notes']);
+        }
+        $surfaceDescriptions = [];
+        if (isset($toothData['surfaces']) && is_array($toothData['surfaces'])) {
+            $surfaceDescriptions = $describeSurfaces($toothData['surfaces']);
+        }
+        $firstSnapshotTeeth[] = [
+            'code' => $toothCode,
+            'status' => $statusLabel,
+            'surfaces' => $surfaceDescriptions,
+            'notes' => $notes,
+        ];
+    }
+    usort(
+        $firstSnapshotTeeth,
+        static function (array $a, array $b): int {
+            return strcmp((string) $a['code'], (string) $b['code']);
+        }
+    );
+}
+
+$filteredSnapshots = $snapshots;
+if ($odontogramSearchQuery !== '') {
+    $queryLower = strtolower($odontogramSearchQuery);
+    $filteredSnapshots = array_values(array_filter(
+        $snapshots,
+        static function (array $snapshot) use ($queryLower): bool {
+            $createdAt = isset($snapshot['created_at']) ? strtolower((string) $snapshot['created_at']) : '';
+            if (strpos($createdAt, $queryLower) !== false) {
+                return true;
+            }
+            if (ctype_digit($queryLower) && (int) $queryLower === (int) $snapshot['id']) {
+                return true;
+            }
+            foreach ($snapshot['payload']['teeth'] as $toothCode => $_) {
+                if (strpos(strtolower((string) $toothCode), $queryLower) !== false) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    ));
+}
+
+$patientAgeYears = null;
+if (!empty($patient['birth_date'])) {
+    try {
+        $birthDate = new DateTime($patient['birth_date']);
+        $todayDate = new DateTime('today');
+        $diff = $birthDate->diff($todayDate);
+        $patientAgeYears = $diff->y;
+    } catch (Throwable $e) {
+        $patientAgeYears = null;
+    }
+}
 
 $activityPreviousOutstanding = [];
 $latestOutstanding = 0.0;
@@ -1064,137 +1205,307 @@ if (!empty($patient['registered_at'])) {
             </a>
         </div>
     </div>
-    <div class="grid gap-6 lg:grid-cols-2 xl:grid-cols-4">
-        <div class="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-6 shadow-inner xl:col-span-2">
-            <h3 class="mb-6 text-xs font-semibold uppercase tracking-wide text-slate-600">Información general</h3>
-            <dl class="space-y-4 text-sm text-slate-600">
-                <div class="flex justify-between gap-4 border-b border-slate-200/60 pb-3 mb-3">
-                    <dt class="font-semibold text-slate-700">Nombres y apellidos:</dt>
-                    <dd class="text-right font-medium text-slate-900"><?= $formatValue($patient['full_name'] ?? null) ?></dd>
+    <div class="grid gap-6 lg:grid-cols-3">
+        <!-- Columna izquierda: Foto y contacto básico -->
+        <div class="lg:col-span-1">
+            <div class="flex flex-col gap-6">
+                <div class="flex flex-col items-center gap-4 rounded-2xl border border-slate-200/80 bg-gradient-to-br from-white to-slate-50/50 p-6 text-center shadow-sm">
+                    <?php if (!empty($patient['profile_photo_path'])): ?>
+                        <img src="<?= htmlspecialchars($patient['profile_photo_path']) ?>" alt="<?= htmlspecialchars('Foto del paciente ' . ($patient['full_name'] ?? '')) ?>" class="h-36 w-36 rounded-full object-cover shadow-lg ring-4 ring-brand-100/60">
+                    <?php else: ?>
+                        <div class="flex h-36 w-36 items-center justify-center rounded-full bg-gradient-to-br from-slate-100 to-slate-200 text-5xl text-slate-400 shadow-md">
+                            <span>👤</span>
+                        </div>
+                    <?php endif; ?>
+                    <div class="space-y-1.5 text-sm">
+                        <p class="text-lg font-bold text-slate-900"><?= htmlspecialchars($patient['full_name'] ?? '') ?></p>
+                        <?php if (!empty($patient['preferred_name'])): ?>
+                            <p class="text-sm text-brand-600 font-semibold">Preferido: <?= htmlspecialchars($patient['preferred_name']) ?></p>
+                        <?php endif; ?>
+                        <?php if (!empty($patient['occupation'])): ?>
+                            <p class="text-slate-500"><?= htmlspecialchars($patient['occupation']) ?></p>
+                        <?php endif; ?>
+                    </div>
+                    <div class="w-full space-y-2 text-xs text-slate-500">
+                        <?php if (!empty($patient['phone_primary'])): ?>
+                            <p class="rounded-xl border border-slate-200/80 bg-white px-3.5 py-2.5 font-semibold text-slate-700 shadow-sm">
+                                Teléfono: <a class="text-brand-600 hover:underline" href="tel:<?= htmlspecialchars($patient['phone_primary']) ?>"><?= htmlspecialchars($patient['phone_primary']) ?></a>
+                            </p>
+                        <?php endif; ?>
+                        <?php if (!empty($patient['email'])): ?>
+                            <p class="break-all rounded-xl border border-slate-200/80 bg-white px-3.5 py-2.5 font-semibold text-slate-700 shadow-sm">
+                                Correo: <a class="text-brand-600 hover:underline" href="mailto:<?= htmlspecialchars($patient['email']) ?>"><?= htmlspecialchars($patient['email']) ?></a>
+                            </p>
+                        <?php endif; ?>
+                        <p class="rounded-xl border border-slate-100 bg-slate-50/80 px-3.5 py-2.5 font-semibold text-slate-600">Registrado: <?= htmlspecialchars($registeredAtDisplay) ?></p>
+                    </div>
                 </div>
-                <div class="flex justify-between gap-4 border-b border-slate-200/60 pb-3">
-                    <dt class="font-medium text-slate-700">Nombre preferido:</dt>
-                    <dd class="text-right"><?= $formatValue($patient['preferred_name'] ?? null) ?></dd>
+
+                <!-- Alertas y saldo -->
+                <div class="rounded-2xl border <?= $hasAlert ? 'border-amber-200/80 bg-gradient-to-br from-amber-50 to-amber-100/50' : 'border-emerald-200/80 bg-gradient-to-br from-emerald-50 to-emerald-100/50' ?> p-6 shadow-sm">
+                    <h3 class="mb-4 text-xs font-bold uppercase tracking-wide <?= $hasAlert ? 'text-amber-800' : 'text-emerald-800' ?>">Alertas y saldo</h3>
+                    <div class="space-y-3 text-sm <?= $hasAlert ? 'text-amber-800' : 'text-emerald-800' ?>">
+                        <p class="leading-relaxed font-medium"><?= $hasAlert ? nl2br(htmlspecialchars((string) $alertText)) : 'Sin alertas registradas.' ?></p>
+                        <div class="inline-flex items-center gap-2 rounded-xl bg-white/90 px-4 py-2.5 text-sm font-bold shadow-sm <?= $hasAlert ? 'text-amber-700' : 'text-emerald-700' ?>">
+                            Saldo pendiente: Bs <?= number_format(max($totalBalance, 0), 2, ',', '.') ?>
+                        </div>
+                    </div>
                 </div>
-                <div class="flex justify-between gap-4 border-b border-slate-200/60 pb-3">
-                    <dt class="font-medium text-slate-700">Documento:</dt>
-                    <dd class="text-right"><?= $formatValue($patient['document_id'] ?? null) ?></dd>
+
+                <!-- Resumen rápido -->
+                <div class="rounded-2xl border border-slate-200/80 bg-gradient-to-br from-blue-50/50 to-white p-6 shadow-sm">
+                    <h3 class="mb-4 text-xs font-bold uppercase tracking-wide text-blue-800 flex items-center gap-2">
+                        <span>📊</span> Resumen rápido
+                    </h3>
+                    <div class="space-y-3 text-sm">
+                        <?php
+                        $lastVisit = $visits[0] ?? null;
+                        $lastActivity = $activities[0] ?? null;
+                        $totalVisits = count($visits);
+
+                        // Encontrar próxima cita
+                        $nextAppointment = null;
+                        foreach ($visits as $visit) {
+                            if (!empty($visit['next_appointment'])) {
+                                $appointmentDate = strtotime($visit['next_appointment']);
+                                if ($appointmentDate && $appointmentDate >= strtotime('today')) {
+                                    $nextAppointment = $visit['next_appointment'];
+                                    break;
+                                }
+                            }
+                        }
+                        ?>
+
+                        <div class="flex items-center gap-3 rounded-xl bg-white/80 p-3 border border-blue-100">
+                            <div class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600 font-bold text-lg shrink-0">
+                                <?= $totalVisits ?>
+                            </div>
+                            <div>
+                                <p class="text-xs font-semibold text-slate-500 uppercase">Total visitas</p>
+                                <p class="text-sm font-bold text-slate-700">
+                                    <?= $totalVisits === 1 ? '1 consulta' : $totalVisits . ' consultas' ?>
+                                </p>
+                            </div>
+                        </div>
+
+                        <?php if ($lastVisit): ?>
+                            <div class="rounded-xl bg-white/80 p-3 border border-green-100">
+                                <p class="text-xs font-semibold text-green-700 uppercase mb-2 flex items-center gap-1">
+                                    <span>✓</span> Última visita
+                                </p>
+                                <p class="text-sm font-bold text-slate-700 mb-1">
+                                    <?= date('d/m/Y', strtotime($lastVisit['visit_date'])) ?>
+                                </p>
+                                <?php if (!empty($lastVisit['subjective'])): ?>
+                                    <p class="text-xs text-slate-600 line-clamp-2">
+                                        <?= htmlspecialchars(substr($lastVisit['subjective'], 0, 60)) ?><?= strlen($lastVisit['subjective']) > 60 ? '...' : '' ?>
+                                    </p>
+                                <?php endif; ?>
+                            </div>
+                        <?php else: ?>
+                            <div class="rounded-xl bg-slate-50 p-3 border border-slate-200 text-center">
+                                <p class="text-xs text-slate-500">Sin visitas registradas</p>
+                            </div>
+                        <?php endif; ?>
+
+                        <?php if ($nextAppointment): ?>
+                            <div class="rounded-xl bg-white/80 p-3 border border-purple-100">
+                                <p class="text-xs font-semibold text-purple-700 uppercase mb-2 flex items-center gap-1">
+                                    <span>📅</span> Próxima cita
+                                </p>
+                                <p class="text-sm font-bold text-purple-700">
+                                    <?= date('d/m/Y', strtotime($nextAppointment)) ?>
+                                </p>
+                                <?php
+                                $daysUntil = floor((strtotime($nextAppointment) - strtotime('today')) / 86400);
+                                ?>
+                                <p class="text-xs text-slate-600">
+                                    <?php if ($daysUntil === 0): ?>
+                                        Hoy
+                                    <?php elseif ($daysUntil === 1): ?>
+                                        Mañana
+                                    <?php elseif ($daysUntil > 1): ?>
+                                        En <?= $daysUntil ?> días
+                                    <?php endif; ?>
+                                </p>
+                            </div>
+                        <?php endif; ?>
+
+                        <?php if ($lastActivity): ?>
+                            <div class="rounded-xl bg-white/80 p-3 border border-teal-100">
+                                <p class="text-xs font-semibold text-teal-700 uppercase mb-2 flex items-center gap-1">
+                                    <span>💰</span> Último pago
+                                </p>
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-sm font-bold text-slate-700">
+                                            Bs <?= number_format((float)($lastActivity['payment'] ?? 0), 2, ',', '.') ?>
+                                        </p>
+                                        <p class="text-xs text-slate-600">
+                                            <?= date('d/m/Y', strtotime($lastActivity['activity_date'])) ?>
+                                        </p>
+                                    </div>
+                                    <?php if (!empty($lastActivity['payment_method'])): ?>
+                                        <span class="text-xs bg-teal-100 text-teal-700 px-2 py-1 rounded-lg font-semibold">
+                                            <?= htmlspecialchars($lastActivity['payment_method']) ?>
+                                        </span>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        <?php endif; ?>
+                    </div>
                 </div>
-                <div class="flex justify-between gap-4 border-b border-slate-200/60 pb-3">
-                    <dt class="font-medium text-slate-700">Fecha de nacimiento:</dt>
-                    <dd class="text-right"><?= htmlspecialchars($birthDateDisplay) ?></dd>
-                </div>
-                <div class="flex justify-between gap-4 border-b border-slate-200/60 pb-3">
-                    <dt class="font-medium text-slate-700">Edad:</dt>
-                    <dd class="text-right"><?= $patient['age'] ? (int) $patient['age'] . ' años' : '—' ?></dd>
-                </div>
-                <div class="flex justify-between gap-4 border-b border-slate-200/60 pb-3">
-                    <dt class="font-medium text-slate-700">Género:</dt>
-                    <dd class="text-right"><?= $formatValue($patient['gender'] ?? null) ?></dd>
-                </div>
-                <div class="flex justify-between gap-4 border-b border-slate-200/60 pb-3">
-                    <dt class="font-medium text-slate-700">Estado civil:</dt>
-                    <dd class="text-right"><?= $formatValue($patient['marital_status'] ?? null) ?></dd>
-                </div>
-                <div class="flex justify-between gap-4 border-b border-slate-200/60 pb-3">
-                    <dt class="font-medium text-slate-700">Ocupación:</dt>
-                    <dd class="text-right"><?= $formatValue($patient['occupation'] ?? null) ?></dd>
-                </div>
-                <div class="flex justify-between gap-4 pb-2">
-                    <dt class="font-medium text-slate-700">Dirección:</dt>
-                    <dd class="text-right"><?= $formatValue($patient['address'] ?? null) ?></dd>
-                </div>
-                <div class="flex justify-between gap-4 border-t border-slate-200/60 pt-3">
-                    <dt class="font-medium text-slate-700">Registro inicial:</dt>
-                    <dd class="text-right text-slate-500"><?= htmlspecialchars($registeredAtDisplay) ?></dd>
-                </div>
-            </dl>
+            </div>
         </div>
-        <div class="rounded-2xl border border-slate-200/80 bg-white p-6 xl:col-span-2 space-y-5">
-            <div>
-                <h3 class="mb-6 text-xs font-semibold uppercase tracking-wide text-slate-600">Red de contacto</h3>
-                <dl class="space-y-3 text-sm text-slate-600">
-                    <div class="flex justify-between gap-4 border-b border-slate-200/60 pb-3">
-                        <dt class="font-medium text-slate-700">Correo:</dt>
-                        <dd class="text-right break-words"><?= $formatValue($patient['email'] ?? null) ?></dd>
+
+        <!-- Columna derecha: Información detallada -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Información general -->
+            <div class="rounded-2xl border border-slate-200/80 bg-gradient-to-br from-slate-50 to-white p-6 shadow-sm">
+                <h3 class="mb-5 text-sm font-bold uppercase tracking-wide text-slate-700 flex items-center gap-2">
+                    <span class="text-brand-600">📋</span> Información general
+                </h3>
+                <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3.5 text-sm text-slate-600">
+                    <div class="flex flex-col gap-1 border-b border-slate-200/60 pb-3">
+                        <dt class="font-semibold text-slate-500 text-xs uppercase tracking-wide">Nombres y apellidos</dt>
+                        <dd class="font-bold text-slate-900"><?= $formatValue($patient['full_name'] ?? null) ?></dd>
                     </div>
-                    <div class="flex justify-between gap-4 border-b border-slate-200/60 pb-3">
-                        <dt class="font-medium text-slate-700">Tel. principal:</dt>
-                        <dd class="text-right"><?= $formatValue($patient['phone_primary'] ?? null) ?></dd>
+                    <div class="flex flex-col gap-1 border-b border-slate-200/60 pb-3">
+                        <dt class="font-semibold text-slate-500 text-xs uppercase tracking-wide">Nombre preferido</dt>
+                        <dd class="font-medium text-slate-700"><?= $formatValue($patient['preferred_name'] ?? null) ?></dd>
                     </div>
-                    <div class="flex justify-between gap-4 pb-2">
-                        <dt class="font-medium text-slate-700">Tel. alterno:</dt>
-                        <dd class="text-right"><?= $formatValue($patient['phone_secondary'] ?? null) ?></dd>
+                    <div class="flex flex-col gap-1 border-b border-slate-200/60 pb-3">
+                        <dt class="font-semibold text-slate-500 text-xs uppercase tracking-wide">Documento</dt>
+                        <dd class="font-medium text-slate-700"><?= $formatValue($patient['document_id'] ?? null) ?></dd>
+                    </div>
+                    <div class="flex flex-col gap-1 border-b border-slate-200/60 pb-3">
+                        <dt class="font-semibold text-slate-500 text-xs uppercase tracking-wide">Fecha de nacimiento</dt>
+                        <dd class="font-medium text-slate-700"><?= htmlspecialchars($birthDateDisplay) ?></dd>
+                    </div>
+                    <div class="flex flex-col gap-1 border-b border-slate-200/60 pb-3">
+                        <dt class="font-semibold text-slate-500 text-xs uppercase tracking-wide">Edad</dt>
+                        <dd class="font-medium text-slate-700"><?= $patient['age'] ? (int) $patient['age'] . ' años' : '—' ?></dd>
+                    </div>
+                    <div class="flex flex-col gap-1 border-b border-slate-200/60 pb-3">
+                        <dt class="font-semibold text-slate-500 text-xs uppercase tracking-wide">Género</dt>
+                        <dd class="font-medium text-slate-700"><?= $formatValue($patient['gender'] ?? null) ?></dd>
+                    </div>
+                    <div class="flex flex-col gap-1 border-b border-slate-200/60 pb-3">
+                        <dt class="font-semibold text-slate-500 text-xs uppercase tracking-wide">Estado civil</dt>
+                        <dd class="font-medium text-slate-700"><?= $formatValue($patient['marital_status'] ?? null) ?></dd>
+                    </div>
+                    <div class="flex flex-col gap-1 border-b border-slate-200/60 pb-3">
+                        <dt class="font-semibold text-slate-500 text-xs uppercase tracking-wide">Ocupación</dt>
+                        <dd class="font-medium text-slate-700"><?= $formatValue($patient['occupation'] ?? null) ?></dd>
+                    </div>
+                    <div class="flex flex-col gap-1 md:col-span-2">
+                        <dt class="font-semibold text-slate-500 text-xs uppercase tracking-wide">Dirección</dt>
+                        <dd class="font-medium text-slate-700"><?= $formatValue($patient['address'] ?? null) ?></dd>
                     </div>
                 </dl>
             </div>
-            <div class="rounded-xl border border-brand-100/70 bg-brand-50/50 p-5">
-                <h4 class="mb-5 text-xs font-semibold uppercase tracking-wide text-brand-700">Contacto de emergencia</h4>
-                <dl class="space-y-3 text-sm text-brand-800">
-                    <div class="flex justify-between gap-4 border-b border-brand-200/50 pb-3">
-                        <dt class="font-medium">Nombres:</dt>
-                        <dd class="text-right"><?= $formatValue($patient['emergency_contact'] ?? null) ?></dd>
+
+            <!-- Red de contacto y contactos de emergencia -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="rounded-2xl border border-blue-200/60 bg-gradient-to-br from-blue-50/50 to-white p-5 shadow-sm">
+                    <h3 class="mb-4 text-xs font-bold uppercase tracking-wide text-blue-700 flex items-center gap-2">
+                        <span>📞</span> Red de contacto
+                    </h3>
+                    <dl class="space-y-3 text-sm text-slate-600">
+                        <div class="flex flex-col gap-1">
+                            <dt class="font-semibold text-slate-500 text-xs uppercase">Correo</dt>
+                            <dd class="break-words font-medium text-slate-700"><?= $formatValue($patient['email'] ?? null) ?></dd>
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            <dt class="font-semibold text-slate-500 text-xs uppercase">Tel. principal</dt>
+                            <dd class="font-medium text-slate-700"><?= $formatValue($patient['phone_primary'] ?? null) ?></dd>
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            <dt class="font-semibold text-slate-500 text-xs uppercase">Tel. alterno</dt>
+                            <dd class="font-medium text-slate-700"><?= $formatValue($patient['phone_secondary'] ?? null) ?></dd>
+                        </div>
+                    </dl>
+                </div>
+
+                <div class="rounded-2xl border border-red-200/60 bg-gradient-to-br from-red-50/50 to-white p-5 shadow-sm">
+                    <h4 class="mb-4 text-xs font-bold uppercase tracking-wide text-red-700 flex items-center gap-2">
+                        <span>🚨</span> Contacto de emergencia
+                    </h4>
+                    <dl class="space-y-3 text-sm text-red-900">
+                        <div class="flex flex-col gap-1">
+                            <dt class="font-semibold text-red-600 text-xs uppercase">Nombres</dt>
+                            <dd class="font-medium"><?= $formatValue($patient['emergency_contact'] ?? null) ?></dd>
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            <dt class="font-semibold text-red-600 text-xs uppercase">Parentesco</dt>
+                            <dd class="font-medium"><?= $formatValue($patient['emergency_contact_relationship'] ?? null) ?></dd>
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            <dt class="font-semibold text-red-600 text-xs uppercase">Teléfono</dt>
+                            <dd class="font-medium"><?= $formatValue($patient['emergency_contact_phone'] ?? null) ?></dd>
+                        </div>
+                    </dl>
+                </div>
+            </div>
+
+            <!-- Responsable legal e información administrativa -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="rounded-2xl border border-purple-200/60 bg-gradient-to-br from-purple-50/50 to-white p-5 shadow-sm">
+                    <h4 class="mb-4 text-xs font-bold uppercase tracking-wide text-purple-700 flex items-center gap-2">
+                        <span>👤</span> Responsable legal
+                    </h4>
+                    <dl class="space-y-3 text-sm text-slate-600">
+                        <div class="flex flex-col gap-1">
+                            <dt class="font-semibold text-slate-500 text-xs uppercase">Nombres</dt>
+                            <dd class="font-medium text-slate-700"><?= $formatValue($patient['representative_name'] ?? null) ?></dd>
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            <dt class="font-semibold text-slate-500 text-xs uppercase">Documento</dt>
+                            <dd class="font-medium text-slate-700"><?= $formatValue($patient['representative_document'] ?? null) ?></dd>
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            <dt class="font-semibold text-slate-500 text-xs uppercase">Teléfono</dt>
+                            <dd class="font-medium text-slate-700"><?= $formatValue($patient['representative_phone'] ?? null) ?></dd>
+                        </div>
+                    </dl>
+                </div>
+
+                <div class="rounded-2xl border border-teal-200/60 bg-gradient-to-br from-teal-50/50 to-white p-5 shadow-sm">
+                    <h3 class="mb-4 text-xs font-bold uppercase tracking-wide text-teal-700 flex items-center gap-2">
+                        <span>🏥</span> Información administrativa
+                    </h3>
+                    <dl class="space-y-3 text-sm text-slate-600">
+                        <div class="flex flex-col gap-1">
+                            <dt class="font-semibold text-slate-500 text-xs uppercase">Referido por</dt>
+                            <dd class="font-medium text-slate-700"><?= $formatValue($patient['referred_by'] ?? null) ?></dd>
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            <dt class="font-semibold text-slate-500 text-xs uppercase">Médico tratante</dt>
+                            <dd class="font-medium text-slate-700"><?= $formatValue($patient['primary_physician'] ?? null) ?></dd>
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            <dt class="font-semibold text-slate-500 text-xs uppercase">Tel. del médico</dt>
+                            <dd class="font-medium text-slate-700"><?= $formatValue($patient['primary_physician_phone'] ?? null) ?></dd>
+                        </div>
+                    </dl>
+                </div>
+            </div>
+
+            <!-- Aseguradora -->
+            <div class="rounded-2xl border border-indigo-200/60 bg-gradient-to-br from-indigo-50/50 to-white p-5 shadow-sm">
+                <h3 class="mb-4 text-xs font-bold uppercase tracking-wide text-indigo-700 flex items-center gap-2">
+                    <span>🏢</span> Información de seguro
+                </h3>
+                <dl class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-slate-600">
+                    <div class="flex flex-col gap-1">
+                        <dt class="font-semibold text-slate-500 text-xs uppercase">Aseguradora</dt>
+                        <dd class="font-medium text-slate-700"><?= $formatValue($patient['insurance_provider'] ?? null) ?></dd>
                     </div>
-                    <div class="flex justify-between gap-4 border-b border-brand-200/50 pb-3">
-                        <dt class="font-medium">Parentesco:</dt>
-                        <dd class="text-right"><?= $formatValue($patient['emergency_contact_relationship'] ?? null) ?></dd>
-                    </div>
-                    <div class="flex justify-between gap-4 pb-1">
-                        <dt class="font-medium">Teléfono:</dt>
-                        <dd class="text-right"><?= $formatValue($patient['emergency_contact_phone'] ?? null) ?></dd>
+                    <div class="flex flex-col gap-1">
+                        <dt class="font-semibold text-slate-500 text-xs uppercase">N.º de póliza</dt>
+                        <dd class="font-medium text-slate-700"><?= $formatValue($patient['insurance_policy_number'] ?? null) ?></dd>
                     </div>
                 </dl>
-            </div>
-            <div class="rounded-xl border border-slate-200/70 bg-slate-50/80 p-5">
-                <h4 class="mb-5 text-xs font-semibold uppercase tracking-wide text-slate-600">Responsable legal</h4>
-                <dl class="space-y-3 text-sm text-slate-600">
-                    <div class="flex justify-between gap-4 border-b border-slate-200/60 pb-3">
-                        <dt class="font-medium text-slate-700">Nombres:</dt>
-                        <dd class="text-right"><?= $formatValue($patient['representative_name'] ?? null) ?></dd>
-                    </div>
-                    <div class="flex justify-between gap-4 border-b border-slate-200/60 pb-3">
-                        <dt class="font-medium text-slate-700">Documento:</dt>
-                        <dd class="text-right"><?= $formatValue($patient['representative_document'] ?? null) ?></dd>
-                    </div>
-                    <div class="flex justify-between gap-4 pb-1">
-                        <dt class="font-medium text-slate-700">Teléfono:</dt>
-                        <dd class="text-right"><?= $formatValue($patient['representative_phone'] ?? null) ?></dd>
-                    </div>
-                </dl>
-            </div>
-        </div>
-        <div class="rounded-2xl border border-slate-200/80 bg-white p-6 xl:col-span-2">
-            <h3 class="mb-6 text-xs font-semibold uppercase tracking-wide text-slate-600">Información administrativa</h3>
-            <dl class="space-y-3 text-sm text-slate-600">
-                <div class="flex justify-between gap-4 border-b border-slate-200/60 pb-3">
-                    <dt class="font-medium text-slate-700">Referido por:</dt>
-                    <dd class="text-right"><?= $formatValue($patient['referred_by'] ?? null) ?></dd>
-                </div>
-                <div class="flex justify-between gap-4 border-b border-slate-200/60 pb-3">
-                    <dt class="font-medium text-slate-700">Médico tratante:</dt>
-                    <dd class="text-right"><?= $formatValue($patient['primary_physician'] ?? null) ?></dd>
-                </div>
-                <div class="flex justify-between gap-4 border-b border-slate-200/60 pb-3">
-                    <dt class="font-medium text-slate-700">Tel. del médico:</dt>
-                    <dd class="text-right"><?= $formatValue($patient['primary_physician_phone'] ?? null) ?></dd>
-                </div>
-                <div class="flex justify-between gap-4 border-b border-slate-200/60 pb-3">
-                    <dt class="font-medium text-slate-700">Aseguradora:</dt>
-                    <dd class="text-right"><?= $formatValue($patient['insurance_provider'] ?? null) ?></dd>
-                </div>
-                <div class="flex justify-between gap-4 pb-2">
-                    <dt class="font-medium text-slate-700">N.º de póliza:</dt>
-                    <dd class="text-right"><?= $formatValue($patient['insurance_policy_number'] ?? null) ?></dd>
-                </div>
-            </dl>
-        </div>
-        <div class="rounded-2xl border <?= $hasAlert ? 'border-amber-200/70 bg-amber-50/80' : 'border-emerald-200/70 bg-emerald-50/80' ?> p-6 xl:col-span-2">
-            <h3 class="mb-6 text-xs font-semibold uppercase tracking-wide <?= $hasAlert ? 'text-amber-700' : 'text-emerald-700' ?>">Alertas y saldo</h3>
-            <div class="space-y-4 text-sm <?= $hasAlert ? 'text-amber-700' : 'text-emerald-700' ?>">
-                <p class="leading-relaxed"><?= $hasAlert ? nl2br(htmlspecialchars((string) $alertText)) : 'Sin alertas registradas.' ?></p>
-                <div class="inline-flex items-center gap-2 rounded-full bg-white/80 px-5 py-2.5 text-sm font-semibold shadow-sm <?= $hasAlert ? 'text-amber-700' : 'text-emerald-700' ?>">
-                    Saldo pendiente: Bs <?= number_format(max($totalBalance, 0), 2, ',', '.') ?>
-                </div>
             </div>
         </div>
     </div>
@@ -1204,9 +1515,9 @@ if (!empty($patient['registered_at'])) {
     <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div class="space-y-1">
             <h2 class="text-2xl font-semibold text-slate-900">Odontograma</h2>
-            <p class="text-sm text-slate-500">Registra el odontodiagrama inicial y su evolución clínica pieza por pieza.</p>
+            <p class="text-sm text-slate-500">Registra el odontodiagrama clínico pieza por pieza para conservar un historial claro.</p>
         </div>
-        <p class="text-xs text-slate-400 md:text-right">Los cambios se almacenan en la base de datos cuando presionas “Guardar odontograma”.</p>
+        <p class="text-xs text-slate-400 md:text-right">Al guardar se crea un nuevo odontograma en el historial y este lienzo vuelve a quedar en blanco.</p>
     </div>
     <form method="post" class="space-y-6" data-odontogram-form>
         <input type="hidden" name="action" value="save_odontogram">
@@ -1238,12 +1549,7 @@ if (!empty($patient['registered_at'])) {
             $renderOdontogramSection(
                 'odontodiagrama',
                 'Odontodiagrama',
-                'Dibuja hallazgos iniciales según el examen físico y radiográfico.'
-            );
-            $renderOdontogramSection(
-                'evolucion',
-                'Evolución',
-                'Actualiza los cambios observados durante el seguimiento del tratamiento.'
+                'Dibuja hallazgos clínicos y radiográficos directamente sobre el diagrama dental.'
             );
         ?>
         <div class="flex justify-end">
@@ -1252,6 +1558,147 @@ if (!empty($patient['registered_at'])) {
             </button>
         </div>
     </form>
+</section>
+
+
+
+<section class="rounded-3xl bg-white/95 p-6 shadow-sm shadow-slate-200/60 ring-1 ring-slate-200/70 sm:p-8 space-y-6" id="odontogramas">
+    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div class="space-y-1">
+            <h2 class="text-2xl font-semibold text-slate-900">Historial de odontogramas</h2>
+            <p class="text-sm text-slate-500">Consulta el primer registro, busca versiones previas y confirma cuándo se guardaron.</p>
+        </div>
+    </div>
+
+    <?php if (!$firstSnapshot): ?>
+        <p class="text-sm text-slate-500">Aún no se ha registrado ningún odontograma para este paciente.</p>
+    <?php endif; ?>
+
+    <div class="rounded-2xl border border-slate-200/80 bg-white/95 p-4 shadow-sm">
+        <form method="get" class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <input type="hidden" name="id" value="<?= $patientId ?>">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+                <label for="odontogram-search" class="text-xs font-semibold uppercase tracking-wide text-slate-600">Buscar odontogramas guardados</label>
+                <input
+                    id="odontogram-search"
+                    name="odontogram_query"
+                    type="search"
+                    value="<?= htmlspecialchars($odontogramSearchQuery) ?>"
+                    placeholder="Filtra por fecha (2025-10), ID o pieza (ej. 1.1)"
+                    class="w-full rounded-full border border-slate-300 px-4 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 sm:w-80"
+                >
+            </div>
+            <div class="flex items-center gap-2">
+                <button type="submit" class="inline-flex items-center justify-center rounded-full bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-soft transition hover:-translate-y-0.5 hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500">
+                    Buscar
+                </button>
+                <?php if ($odontogramSearchQuery !== ''): ?>
+                    <a class="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50" href="patient.php?id=<?= $patientId ?>#odontogramas">
+                        Limpiar
+                    </a>
+                <?php endif; ?>
+            </div>
+        </form>
+    </div>
+
+    <?php if ($filteredSnapshots): ?>
+        <div class="space-y-4">
+            <?php foreach ($filteredSnapshots as $snapshot): ?>
+                <?php
+                    $teethEntries = isset($snapshot['payload']['teeth']) && is_array($snapshot['payload']['teeth'])
+                        ? $snapshot['payload']['teeth']
+                        : [];
+                    ksort($teethEntries);
+                    $teethCount = count($teethEntries);
+                    $isFirstSnapshot = $firstSnapshot && $snapshot['id'] === $firstSnapshot['id'];
+                    $ordinalLabel = $snapshotOrdinalLabels[$snapshot['id']] ?? 'Odontograma';
+                    $snapshotDate = $formatDateTime($snapshot['created_at']);
+                    $badgeLabel = $isFirstSnapshot ? 'Registro inicial' : 'Seguimiento';
+                    $badgeClasses = $isFirstSnapshot ? 'bg-emerald-100 text-emerald-700' : 'bg-brand-100 text-brand-700';
+                ?>
+                <details class="group rounded-2xl border border-slate-200/80 bg-white/95 p-4 shadow-sm">
+                    <summary class="flex cursor-pointer items-center justify-between gap-3 text-sm font-medium text-slate-700">
+                        <div class="flex flex-col sm:flex-row sm:items-center sm:gap-3">
+                            <a class="text-brand-600 underline-offset-2 hover:underline" href="odontogram_view.php?patient_id=<?= $patientId ?>&snapshot_id=<?= (int) $snapshot['id'] ?>">
+                                <?= htmlspecialchars($ordinalLabel) ?>
+                            </a>
+                            <span class="text-xs font-semibold text-slate-500"><?= htmlspecialchars($snapshotDate) ?></span>
+                        </div>
+                        <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold <?= htmlspecialchars($badgeClasses) ?>">
+                            <?= htmlspecialchars($badgeLabel) ?>
+                        </span>
+                    </summary>
+                    <div class="mt-3 space-y-3 text-sm text-slate-600">
+                        <?php if ($isFirstSnapshot): ?>
+                            <p class="text-xs font-semibold text-emerald-600">
+                                <?= htmlspecialchars($ordinalLabel) ?> registrado para este paciente.
+                            </p>
+                        <?php endif; ?>
+                        <p class="flex items-center gap-2">
+                            <span class="font-medium text-slate-700">Piezas registradas:</span>
+                            <span><?= $teethCount ?></span>
+                        </p>
+                        <?php if ($teethCount > 0): ?>
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full table-auto divide-y divide-slate-200 text-left text-xs">
+                                    <thead class="bg-slate-50">
+                                        <tr>
+                                            <th class="px-3 py-2 font-semibold text-slate-600">Pieza</th>
+                                            <th class="px-3 py-2 font-semibold text-slate-600">Estado</th>
+                                            <th class="px-3 py-2 font-semibold text-slate-600">Superficies</th>
+                                            <th class="px-3 py-2 font-semibold text-slate-600">Notas</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-100">
+                                        <?php foreach ($teethEntries as $toothCode => $toothData): ?>
+                                            <?php
+                                                $statusKey = isset($toothData['status']) && is_string($toothData['status']) ? $toothData['status'] : null;
+                                                $statusLabel = $statusKey && isset($odontogramStatuses[$statusKey]) ? $odontogramStatuses[$statusKey] : 'Sin registro';
+                                                $notes = '';
+                                                if (isset($toothData['notes']) && is_string($toothData['notes'])) {
+                                                    $notes = trim($toothData['notes']);
+                                                }
+                                                $surfaceLines = [];
+                                                if (isset($toothData['surfaces']) && is_array($toothData['surfaces'])) {
+                                                    $surfaceLines = $describeSurfaces($toothData['surfaces']);
+                                                }
+                                            ?>
+                                            <tr>
+                                                <td class="px-3 py-2 font-medium text-slate-700"><?= $formatValue($toothCode) ?></td>
+                                                <td class="px-3 py-2 text-slate-600"><?= htmlspecialchars($statusLabel) ?></td>
+                                                <td class="px-3 py-2 text-slate-600">
+                                                    <?php if ($surfaceLines): ?>
+                                                        <ul class="list-disc space-y-1 pl-4">
+                                                            <?php foreach ($surfaceLines as $line): ?>
+                                                                <li><?= htmlspecialchars($line) ?></li>
+                                                            <?php endforeach; ?>
+                                                        </ul>
+                                                    <?php else: ?>
+                                                        <span class="text-slate-400">Sin superficies</span>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td class="px-3 py-2 text-slate-600">
+                                                    <?php if ($notes !== ''): ?>
+                                                        <?= htmlspecialchars($notes) ?>
+                                                    <?php else: ?>
+                                                        <span class="text-slate-400">—</span>
+                                                    <?php endif; ?>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php else: ?>
+                            <p class="text-slate-500">Sin piezas registradas en este snapshot.</p>
+                        <?php endif; ?>
+                    </div>
+                </details>
+            <?php endforeach; ?>
+        </div>
+    <?php else: ?>
+        <p class="text-sm text-slate-500">No hay odontogramas que coincidan con la búsqueda.</p>
+    <?php endif; ?>
 </section>
 
 
