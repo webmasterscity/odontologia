@@ -68,10 +68,6 @@ $formatValue = static function ($value, string $default = '—'): string {
 };
 
 $formatDateTime = static function (?string $value, string $default = '—'): string {
-    $formatted = formatUtcStringToLocal($value);
-    if ($formatted !== null) {
-        return $formatted;
-    }
     if ($value === null) {
         return $default;
     }
@@ -682,7 +678,7 @@ if (is_array($decodedPayload) && isset($decodedPayload['teeth']) && is_array($de
 
 $ordinalLabel = 'Odontograma';
 $orderedSnapshotsStmt = $pdo->prepare(
-    'SELECT id FROM odontogram_snapshots WHERE patient_id = :patient_id ORDER BY datetime(created_at) ASC, id ASC'
+    'SELECT id FROM odontogram_snapshots WHERE patient_id = :patient_id AND is_blank = 0 ORDER BY datetime(created_at) ASC, id ASC'
 );
 $orderedSnapshotsStmt->execute([':patient_id' => $patientId]);
 $orderedSnapshotIds = $orderedSnapshotsStmt->fetchAll(PDO::FETCH_COLUMN, 0);
@@ -713,10 +709,27 @@ require __DIR__ . '/templates/header.php';
 
 <section class="rounded-3xl bg-white/95 p-6 shadow-sm shadow-slate-200/60 ring-1 ring-slate-200/70 sm:p-8 space-y-6">
     <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div class="space-y-2">
-            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Paciente</p>
-            <h1 class="text-2xl font-semibold text-slate-900"><?= htmlspecialchars($patient['full_name'] ?? '') ?></h1>
-            <p class="text-sm text-slate-500"><?= htmlspecialchars($ordinalLabel) ?> registrado el <?= htmlspecialchars($snapshotDate) ?><?php if ((int) $snapshot['is_blank'] === 1): ?> <span class="ml-2 inline-flex items-center rounded-full bg-slate-200 px-2.5 py-0.5 text-xs font-semibold text-slate-700">Plantilla en blanco</span><?php endif; ?></p>
+        <div class="space-y-3">
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="inline-flex items-center rounded-full bg-brand-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-brand-700">
+                    <?= htmlspecialchars($ordinalLabel) ?>
+                </span>
+                <?php if ($snapshotDate !== '—'): ?>
+                    <span class="text-xs font-medium text-slate-500"><?= htmlspecialchars($snapshotDate) ?></span>
+                <?php endif; ?>
+                <?php if ((int) $snapshot['is_blank'] === 1): ?>
+                    <span class="inline-flex items-center rounded-full bg-slate-200 px-2.5 py-0.5 text-xs font-semibold text-slate-700">
+                        Plantilla en blanco
+                    </span>
+                <?php endif; ?>
+            </div>
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Paciente</p>
+                <h1 class="text-2xl font-semibold text-slate-900"><?= htmlspecialchars($patient['full_name'] ?? '') ?></h1>
+            </div>
+            <p class="text-sm text-slate-500">
+                Registro guardado con los datos básicos del paciente y el odontograma completo para su seguimiento clínico.
+            </p>
         </div>
         <div class="flex gap-2">
             <a href="patient.php?id=<?= $patientId ?>#odontograma" class="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50">

@@ -19,6 +19,11 @@ if ($patientId) {
     }
 }
 
+$profilePhotoPath = $patient['profile_photo_path'] ?? null;
+$previousPhotoPath = $profilePhotoPath;
+$manualPhotoPathValue = '';
+$removePhotoRequested = false;
+
 function calculateAge(?string $birthDate): ?int
 {
     if (!$birthDate) {
@@ -56,6 +61,23 @@ function capitalizeInitial($value): ?string
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $photoUpload = $_FILES['profile_photo'] ?? null;
+    $shouldProcessPhoto = is_array($photoUpload) && (($photoUpload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE);
+    $photoExtension = null;
+    $allowedPhotoTypes = [
+        'image/jpeg' => 'jpg',
+        'image/png' => 'png',
+        'image/webp' => 'webp',
+    ];
+    $manualPhotoPathInput = trim((string) post('profile_photo_copy_path'));
+    $manualPhotoPathValue = $manualPhotoPathInput;
+    $pathsToDelete = [];
+    $removePhotoRequested = (string) post('remove_photo', '0') === '1';
+    if ($removePhotoRequested && $profilePhotoPath) {
+        $pathsToDelete[] = $profilePhotoPath;
+        $profilePhotoPath = null;
+    }
+
     $fullName = capitalizeInitial(post('full_name'));
     if ($fullName === null) {
         $errors[] = 'El nombre del paciente es obligatorio.';
@@ -89,6 +111,150 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'notes' => capitalizeInitial(post('notes')),
     ];
 
+    if ($shouldProcessPhoto) {
+        if (($photoUpload['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) {
+            $errors[] = 'No se pudo cargar la foto del paciente. Inténtalo nuevamente.';
+        } elseif (($photoUpload['size'] ?? 0) <= 0) {
+            $errors[] = 'El archivo seleccionado está vacío. Selecciona una imagen válida.';
+        } elseif (($photoUpload['size'] ?? 0) > 5 * 1024 * 1024) {
+            $errors[] = 'La foto debe pesar menos de 5 MB.';
+        } else {
+            $detectedMime = null;
+
+            if (function_exists('finfo_open')) {
+                $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                if ($finfo !== false) {
+                    $detectedMime = finfo_file($finfo, $photoUpload['tmp_name']) ?: null;
+                    finfo_close($finfo);
+                }
+            }
+            if ($detectedMime === null && function_exists('mime_content_type')) {
+                $detectedMime = @mime_content_type($photoUpload['tmp_name']) ?: null;
+            }
+            if ($detectedMime === null) {
+                $imageInfo = @getimagesize($photoUpload['tmp_name']);
+                if (is_array($imageInfo) && isset($imageInfo['mime'])) {
+                    $detectedMime = $imageInfo['mime'];
+                }
+            }
+
+            if ($detectedMime === null || !isset($allowedPhotoTypes[$detectedMime])) {
+                $errors[] = 'Solo se permiten imágenes en formato JPG, PNG o WEBP.';
+            } else {
+                $photoExtension = $allowedPhotoTypes[$detectedMime];
+            }
+        }
+    }
+
+    if (empty($errors) && $shouldProcessPhoto && $photoExtension !== null) {
+        $uploadDir = __DIR__ . '/assets/patient_photos';
+        if (!is_dir($uploadDir) && !mkdir($uploadDir, 0775, true) && !is_dir($uploadDir)) {
+            $errors[] = 'No se pudo preparar la carpeta para almacenar la foto del paciente.';
+        } else {
+            try {
+                $uniqueSegment = bin2hex(random_bytes(8));
+            } catch (Exception $exception) {
+                $uniqueSegment = sha1(uniqid('', true));
+            }
+            $fileName = date('YmdHis') . '_' . $uniqueSegment . '.' . $photoExtension;
+            $targetPath = $uploadDir . '/' . $fileName;
+
+            $moved = false;
+            if (is_uploaded_file($photoUpload['tmp_name'])) {
+                $moved = move_uploaded_file($photoUpload['tmp_name'], $targetPath);
+            }
+            if (!$moved && is_file($photoUpload['tmp_name'])) {
+                $moved = rename($photoUpload['tmp_name'], $targetPath) || copy($photoUpload['tmp_name'], $targetPath);
+            }
+
+            if (!$moved) {
+                $lastError = error_get_last();
+                $errors[] = 'No se pudo guardar la foto del paciente. Revisa los permisos e inténtalo nuevamente.' . ($lastError ? ' Detalle: ' . $lastError['message'] : '');
+            } else {
+                @chmod($targetPath, 0664);
+                $newRelativePath = 'assets/patient_photos/' . $fileName;
+                if ($previousPhotoPath && $previousPhotoPath !== $newRelativePath) {
+                    $pathsToDelete[] = $previousPhotoPath;
+                }
+                $profilePhotoPath = $newRelativePath;
+            }
+        }
+    }
+
+    if (!$shouldProcessPhoto && $manualPhotoPathInput !== '' && empty($errors)) {
+        $resolvedManualPath = $manualPhotoPathInput;
+        if ($manualPhotoPathInput[0] === '~') {
+            $homeDir = null;
+            if (function_exists('posix_getpwuid') && function_exists('posix_getuid')) {
+                $pw = @posix_getpwuid(posix_getuid());
+                if (is_array($pw) && isset($pw['dir'])) {
+                    $homeDir = $pw['dir'];
+                }
+            }
+            if ($homeDir === null) {
+                $homeDir = getenv('HOME') ?: null;
+            }
+            if ($homeDir !== null) {
+                $resolvedManualPath = rtrim($homeDir, '/') . '/' . ltrim(substr($manualPhotoPathInput, 1), '/');
+            }
+        }
+        $resolvedManualPath = realpath($resolvedManualPath) ?: $manualPhotoPathInput;
+        if (!is_file($resolvedManualPath) || !is_readable($resolvedManualPath)) {
+            $errors[] = 'No se encontró la imagen en la ruta indicada o no se puede leer.';
+        } else {
+            $detectedMime = null;
+            if (function_exists('finfo_open')) {
+                $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                if ($finfo !== false) {
+                    $detectedMime = finfo_file($finfo, $resolvedManualPath) ?: null;
+                    finfo_close($finfo);
+                }
+            }
+            if ($detectedMime === null && function_exists('mime_content_type')) {
+                $detectedMime = @mime_content_type($resolvedManualPath) ?: null;
+            }
+            if ($detectedMime === null) {
+                $imageInfo = @getimagesize($resolvedManualPath);
+                if (is_array($imageInfo) && isset($imageInfo['mime'])) {
+                    $detectedMime = $imageInfo['mime'];
+                }
+            }
+
+            if ($detectedMime === null || !isset($allowedPhotoTypes[$detectedMime])) {
+                $errors[] = 'La imagen indicada no es un archivo JPG, PNG o WEBP válido.';
+            } else {
+                $manualExtension = $allowedPhotoTypes[$detectedMime];
+                $uploadDir = __DIR__ . '/assets/patient_photos';
+                if (!is_dir($uploadDir) && !mkdir($uploadDir, 0775, true) && !is_dir($uploadDir)) {
+                    $errors[] = 'No se pudo preparar la carpeta para almacenar la foto del paciente.';
+                } else {
+                    try {
+                        $uniqueSegment = bin2hex(random_bytes(8));
+                    } catch (Exception $exception) {
+                        $uniqueSegment = sha1(uniqid('', true));
+                    }
+                    $fileName = date('YmdHis') . '_' . $uniqueSegment . '.' . $manualExtension;
+                    $targetPath = $uploadDir . '/' . $fileName;
+
+                    if (!copy($resolvedManualPath, $targetPath)) {
+                        $lastError = error_get_last();
+                        $errors[] = 'No se pudo copiar la imagen desde la ruta indicada.' . ($lastError ? ' Detalle: ' . $lastError['message'] : '');
+                    } else {
+                        @chmod($targetPath, 0664);
+                        $newRelativePath = 'assets/patient_photos/' . $fileName;
+                        if ($previousPhotoPath && $previousPhotoPath !== $newRelativePath) {
+                            $pathsToDelete[] = $previousPhotoPath;
+                        }
+                        $profilePhotoPath = $newRelativePath;
+                        $manualPhotoPathValue = '';
+                    }
+                }
+            }
+        }
+    }
+
+    $payload['profile_photo_path'] = $profilePhotoPath;
+
     if (empty($errors)) {
         $redirectTarget = '';
         if ($patientId) {
@@ -106,11 +272,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'INSERT OR IGNORE INTO clinical_profiles (patient_id) VALUES (:patient_id)'
         )->execute([':patient_id' => $targetId]);
 
+        if ($pathsToDelete) {
+            $uniquePaths = array_unique(array_filter($pathsToDelete));
+            foreach ($uniquePaths as $relativePath) {
+                $absolutePath = __DIR__ . '/' . ltrim($relativePath, '/');
+                if (is_file($absolutePath)) {
+                    @unlink($absolutePath);
+                }
+            }
+        }
+
         header('Location: ' . $redirectTarget);
         exit;
     } else {
         $patient = array_merge($patient ?? [], $payload);
+        $profilePhotoPath = $patient['profile_photo_path'] ?? null;
     }
+} else {
+    $manualPhotoPathValue = '';
 }
 
 $pageTitle = $patientId ? 'Editar paciente' : 'Nuevo paciente';
@@ -138,7 +317,7 @@ require __DIR__ . '/templates/header.php';
         </div>
     <?php endif; ?>
 
-    <form method="post" class="space-y-6" data-capitalize-initial-form>
+    <form method="post" enctype="multipart/form-data" class="space-y-6" data-capitalize-initial-form>
         <?php
         $genders = ['Femenino', 'Masculino', 'No binario', 'Prefiere no indicarlo'];
         $maritalStatuses = ['Soltero(a)', 'Casado(a)', 'Unión estable', 'Divorciado(a)', 'Viudo(a)', 'Prefiere no indicarlo'];
@@ -146,6 +325,42 @@ require __DIR__ . '/templates/header.php';
         <fieldset class="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4 sm:p-6">
             <legend class="px-3 text-xs font-semibold uppercase tracking-wide text-brand-700">Identificación</legend>
             <div class="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <?php $hasProfilePhoto = !empty($profilePhotoPath); ?>
+                <div class="md:col-span-2 lg:col-span-4 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-inner sm:flex-row sm:items-center" data-profile-photo-field>
+                    <div class="flex items-center justify-center">
+                        <div class="relative">
+                            <img
+                                src="<?= htmlspecialchars($profilePhotoPath ?? '') ?>"
+                                alt="<?= htmlspecialchars('Foto del paciente ' . ($patient['full_name'] ?? '')) ?>"
+                                class="h-24 w-24 rounded-full object-cover shadow-md ring-2 ring-brand-100/80 <?= $hasProfilePhoto ? '' : 'hidden' ?>"
+                                data-profile-photo-preview
+                                data-initial-src="<?= htmlspecialchars($profilePhotoPath ?? '') ?>"
+                            >
+                            <div class="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-slate-100 to-slate-200 text-3xl text-slate-500 shadow-inner <?= $hasProfilePhoto ? 'hidden' : '' ?>" data-profile-photo-placeholder>
+                                <span>👤</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex-1 text-sm text-slate-600 space-y-4">
+                        <input type="hidden" name="remove_photo" value="<?= $removePhotoRequested ? '1' : '0' ?>" data-profile-photo-remove-flag>
+                        <label class="flex flex-col gap-2">
+                            <span class="font-medium text-slate-700">Foto de perfil</span>
+                            <input type="file" name="profile_photo" accept="image/*" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400" data-profile-photo-input>
+                            <span class="text-xs text-slate-500">Opcional. Formatos aceptados: JPG, PNG o WEBP (máx. 5&nbsp;MB). Se mostrará una vista previa al seleccionar el archivo.</span>
+                        </label>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button type="button" class="inline-flex items-center justify-center gap-1 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-rose-200 hover:text-rose-600 <?= $hasProfilePhoto ? '' : 'hidden' ?>" data-profile-photo-remove>
+                                <span aria-hidden="true">✖️</span>
+                                Quitar foto
+                            </button>
+                        </div>
+                        <label class="flex flex-col gap-2">
+                            <span class="font-medium text-slate-700">Copiar imagen desde una ruta del sistema</span>
+                            <input type="text" name="profile_photo_copy_path" value="<?= htmlspecialchars($manualPhotoPathValue) ?>" placeholder="/ruta/al/archivo.png" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400" data-profile-photo-manual>
+                            <span class="text-xs text-slate-500">Opcional. Ingresa la ruta completa de un archivo existente en este equipo (se copiará a la carpeta de pacientes).</span>
+                        </label>
+                    </div>
+                </div>
                 <label class="flex flex-col gap-2 text-sm text-slate-600 md:col-span-2 lg:col-span-4">
                     <span class="font-medium text-slate-700">Nombre y apellidos *</span>
                     <input type="text" name="full_name" required value="<?= htmlspecialchars($patient['full_name'] ?? '') ?>" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
@@ -363,6 +578,116 @@ document.addEventListener('DOMContentLoaded', function () {
 
             applyCapitalization();
         });
+
+        var profileField = form.querySelector('[data-profile-photo-field]');
+        if (profileField) {
+            var fileInput = profileField.querySelector('[data-profile-photo-input]');
+            var preview = profileField.querySelector('[data-profile-photo-preview]');
+            var placeholder = profileField.querySelector('[data-profile-photo-placeholder]');
+            var removeFlagInput = profileField.querySelector('[data-profile-photo-remove-flag]');
+            var removeButton = profileField.querySelector('[data-profile-photo-remove]');
+            var manualInput = profileField.querySelector('[data-profile-photo-manual]');
+            var initialSrc = preview && preview.dataset.initialSrc ? preview.dataset.initialSrc : '';
+            var currentObjectUrl = null;
+
+            var resetObjectUrl = function () {
+                if (currentObjectUrl) {
+                    URL.revokeObjectURL(currentObjectUrl);
+                    currentObjectUrl = null;
+                }
+            };
+
+            var showPreview = function (src) {
+                if (!preview) {
+                    return;
+                }
+                preview.src = src;
+                preview.classList.remove('hidden');
+                if (placeholder) {
+                    placeholder.classList.add('hidden');
+                }
+                if (removeButton) {
+                    removeButton.classList.remove('hidden');
+                }
+                if (removeFlagInput) {
+                    removeFlagInput.value = '0';
+                }
+            };
+
+            var showPlaceholder = function (markRemovalFlag) {
+                if (preview) {
+                    preview.classList.add('hidden');
+                }
+                if (placeholder) {
+                    placeholder.classList.remove('hidden');
+                }
+                if (removeButton) {
+                    removeButton.classList.add('hidden');
+                }
+                if (markRemovalFlag && removeFlagInput) {
+                    removeFlagInput.value = '1';
+                }
+            };
+
+            if (fileInput) {
+                fileInput.addEventListener('change', function () {
+                    resetObjectUrl();
+                    var file = fileInput.files && fileInput.files[0];
+                    if (file) {
+                        currentObjectUrl = URL.createObjectURL(file);
+                        showPreview(currentObjectUrl);
+                    } else if (initialSrc) {
+                        showPreview(initialSrc);
+                    } else {
+                        showPlaceholder(false);
+                    }
+                });
+            }
+
+            if (removeButton) {
+                removeButton.addEventListener('click', function () {
+                    resetObjectUrl();
+                    var hasNewFile = fileInput && fileInput.files && fileInput.files.length > 0;
+                    if (hasNewFile && initialSrc) {
+                        fileInput.value = '';
+                        showPreview(initialSrc);
+                        return;
+                    }
+
+                    var manualHasValue = manualInput && manualInput.value.trim() !== '';
+
+                    if (manualHasValue && initialSrc) {
+                        manualInput.value = '';
+                        showPreview(initialSrc);
+                        return;
+                    }
+
+                    if (fileInput) {
+                        fileInput.value = '';
+                    }
+                    if (manualInput) {
+                        manualInput.value = '';
+                    }
+
+                    if (initialSrc) {
+                        initialSrc = '';
+                    }
+                    showPlaceholder(true);
+                });
+            }
+
+            if (manualInput) {
+                manualInput.addEventListener('input', function () {
+                    if (manualInput.value.trim() !== '' && removeFlagInput) {
+                        removeFlagInput.value = '0';
+                    }
+                });
+            }
+
+            form.addEventListener('submit', function () {
+                resetObjectUrl();
+            });
+        }
     });
 });
 </script>

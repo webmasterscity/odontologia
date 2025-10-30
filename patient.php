@@ -56,10 +56,6 @@ $formatMultiline = static function ($value, string $default = '—') use ($forma
 };
 
 $formatDateTime = static function (?string $value, string $default = '—'): string {
-    $formatted = formatUtcStringToLocal($value);
-    if ($formatted !== null) {
-        return $formatted;
-    }
     if ($value === null) {
         return $default;
     }
@@ -688,9 +684,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!is_array($decodedPayload)) {
             $errors[] = 'El formato del odontograma no es válido.';
         } else {
-            $baseDirty = (string) post('odontogram_base_dirty') === '1';
             $snapshotOriginId = (int) post('snapshot_origin_id', '0');
-            $snapshotOnly = (string) post('snapshot_only', '0') === '1';
             $diagramData = $decodedPayload['odontodiagrama'] ?? [];
             if (!is_array($diagramData)) {
                 $diagramData = [];
@@ -800,11 +794,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 try {
                     $pdo->beginTransaction();
 
-                    if (!$snapshotOnly) {
-                        $pdo->prepare('DELETE FROM odontogram_entries WHERE patient_id = :patient_id')
-                            ->execute([':patient_id' => $patientId]);
-                    }
-
                     $snapshotPayload = ['teeth' => []];
                     foreach ($normalized as $toothCode => $toothData) {
                         $surfacesPayload = $toothData['surfaces'] ?? [];
@@ -852,6 +841,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     if (!$updatedExistingSnapshot) {
                         $savedSnapshotId = insertOdontogramSnapshot($pdo, $patientId, $snapshotPayload, false);
+                    }
+
+                    if (!$snapshotOnly) {
+                        clearOdontogramEntries($pdo, $patientId);
                     }
 
                     $pdo->commit();
@@ -1073,7 +1066,29 @@ $profileStmt = $pdo->prepare('SELECT * FROM clinical_profiles WHERE patient_id =
 $profileStmt->execute([':id' => $patientId]);
 $profile = $profileStmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
-$odontogramInitialJson = '{"odontodiagrama":{}}';
+// Cargar datos del odontograma desde la base de datos
+$odontogramEntries = $pdo->prepare('SELECT * FROM odontogram_entries WHERE patient_id = :id');
+$odontogramEntries->execute([':id' => $patientId]);
+$entriesData = $odontogramEntries->fetchAll(PDO::FETCH_ASSOC);
+
+$teethInitialData = [];
+foreach ($entriesData as $entry) {
+    $toothCode = $entry['tooth_code'];
+    $surfaces = [];
+
+    if (!empty($entry['surface_data'])) {
+        $surfaceJson = json_decode($entry['surface_data'], true);
+        if (isset($surfaceJson['odontodiagrama']) && is_array($surfaceJson['odontodiagrama'])) {
+            $surfaces = $surfaceJson['odontodiagrama'];
+        }
+    }
+
+    $teethInitialData[$toothCode] = [
+        'surfaces' => $surfaces,
+        'status' => $entry['status'] ?? 'sin_registro',
+        'notes' => $entry['notes'] ?? ''
+    ];
+}
 
 $visitsStmt = $pdo->prepare('SELECT * FROM visits WHERE patient_id = :id ORDER BY date(visit_date) DESC, id DESC');
 $visitsStmt->execute([':id' => $patientId]);
@@ -1103,10 +1118,15 @@ foreach ($snapshotsRaw as $row) {
     }
 
     $createdAtRaw = isset($row['created_at']) ? (string) $row['created_at'] : '';
-    $createdAtLocalDt = $createdAtRaw !== '' ? utcStringToLocalDateTime($createdAtRaw) : null;
-    $createdAtLocalIso = $createdAtLocalDt ? $createdAtLocalDt->format('Y-m-d H:i:s') : ($createdAtRaw !== '' ? $createdAtRaw : null);
-    $createdAtFormatted = $createdAtLocalDt ? $createdAtLocalDt->format('d/m/Y H:i') : $formatDateTime($createdAtRaw);
-    $createdAtDateOnly = $createdAtLocalDt ? $createdAtLocalDt->format('d/m/Y') : null;
+    $createdAtFormatted = $formatDateTime($createdAtRaw);
+    $createdAtLocalIso = $createdAtRaw;
+    $createdAtDateOnly = null;
+    if ($createdAtRaw !== '') {
+        $timestamp = strtotime($createdAtRaw);
+        if ($timestamp !== false) {
+            $createdAtDateOnly = date('d/m/Y', $timestamp);
+        }
+    }
 
     $tokenSources = array_filter([
         $createdAtRaw,
@@ -1209,6 +1229,17 @@ if ($snapshots) {
         $snapshotRef['search_tokens'] = array_values(array_keys($tokenSet));
     }
     unset($snapshotRef);
+}
+
+$hasSnapshots = !empty($snapshots);
+if ($hasSnapshots) {
+    $odontogramInitialJson = '{"odontodiagrama":{}}';
+} else {
+    $odontogramInitialPayload = ['odontodiagrama' => $teethInitialData];
+    $odontogramInitialJson = json_encode($odontogramInitialPayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($odontogramInitialJson === false) {
+        $odontogramInitialJson = '{"odontodiagrama":{}}';
+    }
 }
 
 $firstSnapshotTeeth = [];
@@ -1850,10 +1881,15 @@ if (!empty($patient['registered_at'])) {
                 <details class="group rounded-2xl border border-slate-200/80 bg-white/95 p-4 shadow-sm">
                     <summary class="flex cursor-pointer items-center justify-between gap-3 text-sm font-medium text-slate-700">
                         <div class="flex flex-col sm:flex-row sm:items-center sm:gap-3">
-                            <a class="text-brand-600 underline-offset-2 hover:underline" href="odontogram_view.php?patient_id=<?= $patientId ?>&snapshot_id=<?= (int) $snapshot['id'] ?>">
-                                <?= htmlspecialchars($ordinalLabel) ?>
+                            <a
+                                class="flex flex-wrap items-center gap-x-2 gap-y-1 text-brand-600 underline-offset-2 hover:underline"
+                                href="odontogram_view.php?patient_id=<?= $patientId ?>&snapshot_id=<?= (int) $snapshot['id'] ?>"
+                            >
+                                <span class="font-semibold"><?= htmlspecialchars($ordinalLabel) ?></span>
+                                <?php if ($snapshotDate && $snapshotDate !== '—'): ?>
+                                    <span class="text-xs font-medium text-slate-500">• <?= htmlspecialchars($snapshotDate) ?></span>
+                                <?php endif; ?>
                             </a>
-                            <span class="text-xs font-semibold text-slate-500"><?= htmlspecialchars($snapshotDate) ?></span>
                         </div>
                         <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold <?= htmlspecialchars($badgeClasses) ?>">
                             <?= htmlspecialchars($badgeLabel) ?>

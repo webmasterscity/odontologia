@@ -67,6 +67,7 @@ function bootstrapSchema(PDO $pdo): void
             emergency_contact TEXT,
             emergency_contact_relationship TEXT,
             emergency_contact_phone TEXT,
+            profile_photo_path TEXT,
             notes TEXT,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -204,6 +205,9 @@ function ensureSchemaUpgrades(PDO $pdo): void
     if (!isset($patientColumns['emergency_contact_phone'])) {
         $pdo->exec('ALTER TABLE patients ADD COLUMN emergency_contact_phone TEXT');
     }
+    if (!isset($patientColumns['profile_photo_path'])) {
+        $pdo->exec('ALTER TABLE patients ADD COLUMN profile_photo_path TEXT');
+    }
     if (!isset($patientColumns['registered_at'])) {
         $pdo->exec('ALTER TABLE patients ADD COLUMN registered_at TEXT');
         $pdo->exec('UPDATE patients SET registered_at = created_at WHERE registered_at IS NULL');
@@ -294,6 +298,23 @@ function ensureSchemaUpgrades(PDO $pdo): void
             $pdo->exec('ALTER TABLE finance_entries ADD COLUMN updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP');
         }
     }
+
+    // Create odontogram_snapshots table if it doesn't exist
+    $snapshotColumns = tableColumns($pdo, 'odontogram_snapshots');
+    if ($snapshotColumns === []) {
+        $pdo->exec(
+            'CREATE TABLE IF NOT EXISTS odontogram_snapshots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                patient_id INTEGER NOT NULL,
+                payload TEXT NOT NULL,
+                is_blank INTEGER DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(patient_id) REFERENCES patients(id) ON DELETE CASCADE
+            )'
+        );
+        $pdo->exec('CREATE INDEX IF NOT EXISTS odontogram_snapshots_patient_id_idx ON odontogram_snapshots(patient_id)');
+        $pdo->exec('CREATE INDEX IF NOT EXISTS odontogram_snapshots_created_at_idx ON odontogram_snapshots(created_at)');
+    }
 }
 
 /**
@@ -374,6 +395,100 @@ function upsertOdontogramEntry(PDO $pdo, int $patientId, string $toothCode, arra
         ':surface_data' => $data['surface_data'] ?? null,
         ':notes' => $data['notes'] ?? null,
     ]);
+}
+
+/**
+ * Normalizes the tooth payload structure before persisting snapshots or entries.
+ *
+ * @param array $payload Raw payload that may contain a 'teeth' key with tooth data.
+ * @return array<string,array<string,mixed>>
+ */
+function normalizeSnapshotTeethPayload(array $payload): array
+{
+    $teeth = [];
+    $source = $payload['teeth'] ?? [];
+    if (!is_array($source)) {
+        return $teeth;
+    }
+
+    foreach ($source as $toothCode => $toothData) {
+        $code = trim((string) $toothCode);
+        if ($code === '' || !is_array($toothData)) {
+            continue;
+        }
+
+        $surfaces = [];
+        if (isset($toothData['surfaces']) && is_array($toothData['surfaces'])) {
+            $surfaces = $toothData['surfaces'];
+        }
+
+        $status = null;
+        if (array_key_exists('status', $toothData) && $toothData['status'] !== null) {
+            $statusCandidate = trim((string) $toothData['status']);
+            if ($statusCandidate !== '') {
+                $status = $statusCandidate;
+            }
+        }
+
+        $notes = null;
+        if (array_key_exists('notes', $toothData) && is_string($toothData['notes'])) {
+            $noteCandidate = trim($toothData['notes']);
+            if ($noteCandidate !== '') {
+                $notes = $noteCandidate;
+            }
+        }
+
+        if (empty($surfaces) && $status === null && $notes === null) {
+            continue;
+        }
+
+        $teeth[$code] = [
+            'surfaces' => $surfaces,
+        ];
+        if ($status !== null) {
+            $teeth[$code]['status'] = $status;
+        }
+        if ($notes !== null) {
+            $teeth[$code]['notes'] = $notes;
+        }
+    }
+
+    return $teeth;
+}
+
+/**
+ * Inserts a new odontogram snapshot row and returns its identifier.
+ *
+ * @param array $payload Structured payload with a 'teeth' key.
+ */
+function insertOdontogramSnapshot(PDO $pdo, int $patientId, array $payload, bool $isBlank = false): int
+{
+    $teeth = normalizeSnapshotTeethPayload($payload);
+    $encodedPayload = json_encode(['teeth' => $teeth], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($encodedPayload === false) {
+        throw new RuntimeException('No se pudo serializar el odontograma.');
+    }
+
+    $stmt = $pdo->prepare(
+        'INSERT INTO odontogram_snapshots (patient_id, payload, is_blank)
+         VALUES (:patient_id, :payload, :is_blank)'
+    );
+    $stmt->execute([
+        ':patient_id' => $patientId,
+        ':payload' => $encodedPayload,
+        ':is_blank' => $isBlank ? 1 : 0,
+    ]);
+
+    return (int) $pdo->lastInsertId();
+}
+
+/**
+ * Removes all odontogram entries for the given patient.
+ */
+function clearOdontogramEntries(PDO $pdo, int $patientId): void
+{
+    $stmt = $pdo->prepare('DELETE FROM odontogram_entries WHERE patient_id = :patient_id');
+    $stmt->execute([':patient_id' => $patientId]);
 }
 
 /**

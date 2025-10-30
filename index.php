@@ -167,6 +167,20 @@ $financeCountStmt->execute([
 $monthlyFinance['count'] = (int) $financeCountStmt->fetchColumn();
 $monthlyFinance['net'] = $monthlyFinance['income'] - $monthlyFinance['expense'];
 
+$avatarInitial = static function (?string $name): string {
+    if ($name === null) {
+        return '👤';
+    }
+    $trimmed = trim($name);
+    if ($trimmed === '') {
+        return '👤';
+    }
+    if (function_exists('mb_substr') && function_exists('mb_strtoupper')) {
+        return mb_strtoupper(mb_substr($trimmed, 0, 1, 'UTF-8'), 'UTF-8');
+    }
+    return strtoupper(substr($trimmed, 0, 1));
+};
+
 $pageTitle = 'Pacientes · Consultorio Odontológico';
 require __DIR__ . '/templates/header.php';
 ?>
@@ -276,16 +290,33 @@ require __DIR__ . '/templates/header.php';
                         <?php
                         $balance = (float) ($patient['pending_balance'] ?? 0);
                         $balanceDisplay = $balance > 0 ? -$balance : 0.0;
+                        $profilePhotoPath = trim((string) ($patient['profile_photo_path'] ?? ''));
+                        $hasProfilePhoto = $profilePhotoPath !== '';
+                        $avatarInitialValue = $avatarInitial($patient['full_name'] ?? '');
                         ?>
                         <tr class="transition hover:bg-slate-50/80">
                             <td class="px-4 py-4">
-                                <p class="font-semibold text-slate-900"><?= htmlspecialchars($patient['full_name']) ?></p>
-                                <?php if (!empty($patient['notes'])): ?>
-                                    <span class="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">
-                                        <span aria-hidden="true">⚠️</span>
-                                        Alerta clínica
-                                    </span>
-                                <?php endif; ?>
+                                <div class="flex items-center gap-3">
+                                    <?php if ($hasProfilePhoto): ?>
+                                        <img src="<?= htmlspecialchars($profilePhotoPath) ?>" alt="<?= htmlspecialchars('Foto de ' . ($patient['full_name'] ?? '')) ?>" class="h-11 w-11 rounded-full object-cover shadow-sm ring-2 ring-brand-100/80" loading="lazy">
+                                    <?php else: ?>
+                                        <div class="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-slate-100 to-slate-200 text-sm font-semibold text-slate-600 ring-1 ring-slate-200">
+                                            <?= htmlspecialchars($avatarInitialValue) ?>
+                                        </div>
+                                    <?php endif; ?>
+                                    <div class="space-y-1">
+                                        <p class="font-semibold text-slate-900"><?= htmlspecialchars($patient['full_name']) ?></p>
+                                        <?php if (!empty($patient['preferred_name'])): ?>
+                                            <p class="text-xs text-slate-500">Preferido: <?= htmlspecialchars($patient['preferred_name']) ?></p>
+                                        <?php endif; ?>
+                                        <?php if (!empty($patient['notes'])): ?>
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">
+                                                <span aria-hidden="true">⚠️</span>
+                                                Alerta clínica
+                                            </span>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
                             </td>
                             <td class="px-4 py-4 text-sm text-slate-600">
                                 <?= htmlspecialchars($patient['document_id'] ?? '—') ?>
