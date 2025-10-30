@@ -68,10 +68,18 @@ $formatValue = static function ($value, string $default = '—'): string {
 };
 
 $formatDateTime = static function (?string $value, string $default = '—'): string {
-    if (!$value) {
+    $formatted = formatUtcStringToLocal($value);
+    if ($formatted !== null) {
+        return $formatted;
+    }
+    if ($value === null) {
         return $default;
     }
-    $timestamp = strtotime($value);
+    $trimmed = trim((string) $value);
+    if ($trimmed === '') {
+        return $default;
+    }
+    $timestamp = strtotime($trimmed);
     if ($timestamp === false) {
         return $default;
     }
@@ -116,6 +124,10 @@ $odontogramStatuses = [
     'fractura' => 'Fractura',
     'en_tratamiento' => 'En tratamiento'
 ];
+
+$defaultOdontogramStatus = array_key_exists('sin_registro', $odontogramStatuses)
+    ? 'sin_registro'
+    : (array_key_first($odontogramStatuses) ?? '');
 
 $permanentSurfaces = [
     'top' => 'Superficie oclusal',
@@ -489,7 +501,8 @@ $renderOdontogramSection = static function (
     $renderToothCard,
     $odontogramGroups,
     $permanentSurfaces,
-    $deciduousSurfaces
+    $deciduousSurfaces,
+    $odontogramStatuses
 ): void {
     ?>
     <fieldset class="space-y-6 rounded-2xl border border-slate-200/80 bg-white/90 p-4 sm:p-6 shadow-sm" data-odontogram-section="<?= htmlspecialchars($diagramKey) ?>">
@@ -548,19 +561,89 @@ $renderOdontogramSection = static function (
                     </button>
                 </div>
             </div>
-            <div class="odontogram-canvas space-y-10">
-                <?php foreach ($odontogramGroups as $group): ?>
-                    <div class="odontogram-arch<?= $group['is_deciduous'] ? ' odontogram-arch--deciduous' : '' ?>">
-                        <div class="odontogram-arch__header">
-                            <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-600"><?= htmlspecialchars($group['label']) ?></h3>
+            <div class="odontogram-board space-y-10">
+                <!-- Maxilar superior e inferior -->
+                <div class="space-y-10">
+                    <?php for ($i = 0; $i < 2; $i++): ?>
+                        <?php $group = $odontogramGroups[$i]; ?>
+                        <div class="odontogram-arch<?= $group['is_deciduous'] ? ' odontogram-arch--deciduous' : '' ?>">
+                            <div class="odontogram-arch__header">
+                                <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-600"><?= htmlspecialchars($group['label']) ?></h3>
+                            </div>
+                            <div class="odontogram-row">
+                                <?php foreach ($group['teeth'] as $tooth): ?>
+                                    <?php $renderToothCard($tooth, $permanentSurfaces, $deciduousSurfaces, $group['is_deciduous']); ?>
+                                <?php endforeach; ?>
+                            </div>
                         </div>
-                        <div class="odontogram-row">
-                            <?php foreach ($group['teeth'] as $tooth): ?>
-                                <?php $renderToothCard($tooth, $permanentSurfaces, $deciduousSurfaces, $group['is_deciduous']); ?>
-                            <?php endforeach; ?>
+                    <?php endfor; ?>
+                </div>
+
+                <!-- Dentición temporal con panel lateral en el espacio blanco -->
+                <div class="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_280px]">
+                    <div class="space-y-10">
+                        <?php for ($i = 2; $i < 4; $i++): ?>
+                            <?php $group = $odontogramGroups[$i]; ?>
+                            <div class="odontogram-arch<?= $group['is_deciduous'] ? ' odontogram-arch--deciduous' : '' ?>">
+                                <div class="odontogram-arch__header">
+                                    <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-600"><?= htmlspecialchars($group['label']) ?></h3>
+                                </div>
+                                <div class="odontogram-row">
+                                    <?php foreach ($group['teeth'] as $tooth): ?>
+                                        <?php $renderToothCard($tooth, $permanentSurfaces, $deciduousSurfaces, $group['is_deciduous']); ?>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                        <?php endfor; ?>
+                    </div>
+
+                    <!-- Panel lateral en el espacio blanco -->
+                    <aside
+                        class="odontogram-metadata flex flex-col gap-4 rounded-2xl border border-slate-200/80 bg-white/95 p-4 shadow-sm self-start"
+                        data-odontogram-metadata
+                    >
+                    <div class="odontogram-metadata__empty text-sm text-slate-500" data-odontogram-empty>
+                        <p class="font-semibold text-slate-600">Selecciona una pieza</p>
+                        <p class="mt-1 text-xs leading-relaxed text-slate-500">
+                            Elige cualquier diente del diagrama para registrar su estado clínico y anotar observaciones relevantes.
+                        </p>
+                    </div>
+                    <div class="odontogram-metadata__fields flex-1" data-odontogram-fields hidden>
+                        <div class="space-y-3">
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Pieza seleccionada</p>
+                                <p class="text-lg font-semibold text-brand-600" data-odontogram-tooth>—</p>
+                            </div>
+                            <label class="flex flex-col gap-1 text-sm text-slate-600">
+                                <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">Estado</span>
+                                <select class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200" data-odontogram-status>
+                                    <?php foreach ($odontogramStatuses as $statusKey => $statusLabel): ?>
+                                        <option value="<?= htmlspecialchars($statusKey) ?>"><?= htmlspecialchars($statusLabel) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </label>
+                            <label class="flex flex-col gap-1 text-sm text-slate-600">
+                                <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">Notas</span>
+                                <textarea
+                                    rows="3"
+                                    class="rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-inner focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+                                    data-odontogram-notes
+                                    placeholder="Observaciones clínicas, hallazgos, recomendaciones..."
+                                ></textarea>
+                            </label>
+                        </div>
+                        <div class="mt-4 flex flex-wrap gap-2">
+                            <button
+                                type="button"
+                                class="rounded-full border border-slate-300 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:bg-slate-50"
+                                data-odontogram-clear
+                            >
+                                Limpiar campos
+                            </button>
                         </div>
                     </div>
-                <?php endforeach; ?>
+                </aside>
+                </div>
             </div>
         </div>
     </fieldset>
@@ -641,67 +724,139 @@ require __DIR__ . '/templates/header.php';
             </a>
         </div>
     </div>
-    <div class="grid gap-6 lg:grid-cols-[minmax(0,320px)_1fr]">
-        <div class="flex flex-col items-center gap-4 rounded-2xl border border-slate-200/80 bg-white/92 p-6 text-center shadow-sm">
+    <div class="grid gap-6 lg:grid-cols-[minmax(0,280px)_1fr_minmax(0,320px)]">
+        <div class="flex flex-col items-center gap-4 rounded-2xl border border-slate-200/80 bg-gradient-to-br from-white to-slate-50/50 p-6 text-center shadow-md">
             <?php if (!empty($patient['profile_photo_path'])): ?>
-                <img src="<?= htmlspecialchars($patient['profile_photo_path']) ?>" alt="<?= htmlspecialchars('Foto del paciente ' . ($patient['full_name'] ?? '')) ?>" class="h-32 w-32 rounded-full object-cover shadow-md ring-2 ring-brand-100">
+                <img src="<?= htmlspecialchars($patient['profile_photo_path']) ?>" alt="<?= htmlspecialchars('Foto del paciente ' . ($patient['full_name'] ?? '')) ?>" class="h-28 w-28 rounded-full object-cover shadow-lg ring-4 ring-brand-100/60">
             <?php else: ?>
-                <div class="flex h-32 w-32 items-center justify-center rounded-full bg-slate-100 text-4xl text-slate-400">
+                <div class="flex h-28 w-28 items-center justify-center rounded-full bg-gradient-to-br from-slate-100 to-slate-200 text-4xl text-slate-400 shadow-inner">
                     <span>👤</span>
                 </div>
             <?php endif; ?>
-            <div class="space-y-1 text-sm">
-                <p class="text-base font-semibold text-slate-900"><?= htmlspecialchars($patient['full_name'] ?? '') ?></p>
+            <div class="space-y-1 text-sm w-full">
+                <p class="text-base font-bold text-slate-900 truncate"><?= htmlspecialchars($patient['full_name'] ?? '') ?></p>
                 <?php if (!empty($patient['preferred_name'])): ?>
-                    <p class="text-slate-500">Preferido: <?= htmlspecialchars($patient['preferred_name']) ?></p>
+                    <p class="text-slate-600 text-xs">Preferido: <?= htmlspecialchars($patient['preferred_name']) ?></p>
                 <?php endif; ?>
                 <?php if (!empty($patient['occupation'])): ?>
-                    <p class="text-slate-500"><?= htmlspecialchars($patient['occupation']) ?></p>
+                    <p class="text-slate-500 text-xs truncate"><?= htmlspecialchars($patient['occupation']) ?></p>
                 <?php endif; ?>
             </div>
-            <div class="w-full space-y-2 text-xs text-slate-500 text-left">
-                <p class="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 font-semibold text-slate-700">
-                    Documento: <?= $formatValue($patient['document_id']) ?>
-                </p>
-                <p class="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 font-semibold text-slate-700">
-                    Edad: <?= $patientAgeYears !== null ? $patientAgeYears . ' años' : '—' ?>
-                </p>
+            <div class="w-full space-y-2 text-xs text-slate-600">
+                <div class="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+                    <span class="font-medium text-slate-500">Documento</span>
+                    <p class="font-semibold text-slate-800 mt-0.5"><?= $formatValue($patient['document_id']) ?></p>
+                </div>
+                <div class="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+                    <span class="font-medium text-slate-500">Edad</span>
+                    <p class="font-semibold text-slate-800 mt-0.5"><?= $patientAgeYears !== null ? $patientAgeYears . ' años' : '—' ?></p>
+                </div>
                 <?php if (!empty($patient['phone_primary'])): ?>
-                    <p class="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 font-semibold text-slate-700">
-                        Teléfono: <a class="text-brand-600 hover:underline" href="tel:<?= htmlspecialchars($patient['phone_primary']) ?>"><?= htmlspecialchars($patient['phone_primary']) ?></a>
-                    </p>
+                    <div class="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+                        <span class="font-medium text-slate-500">Teléfono</span>
+                        <p class="font-semibold text-brand-600 hover:text-brand-700 mt-0.5">
+                            <a href="tel:<?= htmlspecialchars($patient['phone_primary']) ?>"><?= htmlspecialchars($patient['phone_primary']) ?></a>
+                        </p>
+                    </div>
                 <?php endif; ?>
                 <?php if (!empty($patient['email'])): ?>
-                    <p class="break-all rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 font-semibold text-slate-700">
-                        Correo: <a class="text-brand-600 hover:underline" href="mailto:<?= htmlspecialchars($patient['email']) ?>"><?= htmlspecialchars($patient['email']) ?></a>
-                    </p>
+                    <div class="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+                        <span class="font-medium text-slate-500">Correo</span>
+                        <p class="font-semibold text-brand-600 hover:text-brand-700 mt-0.5 break-all">
+                            <a href="mailto:<?= htmlspecialchars($patient['email']) ?>"><?= htmlspecialchars($patient['email']) ?></a>
+                        </p>
+                    </div>
                 <?php endif; ?>
-                <p class="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2 font-semibold text-slate-600">Registrado: <?= htmlspecialchars($registeredAtDisplay) ?></p>
             </div>
         </div>
-        <div class="rounded-2xl border border-slate-200/80 bg-white/92 p-6 shadow-sm space-y-4">
-            <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-600">Detalles del odontograma</h2>
-            <dl class="grid gap-3 sm:grid-cols-2 text-sm text-slate-600">
-                <div>
-                    <dt class="font-semibold text-slate-700">Fecha registrada</dt>
-                    <dd><?= htmlspecialchars($snapshotDate) ?></dd>
+        <div class="rounded-2xl border border-slate-200/80 bg-gradient-to-br from-brand-50/40 to-white/95 p-6 shadow-md space-y-5">
+            <div class="flex items-center gap-3">
+                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 text-white shadow-md">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
                 </div>
-                <div>
-                    <dt class="font-semibold text-slate-700">Tipo de registro</dt>
-                    <dd><?= (int) $snapshot['is_blank'] === 1 ? 'Plantilla limpia' : 'Registro clínico' ?></dd>
+                <h2 class="text-base font-bold text-slate-800">Detalles del odontograma</h2>
+            </div>
+            <dl class="grid gap-4 sm:grid-cols-2 text-sm">
+                <div class="rounded-xl border border-brand-100 bg-white/80 p-4 shadow-sm">
+                    <dt class="font-semibold text-brand-700 text-xs uppercase tracking-wide mb-1">Fecha registrada</dt>
+                    <dd class="text-slate-800 font-medium"><?= htmlspecialchars($snapshotDate) ?></dd>
                 </div>
-                <div class="sm:col-span-2">
-                    <dt class="font-semibold text-slate-700">Indicaciones</dt>
-                    <dd class="text-slate-500">Revisa los trazos, marcas y colores registrados. Puedes añadir nuevos hallazgos o ajustar los existentes antes de guardar.</dd>
+                <div class="rounded-xl border border-brand-100 bg-white/80 p-4 shadow-sm">
+                    <dt class="font-semibold text-brand-700 text-xs uppercase tracking-wide mb-1">Tipo de registro</dt>
+                    <dd class="text-slate-800 font-medium"><?= (int) $snapshot['is_blank'] === 1 ? 'Plantilla limpia' : 'Registro clínico' ?></dd>
+                </div>
+                <div class="sm:col-span-2 rounded-xl border border-amber-200 bg-amber-50/50 p-4 shadow-sm">
+                    <dt class="font-semibold text-amber-800 text-xs uppercase tracking-wide mb-2 flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        Indicaciones
+                    </dt>
+                    <dd class="text-amber-900 text-sm leading-relaxed">Revisa los trazos, marcas y colores registrados. Puedes añadir nuevos hallazgos o ajustar los existentes antes de guardar.</dd>
                 </div>
             </dl>
+        </div>
+        <div class="rounded-2xl border border-slate-200/80 bg-gradient-to-br from-white to-blue-50/30 p-6 shadow-md space-y-4">
+            <div class="flex items-center gap-3 pb-3 border-b border-slate-200">
+                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                    </svg>
+                </div>
+                <h2 class="text-base font-bold text-slate-800">Información adicional</h2>
+            </div>
+            <div class="space-y-3">
+                <?php if (!empty($patient['address'])): ?>
+                    <div class="rounded-xl border border-blue-100 bg-white/80 p-3 shadow-sm">
+                        <dt class="font-semibold text-blue-700 text-xs uppercase tracking-wide mb-1">Dirección</dt>
+                        <dd class="text-slate-700 text-sm leading-relaxed"><?= htmlspecialchars($patient['address']) ?></dd>
+                    </div>
+                <?php endif; ?>
+                <div class="rounded-xl border border-slate-200 bg-white/80 p-3 shadow-sm">
+                    <dt class="font-semibold text-slate-600 text-xs uppercase tracking-wide mb-1">Fecha de registro</dt>
+                    <dd class="text-slate-700 text-sm"><?= htmlspecialchars($registeredAtDisplay) ?></dd>
+                </div>
+                <div class="rounded-xl border border-green-200 bg-green-50/50 p-3 shadow-sm">
+                    <dt class="font-semibold text-green-700 text-xs uppercase tracking-wide mb-1 flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        Estado
+                    </dt>
+                    <dd class="text-green-800 text-sm font-medium">Odontograma guardado</dd>
+                </div>
+                <?php
+                $teethWithData = count(array_filter($teethPayload, function($tooth) {
+                    return !empty($tooth['surfaces']) || !empty($tooth['status']) || !empty($tooth['notes']);
+                }));
+                ?>
+                <div class="rounded-xl border border-purple-200 bg-purple-50/50 p-3 shadow-sm">
+                    <dt class="font-semibold text-purple-700 text-xs uppercase tracking-wide mb-1">Piezas registradas</dt>
+                    <dd class="text-purple-800 text-2xl font-bold"><?= $teethWithData ?></dd>
+                </div>
+            </div>
         </div>
     </div>
     <p class="text-sm text-slate-500">Al guardar, se actualizará este odontograma registrado sin modificar el odontograma principal del paciente.</p>
 </section>
 
 <section id="odontograma-guardado" class="rounded-3xl bg-white/95 p-6 shadow-sm shadow-slate-200/60 ring-1 ring-slate-200/70 sm:p-8 space-y-6">
-    <form method="post" action="patient.php?id=<?= $patientId ?>#odontograma" class="space-y-6" data-odontogram-form>
+    <?php
+        $odontogramStatusesJson = json_encode($odontogramStatuses, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($odontogramStatusesJson === false) {
+            $odontogramStatusesJson = '{}';
+        }
+    ?>
+    <form
+        method="post"
+        action="patient.php?id=<?= $patientId ?>#odontograma"
+        class="space-y-6"
+        data-odontogram-form
+        data-odontogram-statuses="<?= htmlspecialchars($odontogramStatusesJson, ENT_QUOTES) ?>"
+        data-odontogram-default-status="<?= htmlspecialchars($defaultOdontogramStatus) ?>"
+    >
         <input type="hidden" name="action" value="save_odontogram">
         <input type="hidden" name="odontogram_payload" value="<?= htmlspecialchars($initialJson, ENT_QUOTES) ?>">
         <input type="hidden" name="odontogram_base_dirty" value="0">

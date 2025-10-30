@@ -56,10 +56,18 @@ $formatMultiline = static function ($value, string $default = '—') use ($forma
 };
 
 $formatDateTime = static function (?string $value, string $default = '—'): string {
-    if (!$value) {
+    $formatted = formatUtcStringToLocal($value);
+    if ($formatted !== null) {
+        return $formatted;
+    }
+    if ($value === null) {
         return $default;
     }
-    $timestamp = strtotime($value);
+    $trimmed = trim((string) $value);
+    if ($trimmed === '') {
+        return $default;
+    }
+    $timestamp = strtotime($trimmed);
     if ($timestamp === false) {
         return $default;
     }
@@ -146,6 +154,9 @@ $odontogramStatuses = [
     'fractura' => 'Fractura',
     'en_tratamiento' => 'En tratamiento'
 ];
+$defaultOdontogramStatus = array_key_exists('sin_registro', $odontogramStatuses)
+    ? 'sin_registro'
+    : (array_key_first($odontogramStatuses) ?? '');
 
 $permanentSurfaces = [
     'top' => 'Superficie oclusal',
@@ -519,7 +530,8 @@ $renderOdontogramSection = static function (
     $renderToothCard,
     $odontogramGroups,
     $permanentSurfaces,
-    $deciduousSurfaces
+    $deciduousSurfaces,
+    $odontogramStatuses
 ): void {
     ?>
     <fieldset class="space-y-6 rounded-2xl border border-slate-200/80 bg-white/90 p-4 sm:p-6 shadow-sm" data-odontogram-section="<?= htmlspecialchars($diagramKey) ?>">
@@ -578,19 +590,89 @@ $renderOdontogramSection = static function (
                     </button>
                 </div>
             </div>
-            <div class="odontogram-canvas space-y-10">
-                <?php foreach ($odontogramGroups as $group): ?>
-                    <div class="odontogram-arch<?= $group['is_deciduous'] ? ' odontogram-arch--deciduous' : '' ?>">
-                        <div class="odontogram-arch__header">
-                            <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-600"><?= htmlspecialchars($group['label']) ?></h3>
+            <div class="odontogram-board space-y-10">
+                <!-- Maxilar superior e inferior -->
+                <div class="space-y-10">
+                    <?php for ($i = 0; $i < 2; $i++): ?>
+                        <?php $group = $odontogramGroups[$i]; ?>
+                        <div class="odontogram-arch<?= $group['is_deciduous'] ? ' odontogram-arch--deciduous' : '' ?>">
+                            <div class="odontogram-arch__header">
+                                <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-600"><?= htmlspecialchars($group['label']) ?></h3>
+                            </div>
+                            <div class="odontogram-row">
+                                <?php foreach ($group['teeth'] as $tooth): ?>
+                                    <?php $renderToothCard($tooth, $permanentSurfaces, $deciduousSurfaces, $group['is_deciduous']); ?>
+                                <?php endforeach; ?>
+                            </div>
                         </div>
-                        <div class="odontogram-row">
-                            <?php foreach ($group['teeth'] as $tooth): ?>
-                                <?php $renderToothCard($tooth, $permanentSurfaces, $deciduousSurfaces, $group['is_deciduous']); ?>
-                            <?php endforeach; ?>
+                    <?php endfor; ?>
+                </div>
+
+                <!-- Dentición temporal con panel lateral en el espacio blanco -->
+                <div class="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_280px]">
+                    <div class="space-y-10">
+                        <?php for ($i = 2; $i < 4; $i++): ?>
+                            <?php $group = $odontogramGroups[$i]; ?>
+                            <div class="odontogram-arch<?= $group['is_deciduous'] ? ' odontogram-arch--deciduous' : '' ?>">
+                                <div class="odontogram-arch__header">
+                                    <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-600"><?= htmlspecialchars($group['label']) ?></h3>
+                                </div>
+                                <div class="odontogram-row">
+                                    <?php foreach ($group['teeth'] as $tooth): ?>
+                                        <?php $renderToothCard($tooth, $permanentSurfaces, $deciduousSurfaces, $group['is_deciduous']); ?>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                        <?php endfor; ?>
+                    </div>
+
+                    <!-- Panel lateral en el espacio blanco -->
+                    <aside
+                        class="odontogram-metadata flex flex-col gap-4 rounded-2xl border border-slate-200/80 bg-white/95 p-4 shadow-sm self-start"
+                        data-odontogram-metadata
+                    >
+                    <div class="odontogram-metadata__empty text-sm text-slate-500" data-odontogram-empty>
+                        <p class="font-semibold text-slate-600">Selecciona una pieza</p>
+                        <p class="mt-1 text-xs leading-relaxed text-slate-500">
+                            Elige cualquier diente del diagrama para registrar su estado clínico y anotar observaciones relevantes.
+                        </p>
+                    </div>
+                    <div class="odontogram-metadata__fields flex-1" data-odontogram-fields hidden>
+                        <div class="space-y-3">
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Pieza seleccionada</p>
+                                <p class="text-lg font-semibold text-brand-600" data-odontogram-tooth>—</p>
+                            </div>
+                            <label class="flex flex-col gap-1 text-sm text-slate-600">
+                                <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">Estado</span>
+                                <select class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200" data-odontogram-status>
+                                    <?php foreach ($odontogramStatuses as $statusKey => $statusLabel): ?>
+                                        <option value="<?= htmlspecialchars($statusKey) ?>"><?= htmlspecialchars($statusLabel) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </label>
+                            <label class="flex flex-col gap-1 text-sm text-slate-600">
+                                <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">Notas</span>
+                                <textarea
+                                    rows="3"
+                                    class="rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-inner focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+                                    data-odontogram-notes
+                                    placeholder="Observaciones clínicas, hallazgos, recomendaciones..."
+                                ></textarea>
+                            </label>
+                        </div>
+                        <div class="mt-4 flex flex-wrap gap-2">
+                            <button
+                                type="button"
+                                class="rounded-full border border-slate-300 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:bg-slate-50"
+                                data-odontogram-clear
+                            >
+                                Limpiar campos
+                            </button>
                         </div>
                     </div>
-                <?php endforeach; ?>
+                </aside>
+                </div>
             </div>
         </div>
     </fieldset>
@@ -1008,6 +1090,9 @@ $snapshotStmt = $pdo->prepare('SELECT id, payload, is_blank, created_at FROM odo
 $snapshotStmt->execute([':patient_id' => $patientId]);
 $snapshotsRaw = $snapshotStmt->fetchAll(PDO::FETCH_ASSOC);
 $snapshots = [];
+$toLower = static function (string $text): string {
+    return function_exists('mb_strtolower') ? mb_strtolower($text, 'UTF-8') : strtolower($text);
+};
 foreach ($snapshotsRaw as $row) {
     if ((int) ($row['is_blank'] ?? 0) === 1) {
         continue;
@@ -1016,9 +1101,49 @@ foreach ($snapshotsRaw as $row) {
     if (!is_array($decodedPayload) || !isset($decodedPayload['teeth']) || !is_array($decodedPayload['teeth'])) {
         $decodedPayload = ['teeth' => []];
     }
+
+    $createdAtRaw = isset($row['created_at']) ? (string) $row['created_at'] : '';
+    $createdAtLocalDt = $createdAtRaw !== '' ? utcStringToLocalDateTime($createdAtRaw) : null;
+    $createdAtLocalIso = $createdAtLocalDt ? $createdAtLocalDt->format('Y-m-d H:i:s') : ($createdAtRaw !== '' ? $createdAtRaw : null);
+    $createdAtFormatted = $createdAtLocalDt ? $createdAtLocalDt->format('d/m/Y H:i') : $formatDateTime($createdAtRaw);
+    $createdAtDateOnly = $createdAtLocalDt ? $createdAtLocalDt->format('d/m/Y') : null;
+
+    $tokenSources = array_filter([
+        $createdAtRaw,
+        $createdAtLocalIso,
+        $createdAtFormatted,
+        $createdAtDateOnly,
+    ]);
+    $tokenRegistry = [];
+    foreach ($tokenSources as $sourceValue) {
+        $lower = $toLower((string) $sourceValue);
+        $tokenRegistry[$lower] = true;
+        $normalized = str_replace(['/', '-', ':', ' '], '', $lower);
+        if ($normalized !== $lower && $normalized !== '') {
+            $tokenRegistry[$normalized] = true;
+        }
+        $slashToDash = str_replace('/', '-', $lower);
+        if ($slashToDash !== $lower) {
+            $tokenRegistry[$slashToDash] = true;
+        }
+        $dashToSlash = str_replace('-', '/', $lower);
+        if ($dashToSlash !== $lower) {
+            $tokenRegistry[$dashToSlash] = true;
+        }
+    }
+
+    $searchTokens = array_map(
+        static fn($token): string => (string) $token,
+        array_keys($tokenRegistry)
+    );
+
     $snapshots[] = [
         'id' => (int) $row['id'],
-        'created_at' => (string) $row['created_at'],
+        'created_at' => $createdAtRaw,
+        'created_at_local' => $createdAtLocalIso,
+        'created_at_formatted' => $createdAtFormatted,
+        'created_at_date' => $createdAtDateOnly,
+        'search_tokens' => $searchTokens,
         'payload' => $decodedPayload,
     ];
 }
@@ -1049,9 +1174,50 @@ if ($snapshots) {
     }
 }
 
+$totalOdontogramSnapshots = count($snapshots);
+
+if ($snapshots) {
+    foreach ($snapshots as &$snapshotRef) {
+        $tokenSet = [];
+        foreach ($snapshotRef['search_tokens'] as $tokenValue) {
+            $tokenString = trim((string) $tokenValue);
+            if ($tokenString !== '') {
+                $tokenLower = $toLower($tokenString);
+                if ($tokenLower !== '') {
+                    $tokenSet[$tokenLower] = true;
+                }
+            }
+        }
+
+        $ordinalLabel = $snapshotOrdinalLabels[$snapshotRef['id']] ?? null;
+        if ($ordinalLabel) {
+            $snapshotRef['ordinal_label'] = $ordinalLabel;
+            $lowerOrdinal = $toLower($ordinalLabel);
+            if ($lowerOrdinal !== '') {
+                $tokenSet[$lowerOrdinal] = true;
+                $tokenSet[$toLower(str_replace(' ', '', $ordinalLabel))] = true;
+                $ordinalWords = preg_split('/\s+/', $lowerOrdinal) ?: [];
+                foreach ($ordinalWords as $word) {
+                    $word = trim($word);
+                    if ($word !== '') {
+                        $tokenSet[$word] = true;
+                    }
+                }
+            }
+        }
+
+        $snapshotRef['search_tokens'] = array_values(array_keys($tokenSet));
+    }
+    unset($snapshotRef);
+}
+
 $firstSnapshotTeeth = [];
-$firstSnapshotCreatedAt = $firstSnapshot ? $formatDateTime($firstSnapshot['created_at']) : null;
-$firstSnapshotOrdinalLabel = $firstSnapshot ? ($snapshotOrdinalLabels[$firstSnapshot['id']] ?? 'Primer odontograma') : null;
+$firstSnapshotCreatedAt = $firstSnapshot
+    ? ($firstSnapshot['created_at_formatted'] ?? $formatDateTime($firstSnapshot['created_at'] ?? null))
+    : null;
+$firstSnapshotOrdinalLabel = $firstSnapshot
+    ? ($firstSnapshot['ordinal_label'] ?? ($snapshotOrdinalLabels[$firstSnapshot['id']] ?? 'Primer odontograma'))
+    : null;
 if ($firstSnapshot) {
     foreach ($firstSnapshot['payload']['teeth'] as $toothCode => $toothData) {
         if (!is_array($toothData)) {
@@ -1084,22 +1250,55 @@ if ($firstSnapshot) {
 
 $filteredSnapshots = $snapshots;
 if ($odontogramSearchQuery !== '') {
-    $queryLower = strtolower($odontogramSearchQuery);
+    $queryLower = $toLower($odontogramSearchQuery);
+    $queryVariants = array_filter(
+        array_unique([
+            $queryLower,
+            str_replace('/', '-', $queryLower),
+            str_replace('-', '/', $queryLower),
+            str_replace(['/', '-', ':', ' '], '', $queryLower),
+            str_replace('.', '', $queryLower),
+        ]),
+        static fn($value) => $value !== ''
+    );
+
     $filteredSnapshots = array_values(array_filter(
         $snapshots,
-        static function (array $snapshot) use ($queryLower): bool {
-            $createdAt = isset($snapshot['created_at']) ? strtolower((string) $snapshot['created_at']) : '';
-            if (strpos($createdAt, $queryLower) !== false) {
+        static function (array $snapshot) use ($queryLower, $queryVariants): bool {
+            if ($queryLower === '') {
                 return true;
             }
+
             if (ctype_digit($queryLower) && (int) $queryLower === (int) $snapshot['id']) {
                 return true;
             }
-            foreach ($snapshot['payload']['teeth'] as $toothCode => $_) {
-                if (strpos(strtolower((string) $toothCode), $queryLower) !== false) {
-                    return true;
+
+            $tokens = $snapshot['search_tokens'] ?? [];
+            foreach ($queryVariants as $variant) {
+                foreach ($tokens as $token) {
+                    $haystack = trim((string) $token);
+                    if ($haystack === '') {
+                        continue;
+                    }
+                    $haystackLower = function_exists('mb_strtolower')
+                        ? mb_strtolower($haystack, 'UTF-8')
+                        : strtolower($haystack);
+                    if (strpos($haystackLower, $variant) !== false) {
+                        return true;
+                    }
                 }
             }
+
+            foreach ($snapshot['payload']['teeth'] as $toothCode => $_) {
+                $toothValue = (string) $toothCode;
+                $toothLower = function_exists('mb_strtolower') ? mb_strtolower($toothValue, 'UTF-8') : strtolower($toothValue);
+                foreach ($queryVariants as $variant) {
+                    if (strpos($toothLower, $variant) !== false) {
+                        return true;
+                    }
+                }
+            }
+
             return false;
         }
     ));
@@ -1275,6 +1474,26 @@ if (!empty($patient['registered_at'])) {
                             }
                         }
                         ?>
+
+                        <div class="rounded-xl border border-brand-200 bg-gradient-to-r from-brand-600 via-brand-500 to-brand-400 p-3 text-white shadow-soft">
+                            <div class="flex items-center gap-3">
+                                <div class="flex h-11 w-11 items-center justify-center rounded-full bg-white/20 text-lg font-semibold">
+                                    <?= $totalOdontogramSnapshots ?>
+                                </div>
+                                <div class="space-y-0.5">
+                                    <p class="text-xs font-semibold uppercase tracking-wide text-white/80">Odontogramas guardados</p>
+                                    <?php if ($totalOdontogramSnapshots > 0): ?>
+                                        <p class="text-sm font-semibold leading-tight">
+                                            <?= $totalOdontogramSnapshots === 1 ? '1 registro histórico' : $totalOdontogramSnapshots . ' registros históricos' ?>
+                                        </p>
+                                    <?php else: ?>
+                                        <p class="text-sm font-semibold leading-tight text-white/90">
+                                            Sin registros guardados todavía
+                                        </p>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
 
                         <div class="flex items-center gap-3 rounded-xl bg-white/80 p-3 border border-blue-100">
                             <div class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600 font-bold text-lg shrink-0">
@@ -1519,7 +1738,19 @@ if (!empty($patient['registered_at'])) {
         </div>
         <p class="text-xs text-slate-400 md:text-right">Al guardar se crea un nuevo odontograma en el historial y este lienzo vuelve a quedar en blanco.</p>
     </div>
-    <form method="post" class="space-y-6" data-odontogram-form>
+    <?php
+        $odontogramStatusesJson = json_encode($odontogramStatuses, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($odontogramStatusesJson === false) {
+            $odontogramStatusesJson = '{}';
+        }
+    ?>
+    <form
+        method="post"
+        class="space-y-6"
+        data-odontogram-form
+        data-odontogram-statuses="<?= htmlspecialchars($odontogramStatusesJson, ENT_QUOTES) ?>"
+        data-odontogram-default-status="<?= htmlspecialchars($defaultOdontogramStatus) ?>"
+    >
         <input type="hidden" name="action" value="save_odontogram">
         <input type="hidden" name="odontogram_payload" value="<?= htmlspecialchars($odontogramInitialJson, ENT_QUOTES) ?>">
         <input type="hidden" name="odontogram_base_dirty" value="0">
@@ -1584,7 +1815,7 @@ if (!empty($patient['registered_at'])) {
                     name="odontogram_query"
                     type="search"
                     value="<?= htmlspecialchars($odontogramSearchQuery) ?>"
-                    placeholder="Filtra por fecha (2025-10), ID o pieza (ej. 1.1)"
+                    placeholder="Filtra por fecha (2025-10), ID, pieza o etapa (ej. 1.1, primer)"
                     class="w-full rounded-full border border-slate-300 px-4 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 sm:w-80"
                 >
             </div>
@@ -1611,8 +1842,8 @@ if (!empty($patient['registered_at'])) {
                     ksort($teethEntries);
                     $teethCount = count($teethEntries);
                     $isFirstSnapshot = $firstSnapshot && $snapshot['id'] === $firstSnapshot['id'];
-                    $ordinalLabel = $snapshotOrdinalLabels[$snapshot['id']] ?? 'Odontograma';
-                    $snapshotDate = $formatDateTime($snapshot['created_at']);
+                    $ordinalLabel = $snapshot['ordinal_label'] ?? ($snapshotOrdinalLabels[$snapshot['id']] ?? 'Odontograma');
+                    $snapshotDate = $snapshot['created_at_formatted'] ?? $formatDateTime($snapshot['created_at'] ?? null);
                     $badgeLabel = $isFirstSnapshot ? 'Registro inicial' : 'Seguimiento';
                     $badgeClasses = $isFirstSnapshot ? 'bg-emerald-100 text-emerald-700' : 'bg-brand-100 text-brand-700';
                 ?>

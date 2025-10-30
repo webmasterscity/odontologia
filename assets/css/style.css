@@ -263,6 +263,41 @@
     padding: 0.25rem 0 0.15rem;
 }
 
+.odontogram-board {
+    /* Removed flex layout to avoid conflict with grid in temporal dentition section */
+}
+
+.odontogram-metadata {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 255, 0.78));
+}
+
+.odontogram-metadata__fields[hidden],
+.odontogram-metadata__empty[hidden] {
+    display: none;
+}
+
+.odontogram-metadata textarea {
+    resize: vertical;
+    min-height: 96px;
+}
+
+.tooth-card.is-selected {
+    border-color: rgba(59, 130, 246, 0.8);
+    box-shadow: 0 24px 48px -28px rgba(37, 80, 214, 0.46);
+}
+
+.tooth-card.is-selected .tooth-card__code {
+    color: #1d4ed8;
+}
+
+.tooth-card.has-metadata:not(.is-selected) {
+    border-color: rgba(124, 58, 237, 0.38);
+}
+
+.tooth-card.has-metadata:not(.is-selected) .tooth-card__code {
+    color: #7c3aed;
+}
+
 .odontogram-arch__header {
     margin-bottom: 0.75rem;
 }
@@ -398,6 +433,10 @@
     height: 100%;
     pointer-events: none;
     z-index: 2;
+}
+
+.odontogram-wrapper.move-mode .tooth-grid__symbols {
+    pointer-events: all;
 }
 
 .tooth-symbol-layer use,
