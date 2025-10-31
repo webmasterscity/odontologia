@@ -29,7 +29,8 @@ $patientStmt = $pdo->prepare(
         profile_photo_path,
         profile_photo_zoom,
         profile_photo_offset_x,
-        profile_photo_offset_y
+        profile_photo_offset_y,
+        age
      FROM patients
      WHERE id = :id'
 );
@@ -123,6 +124,9 @@ if (!empty($patient['birth_date'])) {
     } catch (Throwable $e) {
         $patientAgeYears = null;
     }
+}
+if ($patientAgeYears === null && isset($patient['age']) && is_numeric($patient['age'])) {
+    $patientAgeYears = (int) $patient['age'];
 }
 
 $registeredAtDisplay = $formatDateTime($patient['created_at'] ?? null);

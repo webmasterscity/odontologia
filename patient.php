@@ -1612,7 +1612,7 @@ if (!empty($patient['registered_at'])) {
 
                         <?php
                         $latestStudyDateLabel = null;
-                        $latestStudyTypeLabel = null;
+                        $latestStudyTypeLabel = '';
                         if ($latestPatientStudy) {
                             $latestStudyDateLabel = $formatStudyDate($latestPatientStudy['captured_at'] ?? null);
                             if ($latestStudyDateLabel === null) {
