@@ -20,6 +20,21 @@ if (!$patient) {
     exit;
 }
 
+$clampProfilePhotoValue = static function (float $value, float $min, float $max): float {
+    return max($min, min($max, $value));
+};
+
+$hasProfilePhoto = !empty($patient['profile_photo_path']);
+$profilePhotoZoom = $clampProfilePhotoValue((float) ($patient['profile_photo_zoom'] ?? 1.0), 1.0, 2.5);
+$profilePhotoOffsetX = $clampProfilePhotoValue((float) ($patient['profile_photo_offset_x'] ?? 0.0), -60.0, 60.0);
+$profilePhotoOffsetY = $clampProfilePhotoValue((float) ($patient['profile_photo_offset_y'] ?? 0.0), -60.0, 60.0);
+$profilePhotoStyle = sprintf(
+    'transform: translate(%0.2f%%, %0.2f%%) scale(%0.3f);',
+    $profilePhotoOffsetX,
+    $profilePhotoOffsetY,
+    $profilePhotoZoom
+);
+
 $messages = [];
 $errors = [];
 $today = date('Y-m-d');
@@ -1440,13 +1455,22 @@ if (!empty($patient['registered_at'])) {
         <div class="lg:col-span-1">
             <div class="flex flex-col gap-6">
                 <div class="flex flex-col items-center gap-4 rounded-2xl border border-slate-200/80 bg-gradient-to-br from-white to-slate-50/50 p-6 text-center shadow-sm">
-                    <?php if (!empty($patient['profile_photo_path'])): ?>
-                        <img src="<?= htmlspecialchars($patient['profile_photo_path']) ?>" alt="<?= htmlspecialchars('Foto del paciente ' . ($patient['full_name'] ?? '')) ?>" class="h-36 w-36 rounded-full object-cover shadow-lg ring-4 ring-brand-100/60">
-                    <?php else: ?>
-                        <div class="flex h-36 w-36 items-center justify-center rounded-full bg-gradient-to-br from-slate-100 to-slate-200 text-5xl text-slate-400 shadow-md">
-                            <span>👤</span>
-                        </div>
-                    <?php endif; ?>
+                    <div class="relative h-36 w-36 overflow-hidden rounded-full bg-gradient-to-br from-slate-100 to-slate-200 shadow-lg ring-4 <?= $hasProfilePhoto ? 'ring-brand-100/60' : 'ring-slate-200/70' ?>">
+                        <?php if ($hasProfilePhoto): ?>
+                            <img
+                                src="<?= htmlspecialchars($patient['profile_photo_path']) ?>"
+                                alt="<?= htmlspecialchars('Foto del paciente ' . ($patient['full_name'] ?? '')) ?>"
+                                class="absolute inset-0 h-full w-full object-cover"
+                                style="<?= htmlspecialchars($profilePhotoStyle) ?>"
+                                draggable="false"
+                                loading="lazy"
+                            >
+                        <?php else: ?>
+                            <div class="absolute inset-0 flex items-center justify-center text-5xl text-slate-400 select-none">
+                                <span>👤</span>
+                            </div>
+                        <?php endif; ?>
+                    </div>
                     <div class="space-y-1.5 text-sm">
                         <p class="text-lg font-bold text-slate-900"><?= htmlspecialchars($patient['full_name'] ?? '') ?></p>
                         <?php if (!empty($patient['preferred_name'])): ?>

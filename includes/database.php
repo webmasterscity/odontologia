@@ -68,6 +68,9 @@ function bootstrapSchema(PDO $pdo): void
             emergency_contact_relationship TEXT,
             emergency_contact_phone TEXT,
             profile_photo_path TEXT,
+            profile_photo_zoom REAL DEFAULT 1.0,
+            profile_photo_offset_x REAL DEFAULT 0.0,
+            profile_photo_offset_y REAL DEFAULT 0.0,
             notes TEXT,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -207,6 +210,18 @@ function ensureSchemaUpgrades(PDO $pdo): void
     }
     if (!isset($patientColumns['profile_photo_path'])) {
         $pdo->exec('ALTER TABLE patients ADD COLUMN profile_photo_path TEXT');
+    }
+    if (!isset($patientColumns['profile_photo_zoom'])) {
+        $pdo->exec('ALTER TABLE patients ADD COLUMN profile_photo_zoom REAL DEFAULT 1.0');
+        $pdo->exec('UPDATE patients SET profile_photo_zoom = 1.0 WHERE profile_photo_zoom IS NULL');
+    }
+    if (!isset($patientColumns['profile_photo_offset_x'])) {
+        $pdo->exec('ALTER TABLE patients ADD COLUMN profile_photo_offset_x REAL DEFAULT 0.0');
+        $pdo->exec('UPDATE patients SET profile_photo_offset_x = 0.0 WHERE profile_photo_offset_x IS NULL');
+    }
+    if (!isset($patientColumns['profile_photo_offset_y'])) {
+        $pdo->exec('ALTER TABLE patients ADD COLUMN profile_photo_offset_y REAL DEFAULT 0.0');
+        $pdo->exec('UPDATE patients SET profile_photo_offset_y = 0.0 WHERE profile_photo_offset_y IS NULL');
     }
     if (!isset($patientColumns['registered_at'])) {
         $pdo->exec('ALTER TABLE patients ADD COLUMN registered_at TEXT');

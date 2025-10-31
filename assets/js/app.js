@@ -75,6 +75,45 @@ function setupOdontogram() {
     const wrapperControllers = new Map();
     const toggleLabelUpdaters = new Map();
 
+    let statusLabelsMap = {};
+    try {
+        const rawStatuses = form.dataset.odontogramStatuses || '{}';
+        const parsedStatuses = JSON.parse(rawStatuses);
+        if (parsedStatuses && typeof parsedStatuses === 'object') {
+            statusLabelsMap = parsedStatuses;
+        }
+    } catch (error) {
+        console.warn('No se pudo interpretar los estados del odontograma:', error);
+        statusLabelsMap = {};
+    }
+    const allowedStatuses = Object.keys(statusLabelsMap).filter((key) => typeof key === 'string' && key.trim() !== '');
+    const defaultStatusValue = (() => {
+        const preferred = (form.dataset.odontogramDefaultStatus || '').trim();
+        if (preferred && allowedStatuses.includes(preferred)) {
+            return preferred;
+        }
+        return allowedStatuses[0] || '';
+    })();
+    const isValidStatus = (value) => typeof value === 'string' && allowedStatuses.includes(value.trim());
+    const normalizeStatus = (value) => {
+        if (!isValidStatus(value)) {
+            return '';
+        }
+        return value.trim();
+    };
+    const normalizeNotes = (value) => {
+        if (typeof value !== 'string') {
+            return '';
+        }
+        return value.trim();
+    };
+    const markDirtyForDiagram = (diagramKey) => {
+        form.dataset.odontogramDirty = 'true';
+        if (diagramKey === 'odontodiagrama') {
+            form.dataset.odontogramBaseDirty = 'true';
+        }
+    };
+
     const allowedColors = ['blue', 'red'];
     const strokePalette = {
         blue: '#1D4ED8',
@@ -430,31 +469,155 @@ function setupOdontogram() {
                 state[diagramKey] = {};
                 return;
             }
-            Object.keys(diagramData).forEach((toothKey) => {
-                const toothEntry = diagramData[toothKey];
-                if (!toothEntry || typeof toothEntry !== 'object') {
-                    delete diagramData[toothKey];
-                    return;
-                }
-                if (!toothEntry.surfaces || typeof toothEntry.surfaces !== 'object') {
-                    toothEntry.surfaces = {};
-                }
-                Object.keys(toothEntry.surfaces).forEach((surfaceKey) => {
-                    const normalized = normalizeCellState(toothEntry.surfaces[surfaceKey]);
-                    if (normalized) {
-                        toothEntry.surfaces[surfaceKey] = normalized;
-                    } else {
-                        delete toothEntry.surfaces[surfaceKey];
-                    }
-                });
-                if (!Object.keys(toothEntry.surfaces).length && !toothEntry.status && !toothEntry.notes) {
-                    delete diagramData[toothKey];
+        Object.keys(diagramData).forEach((toothKey) => {
+            const toothEntry = diagramData[toothKey];
+            if (!toothEntry || typeof toothEntry !== 'object') {
+                delete diagramData[toothKey];
+                return;
+            }
+            if (!toothEntry.surfaces || typeof toothEntry.surfaces !== 'object') {
+                toothEntry.surfaces = {};
+            }
+            Object.keys(toothEntry.surfaces).forEach((surfaceKey) => {
+                const normalized = normalizeCellState(toothEntry.surfaces[surfaceKey]);
+                if (normalized) {
+                    toothEntry.surfaces[surfaceKey] = normalized;
+                } else {
+                    delete toothEntry.surfaces[surfaceKey];
                 }
             });
+            const normalizedStatus = normalizeStatus(toothEntry.status);
+            if (normalizedStatus) {
+                toothEntry.status = normalizedStatus;
+            } else {
+                delete toothEntry.status;
+            }
+            if (typeof toothEntry.notes === 'string') {
+                const normalizedNote = normalizeNotes(toothEntry.notes);
+                if (normalizedNote) {
+                    toothEntry.notes = normalizedNote;
+                } else {
+                    delete toothEntry.notes;
+                }
+            } else if (toothEntry.notes !== undefined) {
+                delete toothEntry.notes;
+            }
+            const hasMetadata = Boolean(toothEntry.status || toothEntry.notes);
+            if (!Object.keys(toothEntry.surfaces).length && !hasMetadata) {
+                delete diagramData[toothKey];
+            }
+        });
         });
     };
 
     sanitizeLoadedState();
+
+    const getExistingEntry = (diagramKey, toothCode) => {
+        if (!toothCode) {
+            return null;
+        }
+        const diagramData = state[diagramKey];
+        if (!diagramData || typeof diagramData !== 'object') {
+            return null;
+        }
+        const entry = diagramData[toothCode];
+        if (!entry || typeof entry !== 'object') {
+            return null;
+        }
+        if (!entry.surfaces || typeof entry.surfaces !== 'object') {
+            entry.surfaces = {};
+        }
+        return entry;
+    };
+
+    const ensureEntry = (diagramKey, toothCode) => {
+        if (!toothCode) {
+            return null;
+        }
+        if (!state[diagramKey] || typeof state[diagramKey] !== 'object') {
+            state[diagramKey] = {};
+        }
+        if (!state[diagramKey][toothCode] || typeof state[diagramKey][toothCode] !== 'object') {
+            state[diagramKey][toothCode] = { surfaces: {} };
+        }
+        const entry = state[diagramKey][toothCode];
+        if (!entry.surfaces || typeof entry.surfaces !== 'object') {
+            entry.surfaces = {};
+        }
+        return entry;
+    };
+
+    const cleanupEntry = (diagramKey, toothCode) => {
+        const diagramData = state[diagramKey];
+        if (!diagramData || typeof diagramData !== 'object') {
+            return;
+        }
+        const entry = diagramData[toothCode];
+        if (!entry || typeof entry !== 'object') {
+            return;
+        }
+        if (!entry.surfaces || typeof entry.surfaces !== 'object') {
+            entry.surfaces = {};
+        }
+        const hasSurfaces = Object.keys(entry.surfaces).length > 0;
+        const statusValue = normalizeStatus(entry.status);
+        const notesValue = normalizeNotes(entry.notes);
+        if (!statusValue) {
+            delete entry.status;
+        } else {
+            entry.status = statusValue;
+        }
+        if (!notesValue) {
+            delete entry.notes;
+        } else {
+            entry.notes = notesValue;
+        }
+        const hasMetadata = Boolean(entry.status || entry.notes);
+        if (!hasSurfaces && !hasMetadata) {
+            delete diagramData[toothCode];
+        }
+    };
+
+    const applyMetadataToState = (diagramKey, toothCode, metadata) => {
+        if (!toothCode) {
+            return { changed: false, hasMetadata: false };
+        }
+        const nextStatus = normalizeStatus(metadata?.status);
+        const nextNotes = normalizeNotes(metadata?.notes);
+        const existingEntry = getExistingEntry(diagramKey, toothCode);
+        const currentStatus = normalizeStatus(existingEntry?.status);
+        const currentNotes = normalizeNotes(existingEntry?.notes);
+
+        if (!nextStatus && !nextNotes) {
+            if (!existingEntry || (!currentStatus && !currentNotes)) {
+                return { changed: false, hasMetadata: false };
+            }
+            if (existingEntry) {
+                delete existingEntry.status;
+                delete existingEntry.notes;
+            }
+            cleanupEntry(diagramKey, toothCode);
+            return { changed: true, hasMetadata: false };
+        }
+
+        if (nextStatus === currentStatus && nextNotes === currentNotes) {
+            return { changed: false, hasMetadata: Boolean(nextStatus || nextNotes) };
+        }
+
+        const entry = ensureEntry(diagramKey, toothCode);
+        if (nextStatus) {
+            entry.status = nextStatus;
+        } else {
+            delete entry.status;
+        }
+        if (nextNotes) {
+            entry.notes = nextNotes;
+        } else {
+            delete entry.notes;
+        }
+        cleanupEntry(diagramKey, toothCode);
+        return { changed: true, hasMetadata: Boolean(nextStatus || nextNotes) };
+    };
 
     const clearFill = (cell) => {
         fillClasses.forEach((cls) => cell.classList.remove(cls));
@@ -713,6 +876,222 @@ function setupOdontogram() {
             state[diagram] = {};
         }
 
+        const section = wrapper.closest('[data-odontogram-section]');
+        const metadataPanel = section ? section.querySelector('[data-odontogram-metadata]') : null;
+        const metadataEmpty = metadataPanel ? metadataPanel.querySelector('[data-odontogram-empty]') : null;
+        const metadataFields = metadataPanel ? metadataPanel.querySelector('[data-odontogram-fields]') : null;
+        const metadataToothLabel = metadataPanel ? metadataPanel.querySelector('[data-odontogram-tooth]') : null;
+        const metadataStatusField = metadataPanel ? metadataPanel.querySelector('[data-odontogram-status]') : null;
+        const metadataNotesField = metadataPanel ? metadataPanel.querySelector('[data-odontogram-notes]') : null;
+        const metadataClearButton = metadataPanel ? metadataPanel.querySelector('[data-odontogram-clear]') : null;
+
+        const metadataControls = {
+            panel: metadataPanel,
+            empty: metadataEmpty,
+            fields: metadataFields,
+            toothLabel: metadataToothLabel,
+            statusField: metadataStatusField,
+            notesField: metadataNotesField,
+            clearButton: metadataClearButton,
+        };
+
+        const toothCards = Array.from(wrapper.querySelectorAll('.tooth-card'));
+        const toothCardLookup = new Map();
+        toothCards.forEach((card) => {
+            const code = (card.dataset.tooth || '').trim();
+            if (code) {
+                toothCardLookup.set(code, card);
+            }
+        });
+
+        let activeToothCode = null;
+        let suppressMetadataHandlers = false;
+
+        const getMetadataFallbackStatus = () => {
+            if (defaultStatusValue) {
+                return defaultStatusValue;
+            }
+            if (metadataControls.statusField && metadataControls.statusField.options.length > 0) {
+                return metadataControls.statusField.options[0].value;
+            }
+            return '';
+        };
+
+        const toggleMetadataView = (showFields) => {
+            if (!metadataControls.panel) {
+                return;
+            }
+            if (metadataControls.empty) {
+                metadataControls.empty.hidden = Boolean(showFields);
+            }
+            if (metadataControls.fields) {
+                metadataControls.fields.hidden = !showFields;
+            }
+        };
+
+        const refreshMetadataBadge = (toothCode) => {
+            if (!toothCode) {
+                return;
+            }
+            const card = toothCardLookup.get(toothCode);
+            if (!card) {
+                return;
+            }
+            const entry = getExistingEntry(diagram, toothCode);
+            const hasStatus = Boolean(normalizeStatus(entry?.status));
+            const hasNotes = Boolean(normalizeNotes(entry?.notes));
+            const hasMetadata = hasStatus || hasNotes;
+            if (hasMetadata) {
+                card.classList.add('has-metadata');
+            } else {
+                card.classList.remove('has-metadata');
+            }
+        };
+
+        const populateMetadataFields = () => {
+            if (!metadataControls.panel) {
+                return;
+            }
+            if (!activeToothCode) {
+                if (metadataControls.toothLabel) {
+                    metadataControls.toothLabel.textContent = '—';
+                }
+                toggleMetadataView(false);
+                suppressMetadataHandlers = true;
+                if (metadataControls.statusField) {
+                    metadataControls.statusField.value = getMetadataFallbackStatus();
+                }
+                if (metadataControls.notesField) {
+                    metadataControls.notesField.value = '';
+                }
+                suppressMetadataHandlers = false;
+                return;
+            }
+
+            const entry = getExistingEntry(diagram, activeToothCode);
+            const statusValue = normalizeStatus(entry?.status);
+            const notesValueRaw = typeof entry?.notes === 'string' ? entry.notes : '';
+            if (metadataControls.toothLabel) {
+                metadataControls.toothLabel.textContent = activeToothCode;
+            }
+            suppressMetadataHandlers = true;
+            if (metadataControls.statusField) {
+                const fallback = statusValue || getMetadataFallbackStatus();
+                metadataControls.statusField.value = fallback;
+            }
+            if (metadataControls.notesField) {
+                metadataControls.notesField.value = notesValueRaw;
+            }
+            suppressMetadataHandlers = false;
+            toggleMetadataView(true);
+        };
+
+        const clearActiveSelection = () => {
+            if (activeToothCode && toothCardLookup.has(activeToothCode)) {
+                const previousCard = toothCardLookup.get(activeToothCode);
+                if (previousCard) {
+                    previousCard.classList.remove('is-selected');
+                }
+            }
+            activeToothCode = null;
+            populateMetadataFields();
+        };
+
+        const setActiveTooth = (toothCode, options = {}) => {
+            if (!toothCode) {
+                clearActiveSelection();
+                return;
+            }
+            const normalized = toothCode.trim();
+            if (!normalized || !toothCardLookup.has(normalized)) {
+                return;
+            }
+            if (activeToothCode !== normalized || options.force) {
+                if (activeToothCode && toothCardLookup.has(activeToothCode)) {
+                    const previousCard = toothCardLookup.get(activeToothCode);
+                    if (previousCard) {
+                        previousCard.classList.remove('is-selected');
+                    }
+                }
+                activeToothCode = normalized;
+                const nextCard = toothCardLookup.get(activeToothCode);
+                if (nextCard) {
+                    nextCard.classList.add('is-selected');
+                }
+                populateMetadataFields();
+            } else if (metadataControls.panel) {
+                populateMetadataFields();
+            }
+            if (options.focusStatus && metadataControls.statusField) {
+                metadataControls.statusField.focus();
+            }
+        };
+
+        if (metadataControls.panel) {
+            toggleMetadataView(false);
+        }
+
+        const handleMetadataChange = () => {
+            if (!activeToothCode || suppressMetadataHandlers) {
+                return;
+            }
+            const statusValue = metadataControls.statusField
+                ? metadataControls.statusField.value
+                : normalizeStatus(getExistingEntry(diagram, activeToothCode)?.status);
+            const notesValue = metadataControls.notesField
+                ? metadataControls.notesField.value
+                : getExistingEntry(diagram, activeToothCode)?.notes || '';
+            const result = applyMetadataToState(diagram, activeToothCode, {
+                status: statusValue,
+                notes: notesValue,
+            });
+            if (result.changed) {
+                markDirtyForDiagram(diagram);
+            }
+            refreshMetadataBadge(activeToothCode);
+        };
+
+        if (metadataControls.statusField) {
+            metadataControls.statusField.addEventListener('change', handleMetadataChange);
+        }
+        if (metadataControls.notesField) {
+            metadataControls.notesField.addEventListener('input', handleMetadataChange);
+            metadataControls.notesField.addEventListener('blur', handleMetadataChange);
+        }
+        if (metadataControls.clearButton) {
+            metadataControls.clearButton.addEventListener('click', () => {
+                if (!activeToothCode) {
+                    return;
+                }
+                const result = applyMetadataToState(diagram, activeToothCode, { status: '', notes: '' });
+                if (result.changed) {
+                    markDirtyForDiagram(diagram);
+                }
+                refreshMetadataBadge(activeToothCode);
+                populateMetadataFields();
+            });
+        }
+
+        toothCards.forEach((card) => {
+            const toothCode = (card.dataset.tooth || '').trim();
+            if (!toothCode) {
+                return;
+            }
+            card.addEventListener('click', (event) => {
+                if (event.defaultPrevented) {
+                    return;
+                }
+                const targetElement = event.target instanceof Element ? event.target : null;
+                if (targetElement && targetElement.closest('.tooth-cell')) {
+                    return;
+                }
+                setActiveTooth(toothCode);
+            });
+            card.addEventListener('focusin', () => {
+                setActiveTooth(toothCode);
+            });
+        });
+
         const isLocked = () => false;
 
         const rememberOriginalTabIndex = (element) => {
@@ -859,10 +1238,7 @@ function setupOdontogram() {
                 position: { x: position.x, y: position.y },
             };
             setCellState(ctxDiagram, toothCode, surface, nextState);
-            form.dataset.odontogramDirty = 'true';
-            if (ctxDiagram === 'odontodiagrama') {
-                form.dataset.odontogramBaseDirty = 'true';
-            }
+            markDirtyForDiagram(ctxDiagram);
         };
         const handlePointerDown = (event) => {
             if (currentMode !== 'move' || isLocked()) {
@@ -1265,6 +1641,7 @@ function setupOdontogram() {
                 if (!toothCode || !surface) {
                     return;
                 }
+                setActiveTooth(toothCode);
                 if (isLocked()) {
                     return;
                 }
@@ -1292,10 +1669,8 @@ function setupOdontogram() {
                     if (cellKey) {
                         syncSymbolElement(cellKey, symbolElement);
                     }
-                    form.dataset.odontogramDirty = 'true';
-                    if (diagram === 'odontodiagrama') {
-                        form.dataset.odontogramBaseDirty = 'true';
-                    }
+                    markDirtyForDiagram(diagram);
+                    refreshMetadataBadge(toothCode);
                     return;
                 }
 
@@ -1332,10 +1707,8 @@ function setupOdontogram() {
                     if (cellKey) {
                         syncSymbolElement(cellKey, symbolElement);
                     }
-                    form.dataset.odontogramDirty = 'true';
-                    if (diagram === 'odontodiagrama') {
-                        form.dataset.odontogramBaseDirty = 'true';
-                    }
+                    markDirtyForDiagram(diagram);
+                    refreshMetadataBadge(toothCode);
                     return;
                 }
 
@@ -1363,10 +1736,8 @@ function setupOdontogram() {
                 if (cellKey) {
                     syncSymbolElement(cellKey, symbolElement);
                 }
-                form.dataset.odontogramDirty = 'true';
-                if (diagram === 'odontodiagrama') {
-                    form.dataset.odontogramBaseDirty = 'true';
-                }
+                markDirtyForDiagram(diagram);
+                refreshMetadataBadge(toothCode);
             });
 
             if (cell.tagName !== 'BUTTON') {
@@ -1380,6 +1751,10 @@ function setupOdontogram() {
                     }
                 });
             }
+        });
+
+        toothCardLookup.forEach((_, toothCode) => {
+            refreshMetadataBadge(toothCode);
         });
 
         setWrapperUnlocked();

@@ -23,6 +23,35 @@ if (!$patient) {
 $messages = [];
 $errors = [];
 $profileData = null;
+$profilePhotoPath = trim((string) ($patient['profile_photo_path'] ?? ''));
+$hasProfilePhoto = $profilePhotoPath !== '';
+
+$computeInitial = static function (?string $name): string {
+    if ($name === null) {
+        return '👤';
+    }
+    $trimmed = trim($name);
+    if ($trimmed === '') {
+        return '👤';
+    }
+    if (function_exists('mb_substr') && function_exists('mb_strtoupper')) {
+        return mb_strtoupper(mb_substr($trimmed, 0, 1, 'UTF-8'), 'UTF-8');
+    }
+    return strtoupper(substr($trimmed, 0, 1));
+};
+$patientInitial = $computeInitial($patient['full_name'] ?? '');
+$clampPhotoValue = static function (float $value, float $min, float $max): float {
+    return max($min, min($max, $value));
+};
+$profilePhotoZoom = $clampPhotoValue((float) ($patient['profile_photo_zoom'] ?? 1.0), 1.0, 2.5);
+$profilePhotoOffsetX = $clampPhotoValue((float) ($patient['profile_photo_offset_x'] ?? 0.0), -60.0, 60.0);
+$profilePhotoOffsetY = $clampPhotoValue((float) ($patient['profile_photo_offset_y'] ?? 0.0), -60.0, 60.0);
+$profilePhotoStyle = sprintf(
+    'transform: translate(%0.2f%%, %0.2f%%) scale(%0.3f);',
+    $profilePhotoOffsetX,
+    $profilePhotoOffsetY,
+    $profilePhotoZoom
+);
 
 if (isset($_GET['saved'])) {
     $messages[] = 'Perfil clínico actualizado.';
@@ -128,6 +157,49 @@ require __DIR__ . '/templates/header.php';
 <?php endif; ?>
 
 <section class="rounded-3xl bg-white/95 p-6 shadow-sm shadow-slate-200/60 ring-1 ring-slate-200/70 sm:p-8 space-y-6">
+    <div class="flex flex-col gap-4 rounded-2xl border border-slate-200/80 bg-gradient-to-br from-white to-slate-50/70 p-4 shadow-inner sm:flex-row sm:items-center sm:justify-between">
+        <div class="flex items-center gap-4">
+            <div class="relative h-20 w-20 overflow-hidden rounded-full bg-gradient-to-br from-slate-100 to-slate-200 shadow-inner ring-4 <?= $hasProfilePhoto ? 'ring-brand-100/70' : 'ring-slate-200' ?>">
+                <?php if ($hasProfilePhoto): ?>
+                    <img
+                        src="<?= htmlspecialchars($profilePhotoPath) ?>"
+                        alt="<?= htmlspecialchars('Foto del paciente ' . ($patient['full_name'] ?? '')) ?>"
+                        class="absolute inset-0 h-full w-full object-cover"
+                        style="<?= htmlspecialchars($profilePhotoStyle) ?>"
+                        draggable="false"
+                        loading="lazy"
+                    >
+                <?php else: ?>
+                    <div class="absolute inset-0 flex items-center justify-center text-2xl font-semibold text-slate-500 select-none">
+                        <?= htmlspecialchars($patientInitial) ?>
+                    </div>
+                <?php endif; ?>
+            </div>
+            <div class="space-y-1 text-sm">
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Paciente</p>
+                <h2 class="text-xl font-semibold text-slate-900"><?= htmlspecialchars($patient['full_name'] ?? '') ?></h2>
+                <?php if (!empty($patient['preferred_name'])): ?>
+                    <p class="text-xs text-slate-500">Nombre preferido: <span class="font-semibold text-brand-600"><?= htmlspecialchars($patient['preferred_name']) ?></span></p>
+                <?php endif; ?>
+                <?php if (!empty($patient['document_id'])): ?>
+                    <p class="text-xs text-slate-500">Documento: <span class="font-medium text-slate-700"><?= htmlspecialchars($patient['document_id']) ?></span></p>
+                <?php endif; ?>
+            </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-3 text-xs">
+            <?php if (!empty($patient['phone_primary'])): ?>
+                <a href="tel:<?= htmlspecialchars($patient['phone_primary']) ?>" class="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1.5 font-semibold text-slate-600 transition hover:border-brand-200 hover:text-brand-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500">
+                    📞 <?= htmlspecialchars($patient['phone_primary']) ?>
+                </a>
+            <?php endif; ?>
+            <?php if (!empty($patient['email'])): ?>
+                <a href="mailto:<?= htmlspecialchars($patient['email']) ?>" class="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1.5 font-semibold text-slate-600 transition hover:border-brand-200 hover:text-brand-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500">
+                    ✉️ <?= htmlspecialchars($patient['email']) ?>
+                </a>
+            <?php endif; ?>
+        </div>
+    </div>
+
     <form method="post" class="space-y-6">
         <div class="space-y-1">
             <h2 class="text-2xl font-semibold text-slate-900">Historia clínica</h2>

@@ -158,6 +158,30 @@
     transform: translateY(-1px);
 }
 
+[data-profile-photo-frame] {
+    position: relative;
+    overflow: hidden;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+}
+
+[data-profile-photo-frame].is-empty {
+    cursor: default;
+}
+
+[data-profile-photo-frame].is-dragging {
+    cursor: grabbing;
+}
+
+[data-profile-photo-preview] {
+    transform-origin: center center;
+    transition: transform 0.2s ease;
+    will-change: transform;
+    pointer-events: none;
+    user-select: none;
+}
+
 .odontogram-toolbar .tool-button.mark-option {
     padding-right: 1rem;
     padding-left: 1rem;

@@ -23,6 +23,34 @@ $profilePhotoPath = $patient['profile_photo_path'] ?? null;
 $previousPhotoPath = $profilePhotoPath;
 $manualPhotoPathValue = '';
 $removePhotoRequested = false;
+$defaultPhotoZoom = 1.0;
+$defaultPhotoOffset = 0.0;
+
+if (!function_exists('clamp_photo_value')) {
+    /**
+     * @return float
+     */
+    function clamp_photo_value(float $value, float $min, float $max)
+    {
+        return max($min, min($max, $value));
+    }
+}
+
+$profilePhotoZoom = clamp_photo_value((float) ($patient['profile_photo_zoom'] ?? $defaultPhotoZoom), 1.0, 2.5);
+$profilePhotoOffsetX = clamp_photo_value((float) ($patient['profile_photo_offset_x'] ?? 0.0), -60.0, 60.0);
+$profilePhotoOffsetY = clamp_photo_value((float) ($patient['profile_photo_offset_y'] ?? 0.0), -60.0, 60.0);
+$profilePhotoTransform = sprintf(
+    'transform: translate(%0.2f%%, %0.2f%%) scale(%0.3f);',
+    $profilePhotoOffsetX,
+    $profilePhotoOffsetY,
+    $profilePhotoZoom
+);
+$profilePhotoZoomValue = number_format($profilePhotoZoom, 2, '.', '');
+$profilePhotoOffsetXValue = number_format($profilePhotoOffsetX, 2, '.', '');
+$profilePhotoOffsetYValue = number_format($profilePhotoOffsetY, 2, '.', '');
+$profilePhotoZoomPercent = (int) round($profilePhotoZoom * 100);
+$profilePhotoOffsetXDisplay = number_format($profilePhotoOffsetX, 1, '.', '');
+$profilePhotoOffsetYDisplay = number_format($profilePhotoOffsetY, 1, '.', '');
 
 function calculateAge(?string $birthDate): ?int
 {
@@ -71,11 +99,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     ];
     $manualPhotoPathInput = trim((string) post('profile_photo_copy_path'));
     $manualPhotoPathValue = $manualPhotoPathInput;
+    $zoomRaw = post('profile_photo_zoom', null);
+    if ($zoomRaw !== null && $zoomRaw !== '') {
+        $profilePhotoZoom = clamp_photo_value((float) $zoomRaw, 1.0, 2.5);
+    }
+    $offsetXRaw = post('profile_photo_offset_x', null);
+    if ($offsetXRaw !== null && $offsetXRaw !== '') {
+        $profilePhotoOffsetX = clamp_photo_value((float) $offsetXRaw, -60.0, 60.0);
+    }
+    $offsetYRaw = post('profile_photo_offset_y', null);
+    if ($offsetYRaw !== null && $offsetYRaw !== '') {
+        $profilePhotoOffsetY = clamp_photo_value((float) $offsetYRaw, -60.0, 60.0);
+    }
     $pathsToDelete = [];
     $removePhotoRequested = (string) post('remove_photo', '0') === '1';
     if ($removePhotoRequested && $profilePhotoPath) {
         $pathsToDelete[] = $profilePhotoPath;
         $profilePhotoPath = null;
+    }
+    if ($removePhotoRequested) {
+        $profilePhotoZoom = $defaultPhotoZoom;
+        $profilePhotoOffsetX = $defaultPhotoOffset;
+        $profilePhotoOffsetY = $defaultPhotoOffset;
     }
 
     $fullName = capitalizeInitial(post('full_name'));
@@ -177,6 +222,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $pathsToDelete[] = $previousPhotoPath;
                 }
                 $profilePhotoPath = $newRelativePath;
+                $removePhotoRequested = false;
             }
         }
     }
@@ -247,13 +293,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
                         $profilePhotoPath = $newRelativePath;
                         $manualPhotoPathValue = '';
+                        $removePhotoRequested = false;
                     }
                 }
             }
         }
     }
 
+    if ($profilePhotoPath === null) {
+        $profilePhotoZoom = $defaultPhotoZoom;
+        $profilePhotoOffsetX = $defaultPhotoOffset;
+        $profilePhotoOffsetY = $defaultPhotoOffset;
+    }
+
     $payload['profile_photo_path'] = $profilePhotoPath;
+    $payload['profile_photo_zoom'] = $profilePhotoZoom;
+    $payload['profile_photo_offset_x'] = $profilePhotoOffsetX;
+    $payload['profile_photo_offset_y'] = $profilePhotoOffsetY;
+
+    $profilePhotoTransform = sprintf(
+        'transform: translate(%0.2f%%, %0.2f%%) scale(%0.3f);',
+        $profilePhotoOffsetX,
+        $profilePhotoOffsetY,
+        $profilePhotoZoom
+    );
+    $profilePhotoZoomValue = number_format($profilePhotoZoom, 2, '.', '');
+    $profilePhotoOffsetXValue = number_format($profilePhotoOffsetX, 2, '.', '');
+    $profilePhotoOffsetYValue = number_format($profilePhotoOffsetY, 2, '.', '');
+    $profilePhotoZoomPercent = (int) round($profilePhotoZoom * 100);
+    $profilePhotoOffsetXDisplay = number_format($profilePhotoOffsetX, 1, '.', '');
+    $profilePhotoOffsetYDisplay = number_format($profilePhotoOffsetY, 1, '.', '');
 
     if (empty($errors)) {
         $redirectTarget = '';
@@ -287,10 +356,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $patient = array_merge($patient ?? [], $payload);
         $profilePhotoPath = $patient['profile_photo_path'] ?? null;
+        $profilePhotoZoom = clamp_photo_value((float) ($patient['profile_photo_zoom'] ?? $defaultPhotoZoom), 1.0, 2.5);
+        $profilePhotoOffsetX = clamp_photo_value((float) ($patient['profile_photo_offset_x'] ?? $defaultPhotoOffset), -60.0, 60.0);
+        $profilePhotoOffsetY = clamp_photo_value((float) ($patient['profile_photo_offset_y'] ?? $defaultPhotoOffset), -60.0, 60.0);
+        $profilePhotoTransform = sprintf(
+            'transform: translate(%0.2f%%, %0.2f%%) scale(%0.3f);',
+            $profilePhotoOffsetX,
+            $profilePhotoOffsetY,
+            $profilePhotoZoom
+        );
+        $profilePhotoZoomValue = number_format($profilePhotoZoom, 2, '.', '');
+        $profilePhotoOffsetXValue = number_format($profilePhotoOffsetX, 2, '.', '');
+        $profilePhotoOffsetYValue = number_format($profilePhotoOffsetY, 2, '.', '');
+        $profilePhotoZoomPercent = (int) round($profilePhotoZoom * 100);
+        $profilePhotoOffsetXDisplay = number_format($profilePhotoOffsetX, 1, '.', '');
+        $profilePhotoOffsetYDisplay = number_format($profilePhotoOffsetY, 1, '.', '');
     }
 } else {
     $manualPhotoPathValue = '';
 }
+
+$hasProfilePhoto = !empty($profilePhotoPath);
 
 $pageTitle = $patientId ? 'Editar paciente' : 'Nuevo paciente';
 require __DIR__ . '/templates/header.php';
@@ -325,18 +411,19 @@ require __DIR__ . '/templates/header.php';
         <fieldset class="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4 sm:p-6">
             <legend class="px-3 text-xs font-semibold uppercase tracking-wide text-brand-700">Identificación</legend>
             <div class="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <?php $hasProfilePhoto = !empty($profilePhotoPath); ?>
                 <div class="md:col-span-2 lg:col-span-4 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-inner sm:flex-row sm:items-center" data-profile-photo-field>
                     <div class="flex items-center justify-center">
-                        <div class="relative">
+                        <div class="relative h-24 w-24 overflow-hidden rounded-full bg-gradient-to-br from-slate-100 to-slate-200 shadow-inner ring-2 <?= $hasProfilePhoto ? 'ring-brand-100/80' : 'ring-slate-200/90 is-empty' ?>" data-profile-photo-frame>
                             <img
                                 src="<?= htmlspecialchars($profilePhotoPath ?? '') ?>"
                                 alt="<?= htmlspecialchars('Foto del paciente ' . ($patient['full_name'] ?? '')) ?>"
-                                class="h-24 w-24 rounded-full object-cover shadow-md ring-2 ring-brand-100/80 <?= $hasProfilePhoto ? '' : 'hidden' ?>"
+                                class="absolute inset-0 h-full w-full object-cover <?= $hasProfilePhoto ? '' : 'hidden' ?>"
+                                style="<?= htmlspecialchars($profilePhotoTransform) ?>"
                                 data-profile-photo-preview
                                 data-initial-src="<?= htmlspecialchars($profilePhotoPath ?? '') ?>"
+                                draggable="false"
                             >
-                            <div class="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-slate-100 to-slate-200 text-3xl text-slate-500 shadow-inner <?= $hasProfilePhoto ? 'hidden' : '' ?>" data-profile-photo-placeholder>
+                            <div class="absolute inset-0 flex items-center justify-center text-3xl text-slate-500 <?= $hasProfilePhoto ? 'hidden' : '' ?>" data-profile-photo-placeholder>
                                 <span>👤</span>
                             </div>
                         </div>
@@ -353,6 +440,29 @@ require __DIR__ . '/templates/header.php';
                                 <span aria-hidden="true">✖️</span>
                                 Quitar foto
                             </button>
+                        </div>
+                        <div class="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3 space-y-3" data-profile-photo-adjustments>
+                            <div class="space-y-1">
+                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Ajustar encuadre</p>
+                                <p class="text-[11px] text-slate-500">Arrastra la imagen o usa los controles para centrar el rostro.</p>
+                            </div>
+                            <div class="grid gap-3 sm:grid-cols-3">
+                                <label class="flex flex-col gap-1 text-xs font-medium text-slate-600 sm:col-span-3">
+                                    <span class="font-semibold text-slate-700">Zoom</span>
+                                    <input type="range" name="profile_photo_zoom" min="1" max="2.5" step="0.01" value="<?= htmlspecialchars($profilePhotoZoomValue) ?>" class="h-2 w-full cursor-pointer accent-brand-500" data-profile-photo-zoom data-default-value="<?= $defaultPhotoZoom ?>">
+                                    <span class="text-[11px] text-slate-500">Ampliación: <span data-profile-photo-zoom-display><?= htmlspecialchars((string) $profilePhotoZoomPercent) ?></span>%</span>
+                                </label>
+                                <label class="flex flex-col gap-1 text-xs font-medium text-slate-600">
+                                    <span class="font-semibold text-slate-700">Horizontal</span>
+                                    <input type="range" name="profile_photo_offset_x" min="-60" max="60" step="0.5" value="<?= htmlspecialchars($profilePhotoOffsetXValue) ?>" class="h-2 w-full cursor-pointer accent-brand-500" data-profile-photo-offset-x data-default-value="<?= $defaultPhotoOffset ?>">
+                                    <span class="text-[11px] text-slate-500">Desplazamiento: <span data-profile-photo-offset-x-display><?= htmlspecialchars($profilePhotoOffsetXDisplay) ?></span>%</span>
+                                </label>
+                                <label class="flex flex-col gap-1 text-xs font-medium text-slate-600">
+                                    <span class="font-semibold text-slate-700">Vertical</span>
+                                    <input type="range" name="profile_photo_offset_y" min="-60" max="60" step="0.5" value="<?= htmlspecialchars($profilePhotoOffsetYValue) ?>" class="h-2 w-full cursor-pointer accent-brand-500" data-profile-photo-offset-y data-default-value="<?= $defaultPhotoOffset ?>">
+                                    <span class="text-[11px] text-slate-500">Desplazamiento: <span data-profile-photo-offset-y-display><?= htmlspecialchars($profilePhotoOffsetYDisplay) ?></span>%</span>
+                                </label>
+                            </div>
                         </div>
                         <label class="flex flex-col gap-2">
                             <span class="font-medium text-slate-700">Copiar imagen desde una ruta del sistema</span>
@@ -587,14 +697,117 @@ document.addEventListener('DOMContentLoaded', function () {
             var removeFlagInput = profileField.querySelector('[data-profile-photo-remove-flag]');
             var removeButton = profileField.querySelector('[data-profile-photo-remove]');
             var manualInput = profileField.querySelector('[data-profile-photo-manual]');
+            var frame = profileField.querySelector('[data-profile-photo-frame]');
+            var zoomInput = profileField.querySelector('[data-profile-photo-zoom]');
+            var offsetXInput = profileField.querySelector('[data-profile-photo-offset-x]');
+            var offsetYInput = profileField.querySelector('[data-profile-photo-offset-y]');
+            var zoomDisplay = profileField.querySelector('[data-profile-photo-zoom-display]');
+            var offsetXDisplay = profileField.querySelector('[data-profile-photo-offset-x-display]');
+            var offsetYDisplay = profileField.querySelector('[data-profile-photo-offset-y-display]');
+            var adjustmentsBlock = profileField.querySelector('[data-profile-photo-adjustments]');
             var initialSrc = preview && preview.dataset.initialSrc ? preview.dataset.initialSrc : '';
             var currentObjectUrl = null;
+            var dragPointerId = null;
+            var isDragging = false;
+            var dragStartX = 0;
+            var dragStartY = 0;
+            var dragStartOffsetX = 0;
+            var dragStartOffsetY = 0;
+            var defaults = {
+                zoom: zoomInput ? parseFloat(zoomInput.dataset.defaultValue || '1') || 1 : 1,
+                offsetX: offsetXInput ? parseFloat(offsetXInput.dataset.defaultValue || '0') || 0 : 0,
+                offsetY: offsetYInput ? parseFloat(offsetYInput.dataset.defaultValue || '0') || 0 : 0
+            };
+
+            var clamp = function (value, min, max) {
+                if (typeof value !== 'number' || !isFinite(value)) {
+                    return min;
+                }
+                return Math.min(Math.max(value, min), max);
+            };
 
             var resetObjectUrl = function () {
                 if (currentObjectUrl) {
                     URL.revokeObjectURL(currentObjectUrl);
                     currentObjectUrl = null;
                 }
+            };
+
+            var updateDisplays = function (zoom, offsetX, offsetY) {
+                if (zoomDisplay) {
+                    zoomDisplay.textContent = Math.round(zoom * 100);
+                }
+                if (offsetXDisplay) {
+                    offsetXDisplay.textContent = offsetX.toFixed(1);
+                }
+                if (offsetYDisplay) {
+                    offsetYDisplay.textContent = offsetY.toFixed(1);
+                }
+            };
+
+            var applyTransform = function () {
+                if (!preview) {
+                    return;
+                }
+                var zoom = zoomInput ? parseFloat(zoomInput.value) : defaults.zoom;
+                var offsetX = offsetXInput ? parseFloat(offsetXInput.value) : defaults.offsetX;
+                var offsetY = offsetYInput ? parseFloat(offsetYInput.value) : defaults.offsetY;
+                zoom = clamp(zoom, 1, 2.5);
+                offsetX = clamp(offsetX, -60, 60);
+                offsetY = clamp(offsetY, -60, 60);
+                if (zoomInput) {
+                    zoomInput.value = zoom.toFixed(2);
+                }
+                if (offsetXInput) {
+                    offsetXInput.value = offsetX.toFixed(2);
+                }
+                if (offsetYInput) {
+                    offsetYInput.value = offsetY.toFixed(2);
+                }
+                preview.style.transform = 'translate(' + offsetX + '%, ' + offsetY + '%) scale(' + zoom + ')';
+                updateDisplays(zoom, offsetX, offsetY);
+            };
+
+            var setControlsDisabled = function (disabled) {
+                [zoomInput, offsetXInput, offsetYInput].forEach(function (input) {
+                    if (input) {
+                        input.disabled = disabled;
+                    }
+                });
+                if (adjustmentsBlock) {
+                    adjustmentsBlock.classList.toggle('opacity-60', disabled);
+                    adjustmentsBlock.classList.toggle('pointer-events-none', disabled);
+                }
+                if (frame) {
+                    frame.classList.toggle('is-empty', disabled);
+                    if (disabled) {
+                        frame.classList.remove('is-dragging');
+                        if (dragPointerId !== null) {
+                            try {
+                                frame.releasePointerCapture(dragPointerId);
+                            } catch (error) {
+                                /* ignore */
+                            }
+                        }
+                    }
+                }
+                if (disabled) {
+                    isDragging = false;
+                    dragPointerId = null;
+                }
+            };
+
+            var resetToDefaults = function () {
+                if (zoomInput) {
+                    zoomInput.value = defaults.zoom.toFixed(2);
+                }
+                if (offsetXInput) {
+                    offsetXInput.value = defaults.offsetX.toFixed(2);
+                }
+                if (offsetYInput) {
+                    offsetYInput.value = defaults.offsetY.toFixed(2);
+                }
+                applyTransform();
             };
 
             var showPreview = function (src) {
@@ -609,6 +822,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (removeButton) {
                     removeButton.classList.remove('hidden');
                 }
+                setControlsDisabled(false);
+                applyTransform();
                 if (removeFlagInput) {
                     removeFlagInput.value = '0';
                 }
@@ -624,10 +839,112 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (removeButton) {
                     removeButton.classList.add('hidden');
                 }
+                resetToDefaults();
+                setControlsDisabled(true);
                 if (markRemovalFlag && removeFlagInput) {
                     removeFlagInput.value = '1';
+                } else if (!markRemovalFlag && removeFlagInput) {
+                    removeFlagInput.value = '0';
                 }
             };
+
+            var hasInitialPhoto = preview && !preview.classList.contains('hidden') && preview.getAttribute('src');
+            if (hasInitialPhoto) {
+                setControlsDisabled(false);
+                applyTransform();
+            } else {
+                setControlsDisabled(true);
+                updateDisplays(defaults.zoom, defaults.offsetX, defaults.offsetY);
+            }
+
+            var beginDrag = function (event) {
+                if (!frame || !preview || preview.classList.contains('hidden')) {
+                    return;
+                }
+                isDragging = true;
+                dragPointerId = event.pointerId;
+                dragStartX = event.clientX;
+                dragStartY = event.clientY;
+                dragStartOffsetX = offsetXInput ? parseFloat(offsetXInput.value) || defaults.offsetX : defaults.offsetX;
+                dragStartOffsetY = offsetYInput ? parseFloat(offsetYInput.value) || defaults.offsetY : defaults.offsetY;
+                frame.classList.add('is-dragging');
+                frame.setPointerCapture(dragPointerId);
+                event.preventDefault();
+            };
+
+            var continueDrag = function (event) {
+                if (!isDragging || !frame) {
+                    return;
+                }
+                var rect = frame.getBoundingClientRect();
+                if (!rect.width || !rect.height) {
+                    return;
+                }
+                var deltaX = ((event.clientX - dragStartX) / rect.width) * 100;
+                var deltaY = ((event.clientY - dragStartY) / rect.height) * 100;
+                var newOffsetX = clamp(dragStartOffsetX + deltaX, -60, 60);
+                var newOffsetY = clamp(dragStartOffsetY + deltaY, -60, 60);
+                if (offsetXInput) {
+                    offsetXInput.value = newOffsetX.toFixed(2);
+                }
+                if (offsetYInput) {
+                    offsetYInput.value = newOffsetY.toFixed(2);
+                }
+                if (removeFlagInput) {
+                    removeFlagInput.value = '0';
+                }
+                applyTransform();
+            };
+
+            var endDrag = function () {
+                if (!isDragging || !frame) {
+                    return;
+                }
+                isDragging = false;
+                if (dragPointerId !== null) {
+                    try {
+                        frame.releasePointerCapture(dragPointerId);
+                    } catch (error) {
+                        /* ignore */
+                    }
+                }
+                dragPointerId = null;
+                frame.classList.remove('is-dragging');
+            };
+
+            if (frame) {
+                frame.addEventListener('pointerdown', beginDrag);
+                frame.addEventListener('pointermove', continueDrag);
+                frame.addEventListener('pointerup', endDrag);
+                frame.addEventListener('pointercancel', endDrag);
+            }
+
+            if (zoomInput) {
+                zoomInput.addEventListener('input', function () {
+                    if (removeFlagInput && preview && !preview.classList.contains('hidden')) {
+                        removeFlagInput.value = '0';
+                    }
+                    applyTransform();
+                });
+            }
+
+            if (offsetXInput) {
+                offsetXInput.addEventListener('input', function () {
+                    if (removeFlagInput && preview && !preview.classList.contains('hidden')) {
+                        removeFlagInput.value = '0';
+                    }
+                    applyTransform();
+                });
+            }
+
+            if (offsetYInput) {
+                offsetYInput.addEventListener('input', function () {
+                    if (removeFlagInput && preview && !preview.classList.contains('hidden')) {
+                        removeFlagInput.value = '0';
+                    }
+                    applyTransform();
+                });
+            }
 
             if (fileInput) {
                 fileInput.addEventListener('change', function () {
@@ -635,6 +952,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     var file = fileInput.files && fileInput.files[0];
                     if (file) {
                         currentObjectUrl = URL.createObjectURL(file);
+                        if (manualInput) {
+                            manualInput.value = '';
+                        }
+                        resetToDefaults();
                         showPreview(currentObjectUrl);
                     } else if (initialSrc) {
                         showPreview(initialSrc);
@@ -647,31 +968,13 @@ document.addEventListener('DOMContentLoaded', function () {
             if (removeButton) {
                 removeButton.addEventListener('click', function () {
                     resetObjectUrl();
-                    var hasNewFile = fileInput && fileInput.files && fileInput.files.length > 0;
-                    if (hasNewFile && initialSrc) {
-                        fileInput.value = '';
-                        showPreview(initialSrc);
-                        return;
-                    }
-
-                    var manualHasValue = manualInput && manualInput.value.trim() !== '';
-
-                    if (manualHasValue && initialSrc) {
-                        manualInput.value = '';
-                        showPreview(initialSrc);
-                        return;
-                    }
-
                     if (fileInput) {
                         fileInput.value = '';
                     }
                     if (manualInput) {
                         manualInput.value = '';
                     }
-
-                    if (initialSrc) {
-                        initialSrc = '';
-                    }
+                    initialSrc = '';
                     showPlaceholder(true);
                 });
             }

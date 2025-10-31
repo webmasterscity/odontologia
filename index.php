@@ -180,6 +180,20 @@ $avatarInitial = static function (?string $name): string {
     }
     return strtoupper(substr($trimmed, 0, 1));
 };
+$clampPhotoValue = static function (float $value, float $min, float $max): float {
+    return max($min, min($max, $value));
+};
+$buildPhotoTransform = static function (array $row) use ($clampPhotoValue): string {
+    $zoom = $clampPhotoValue((float) ($row['profile_photo_zoom'] ?? 1.0), 1.0, 2.5);
+    $offsetX = $clampPhotoValue((float) ($row['profile_photo_offset_x'] ?? 0.0), -60.0, 60.0);
+    $offsetY = $clampPhotoValue((float) ($row['profile_photo_offset_y'] ?? 0.0), -60.0, 60.0);
+    return sprintf(
+        'transform: translate(%0.2f%%, %0.2f%%) scale(%0.3f);',
+        $offsetX,
+        $offsetY,
+        $zoom
+    );
+};
 
 $pageTitle = 'Pacientes · Consultorio Odontológico';
 require __DIR__ . '/templates/header.php';
@@ -293,17 +307,27 @@ require __DIR__ . '/templates/header.php';
                         $profilePhotoPath = trim((string) ($patient['profile_photo_path'] ?? ''));
                         $hasProfilePhoto = $profilePhotoPath !== '';
                         $avatarInitialValue = $avatarInitial($patient['full_name'] ?? '');
+                        $profilePhotoStyle = $buildPhotoTransform($patient);
                         ?>
                         <tr class="transition hover:bg-slate-50/80">
                             <td class="px-4 py-4">
                                 <div class="flex items-center gap-3">
-                                    <?php if ($hasProfilePhoto): ?>
-                                        <img src="<?= htmlspecialchars($profilePhotoPath) ?>" alt="<?= htmlspecialchars('Foto de ' . ($patient['full_name'] ?? '')) ?>" class="h-11 w-11 rounded-full object-cover shadow-sm ring-2 ring-brand-100/80" loading="lazy">
-                                    <?php else: ?>
-                                        <div class="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-slate-100 to-slate-200 text-sm font-semibold text-slate-600 ring-1 ring-slate-200">
-                                            <?= htmlspecialchars($avatarInitialValue) ?>
-                                        </div>
-                                    <?php endif; ?>
+                                    <div class="relative h-11 w-11 overflow-hidden rounded-full bg-gradient-to-br from-slate-100 to-slate-200 shadow-inner ring-2 <?= $hasProfilePhoto ? 'ring-brand-100/80' : 'ring-slate-200' ?>">
+                                        <?php if ($hasProfilePhoto): ?>
+                                            <img
+                                                src="<?= htmlspecialchars($profilePhotoPath) ?>"
+                                                alt="<?= htmlspecialchars('Foto de ' . ($patient['full_name'] ?? '')) ?>"
+                                                class="absolute inset-0 h-full w-full object-cover"
+                                                style="<?= htmlspecialchars($profilePhotoStyle) ?>"
+                                                draggable="false"
+                                                loading="lazy"
+                                            >
+                                        <?php else: ?>
+                                            <div class="absolute inset-0 flex items-center justify-center text-sm font-semibold text-slate-600 select-none">
+                                                <?= htmlspecialchars($avatarInitialValue) ?>
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
                                     <div class="space-y-1">
                                         <p class="font-semibold text-slate-900"><?= htmlspecialchars($patient['full_name']) ?></p>
                                         <?php if (!empty($patient['preferred_name'])): ?>

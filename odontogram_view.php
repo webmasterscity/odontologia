@@ -26,7 +26,10 @@ $patientStmt = $pdo->prepare(
         email,
         address,
         created_at,
-        profile_photo_path
+        profile_photo_path,
+        profile_photo_zoom,
+        profile_photo_offset_x,
+        profile_photo_offset_y
      FROM patients
      WHERE id = :id'
 );
@@ -37,6 +40,19 @@ if (!$patient) {
     echo 'Paciente no encontrado.';
     exit;
 }
+$clampPhotoValue = static function (float $value, float $min, float $max): float {
+    return max($min, min($max, $value));
+};
+$hasProfilePhoto = !empty($patient['profile_photo_path']);
+$profilePhotoZoom = $clampPhotoValue((float) ($patient['profile_photo_zoom'] ?? 1.0), 1.0, 2.5);
+$profilePhotoOffsetX = $clampPhotoValue((float) ($patient['profile_photo_offset_x'] ?? 0.0), -60.0, 60.0);
+$profilePhotoOffsetY = $clampPhotoValue((float) ($patient['profile_photo_offset_y'] ?? 0.0), -60.0, 60.0);
+$profilePhotoStyle = sprintf(
+    'transform: translate(%0.2f%%, %0.2f%%) scale(%0.3f);',
+    $profilePhotoOffsetX,
+    $profilePhotoOffsetY,
+    $profilePhotoZoom
+);
 
 $snapshotStmt = $pdo->prepare('SELECT id, payload, is_blank, created_at FROM odontogram_snapshots WHERE patient_id = :patient_id AND id = :snapshot_id');
 $snapshotStmt->execute([
@@ -739,13 +755,22 @@ require __DIR__ . '/templates/header.php';
     </div>
     <div class="grid gap-6 lg:grid-cols-[minmax(0,280px)_1fr_minmax(0,320px)]">
         <div class="flex flex-col items-center gap-4 rounded-2xl border border-slate-200/80 bg-gradient-to-br from-white to-slate-50/50 p-6 text-center shadow-md">
-            <?php if (!empty($patient['profile_photo_path'])): ?>
-                <img src="<?= htmlspecialchars($patient['profile_photo_path']) ?>" alt="<?= htmlspecialchars('Foto del paciente ' . ($patient['full_name'] ?? '')) ?>" class="h-28 w-28 rounded-full object-cover shadow-lg ring-4 ring-brand-100/60">
-            <?php else: ?>
-                <div class="flex h-28 w-28 items-center justify-center rounded-full bg-gradient-to-br from-slate-100 to-slate-200 text-4xl text-slate-400 shadow-inner">
-                    <span>👤</span>
-                </div>
-            <?php endif; ?>
+            <div class="relative h-28 w-28 overflow-hidden rounded-full bg-gradient-to-br from-slate-100 to-slate-200 shadow-inner ring-4 <?= $hasProfilePhoto ? 'ring-brand-100/60' : 'ring-slate-200/80' ?>">
+                <?php if ($hasProfilePhoto): ?>
+                    <img
+                        src="<?= htmlspecialchars($patient['profile_photo_path']) ?>"
+                        alt="<?= htmlspecialchars('Foto del paciente ' . ($patient['full_name'] ?? '')) ?>"
+                        class="absolute inset-0 h-full w-full object-cover"
+                        style="<?= htmlspecialchars($profilePhotoStyle) ?>"
+                        draggable="false"
+                        loading="lazy"
+                    >
+                <?php else: ?>
+                    <div class="absolute inset-0 flex items-center justify-center text-4xl text-slate-400 select-none">
+                        <span>👤</span>
+                    </div>
+                <?php endif; ?>
+            </div>
             <div class="space-y-1 text-sm w-full">
                 <p class="text-base font-bold text-slate-900 truncate"><?= htmlspecialchars($patient['full_name'] ?? '') ?></p>
                 <?php if (!empty($patient['preferred_name'])): ?>
