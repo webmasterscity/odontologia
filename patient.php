@@ -1930,7 +1930,7 @@ if (!empty($patient['registered_at'])) {
                             <span><?= $teethCount ?></span>
                         </p>
                         <?php if ($teethCount > 0): ?>
-                            <div class="overflow-x-auto">
+                            <div class="overflow-x-auto max-h-96 overflow-y-auto">
                                 <table class="min-w-full table-auto divide-y divide-slate-200 text-left text-xs">
                                     <thead class="bg-slate-50">
                                         <tr>

@@ -834,6 +834,44 @@ require __DIR__ . '/templates/header.php';
                     </dt>
                     <dd class="text-amber-900 text-sm leading-relaxed">Revisa los trazos, marcas y colores registrados. Puedes añadir nuevos hallazgos o ajustar los existentes antes de guardar.</dd>
                 </div>
+                <?php
+                $registeredTeeth = array_filter($teethPayload, function($tooth) {
+                    return !empty($tooth['surfaces']) || !empty($tooth['status']) || !empty($tooth['notes']);
+                });
+                if (!empty($registeredTeeth)):
+                ?>
+                <div class="sm:col-span-2 rounded-xl border border-blue-100 bg-blue-50/50 p-4 shadow-sm">
+                    <dt class="font-semibold text-blue-800 text-xs uppercase tracking-wide mb-3">Piezas registradas: <?= count($registeredTeeth) ?></dt>
+                    <dd class="space-y-2 max-h-64 overflow-y-auto pr-2">
+                        <?php foreach ($registeredTeeth as $toothCode => $toothData): ?>
+                            <div class="text-xs border-l-2 border-blue-400 pl-3 py-1">
+                                <div class="font-bold text-blue-900">Pieza <?= htmlspecialchars((string)$toothCode) ?></div>
+                                <?php if (!empty($toothData['status'])): ?>
+                                    <div class="text-blue-800 mt-0.5">
+                                        <span class="font-medium">Estado:</span> <?= htmlspecialchars($odontogramStatuses[$toothData['status']] ?? $toothData['status']) ?>
+                                    </div>
+                                <?php endif; ?>
+                                <?php if (!empty($toothData['surfaces'])): ?>
+                                    <?php $surfaceDescriptions = $describeSurfaces($toothData['surfaces']); ?>
+                                    <?php if (!empty($surfaceDescriptions)): ?>
+                                        <div class="text-blue-800 mt-0.5">
+                                            <span class="font-medium">Superficies:</span>
+                                            <?php foreach ($surfaceDescriptions as $desc): ?>
+                                                <div class="ml-2">• <?= htmlspecialchars($desc) ?></div>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    <?php endif; ?>
+                                <?php endif; ?>
+                                <?php if (!empty($toothData['notes'])): ?>
+                                    <div class="text-blue-700 mt-0.5 italic">
+                                        <span class="font-medium not-italic">Notas:</span> <?= htmlspecialchars($toothData['notes']) ?>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                        <?php endforeach; ?>
+                    </dd>
+                </div>
+                <?php endif; ?>
             </dl>
         </div>
         <div class="rounded-2xl border border-slate-200/80 bg-gradient-to-br from-white to-blue-50/30 p-6 shadow-md space-y-4">

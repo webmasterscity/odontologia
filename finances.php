@@ -490,7 +490,7 @@ require __DIR__ . '/templates/header.php';
             </div>
         </form>
     </div>
-    <div class="lg:col-span-2 rounded-3xl bg-white/95 p-6 shadow-sm shadow-slate-200/60 ring-1 ring-slate-200/70 space-y-6 overflow-hidden">
+    <div class="lg:col-span-2 rounded-3xl bg-white/95 p-6 shadow-sm shadow-slate-200/60 ring-1 ring-slate-200/70 space-y-6">
         <div class="flex items-center justify-between">
             <div>
                 <h2 class="text-xl font-semibold text-slate-900">Movimientos del mes</h2>
@@ -505,7 +505,7 @@ require __DIR__ . '/templates/header.php';
                 Aún no hay movimientos registrados en este mes.
             </div>
         <?php else: ?>
-            <div class="overflow-x-auto">
+            <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
                 <table class="min-w-full divide-y divide-slate-200 text-sm">
                     <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                         <tr>
