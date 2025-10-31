@@ -411,64 +411,112 @@ require __DIR__ . '/templates/header.php';
         <fieldset class="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4 sm:p-6">
             <legend class="px-3 text-xs font-semibold uppercase tracking-wide text-brand-700">Identificación</legend>
             <div class="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <div class="md:col-span-2 lg:col-span-4 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-inner sm:flex-row sm:items-center" data-profile-photo-field>
-                    <div class="flex items-center justify-center">
-                        <div class="relative h-24 w-24 overflow-hidden rounded-full bg-gradient-to-br from-slate-100 to-slate-200 shadow-inner ring-2 <?= $hasProfilePhoto ? 'ring-brand-100/80' : 'ring-slate-200/90 is-empty' ?>" data-profile-photo-frame>
-                            <img
-                                src="<?= htmlspecialchars($profilePhotoPath ?? '') ?>"
-                                alt="<?= htmlspecialchars('Foto del paciente ' . ($patient['full_name'] ?? '')) ?>"
-                                class="absolute inset-0 h-full w-full object-cover <?= $hasProfilePhoto ? '' : 'hidden' ?>"
-                                style="<?= htmlspecialchars($profilePhotoTransform) ?>"
-                                data-profile-photo-preview
-                                data-initial-src="<?= htmlspecialchars($profilePhotoPath ?? '') ?>"
-                                draggable="false"
-                            >
-                            <div class="absolute inset-0 flex items-center justify-center text-3xl text-slate-500 <?= $hasProfilePhoto ? 'hidden' : '' ?>" data-profile-photo-placeholder>
-                                <span>👤</span>
+                <div class="md:col-span-2 lg:col-span-4 rounded-3xl border border-brand-100/50 bg-gradient-to-br from-white to-slate-50/80 p-6 shadow-lg" data-profile-photo-field>
+                    <div class="flex flex-col gap-6 lg:flex-row">
+                        <!-- Vista previa de la foto -->
+                        <div class="flex flex-col items-center gap-4">
+                            <div class="relative h-40 w-40 overflow-hidden rounded-3xl bg-gradient-to-br from-brand-50 to-slate-100 shadow-lg ring-4 <?= $hasProfilePhoto ? 'ring-brand-200/60' : 'ring-slate-200/50 is-empty' ?> transition-all duration-300" data-profile-photo-frame>
+                                <img
+                                    src="<?= htmlspecialchars($profilePhotoPath ?? '') ?>"
+                                    alt="<?= htmlspecialchars('Foto del paciente ' . ($patient['full_name'] ?? '')) ?>"
+                                    class="absolute inset-0 h-full w-full object-cover <?= $hasProfilePhoto ? '' : 'hidden' ?>"
+                                    style="<?= htmlspecialchars($profilePhotoTransform) ?>"
+                                    data-profile-photo-preview
+                                    data-initial-src="<?= htmlspecialchars($profilePhotoPath ?? '') ?>"
+                                    draggable="false"
+                                >
+                                <div class="absolute inset-0 flex items-center justify-center text-6xl text-slate-400/60 <?= $hasProfilePhoto ? 'hidden' : '' ?>" data-profile-photo-placeholder>
+                                    <svg class="h-20 w-20 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                                    </svg>
+                                </div>
                             </div>
-                        </div>
-                    </div>
-                    <div class="flex-1 text-sm text-slate-600 space-y-4">
-                        <input type="hidden" name="remove_photo" value="<?= $removePhotoRequested ? '1' : '0' ?>" data-profile-photo-remove-flag>
-                        <label class="flex flex-col gap-2">
-                            <span class="font-medium text-slate-700">Foto de perfil</span>
-                            <input type="file" name="profile_photo" accept="image/*" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400" data-profile-photo-input>
-                            <span class="text-xs text-slate-500">Opcional. Formatos aceptados: JPG, PNG o WEBP (máx. 5&nbsp;MB). Se mostrará una vista previa al seleccionar el archivo.</span>
-                        </label>
-                        <div class="flex flex-wrap items-center gap-2">
-                            <button type="button" class="inline-flex items-center justify-center gap-1 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-rose-200 hover:text-rose-600 <?= $hasProfilePhoto ? '' : 'hidden' ?>" data-profile-photo-remove>
-                                <span aria-hidden="true">✖️</span>
-                                Quitar foto
+                            <button type="button" class="inline-flex items-center justify-center gap-2 rounded-full border-2 border-rose-200 bg-white px-4 py-2 text-xs font-semibold text-rose-600 shadow-sm transition hover:bg-rose-50 hover:border-rose-300 hover:-translate-y-0.5 <?= $hasProfilePhoto ? '' : 'hidden' ?>" data-profile-photo-remove>
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                </svg>
+                                Eliminar foto
                             </button>
                         </div>
-                        <div class="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3 space-y-3" data-profile-photo-adjustments>
-                            <div class="space-y-1">
-                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Ajustar encuadre</p>
-                                <p class="text-[11px] text-slate-500">Arrastra la imagen o usa los controles para centrar el rostro.</p>
-                            </div>
-                            <div class="grid gap-3 sm:grid-cols-3">
-                                <label class="flex flex-col gap-1 text-xs font-medium text-slate-600 sm:col-span-3">
-                                    <span class="font-semibold text-slate-700">Zoom</span>
-                                    <input type="range" name="profile_photo_zoom" min="1" max="2.5" step="0.01" value="<?= htmlspecialchars($profilePhotoZoomValue) ?>" class="h-2 w-full cursor-pointer accent-brand-500" data-profile-photo-zoom data-default-value="<?= $defaultPhotoZoom ?>">
-                                    <span class="text-[11px] text-slate-500">Ampliación: <span data-profile-photo-zoom-display><?= htmlspecialchars((string) $profilePhotoZoomPercent) ?></span>%</span>
-                                </label>
-                                <label class="flex flex-col gap-1 text-xs font-medium text-slate-600">
-                                    <span class="font-semibold text-slate-700">Horizontal</span>
-                                    <input type="range" name="profile_photo_offset_x" min="-60" max="60" step="0.5" value="<?= htmlspecialchars($profilePhotoOffsetXValue) ?>" class="h-2 w-full cursor-pointer accent-brand-500" data-profile-photo-offset-x data-default-value="<?= $defaultPhotoOffset ?>">
-                                    <span class="text-[11px] text-slate-500">Desplazamiento: <span data-profile-photo-offset-x-display><?= htmlspecialchars($profilePhotoOffsetXDisplay) ?></span>%</span>
-                                </label>
-                                <label class="flex flex-col gap-1 text-xs font-medium text-slate-600">
-                                    <span class="font-semibold text-slate-700">Vertical</span>
-                                    <input type="range" name="profile_photo_offset_y" min="-60" max="60" step="0.5" value="<?= htmlspecialchars($profilePhotoOffsetYValue) ?>" class="h-2 w-full cursor-pointer accent-brand-500" data-profile-photo-offset-y data-default-value="<?= $defaultPhotoOffset ?>">
-                                    <span class="text-[11px] text-slate-500">Desplazamiento: <span data-profile-photo-offset-y-display><?= htmlspecialchars($profilePhotoOffsetYDisplay) ?></span>%</span>
+
+                        <!-- Controles -->
+                        <div class="flex-1 space-y-5">
+                            <input type="hidden" name="remove_photo" value="<?= $removePhotoRequested ? '1' : '0' ?>" data-profile-photo-remove-flag>
+
+                            <!-- Selector de archivo -->
+                            <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                                <label class="flex flex-col gap-3">
+                                    <span class="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                                        <svg class="h-5 w-5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                        </svg>
+                                        Seleccionar foto
+                                    </span>
+                                    <input type="file" name="profile_photo" accept="image/*" class="block w-full text-sm text-slate-600 file:mr-4 file:rounded-full file:border-0 file:bg-brand-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-brand-700 hover:file:bg-brand-100 file:cursor-pointer cursor-pointer" data-profile-photo-input>
+                                    <span class="text-xs text-slate-500">Formatos: JPG, PNG o WEBP • Tamaño máximo: 5 MB</span>
                                 </label>
                             </div>
+
+                            <!-- Controles de ajuste -->
+                            <div class="rounded-2xl border border-brand-100/50 bg-gradient-to-br from-brand-50/30 to-slate-50 p-5 space-y-4" data-profile-photo-adjustments>
+                                <div class="flex items-start gap-3">
+                                    <div class="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-brand-600">
+                                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
+                                        </svg>
+                                    </div>
+                                    <div class="flex-1">
+                                        <p class="text-sm font-semibold text-slate-700">Ajustar encuadre</p>
+                                        <p class="text-xs text-slate-500">Arrastra la imagen o usa los controles para centrar el rostro</p>
+                                    </div>
+                                </div>
+
+                                <div class="space-y-4">
+                                    <!-- Zoom -->
+                                    <label class="flex flex-col gap-2">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-xs font-medium text-slate-700">Zoom</span>
+                                            <span class="rounded-full bg-brand-100 px-2 py-0.5 text-xs font-semibold text-brand-700" data-profile-photo-zoom-display><?= htmlspecialchars((string) $profilePhotoZoomPercent) ?></span>
+                                        </div>
+                                        <input type="range" name="profile_photo_zoom" min="1" max="2.5" step="0.01" value="<?= htmlspecialchars($profilePhotoZoomValue) ?>" class="h-2.5 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-brand-500 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-brand-500 [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-brand-500 [&::-moz-range-thumb]:shadow-md" data-profile-photo-zoom data-default-value="<?= $defaultPhotoZoom ?>">
+                                    </label>
+
+                                    <div class="grid gap-4 sm:grid-cols-2">
+                                        <!-- Horizontal -->
+                                        <label class="flex flex-col gap-2">
+                                            <div class="flex items-center justify-between">
+                                                <span class="text-xs font-medium text-slate-700">↔ Horizontal</span>
+                                                <span class="text-xs font-mono text-slate-500" data-profile-photo-offset-x-display><?= htmlspecialchars($profilePhotoOffsetXDisplay) ?></span>
+                                            </div>
+                                            <input type="range" name="profile_photo_offset_x" min="-60" max="60" step="0.5" value="<?= htmlspecialchars($profilePhotoOffsetXValue) ?>" class="h-2.5 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-brand-500 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-brand-500 [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-brand-500 [&::-moz-range-thumb]:shadow-md" data-profile-photo-offset-x data-default-value="<?= $defaultPhotoOffset ?>">
+                                        </label>
+
+                                        <!-- Vertical -->
+                                        <label class="flex flex-col gap-2">
+                                            <div class="flex items-center justify-between">
+                                                <span class="text-xs font-medium text-slate-700">↕ Vertical</span>
+                                                <span class="text-xs font-mono text-slate-500" data-profile-photo-offset-y-display><?= htmlspecialchars($profilePhotoOffsetYDisplay) ?></span>
+                                            </div>
+                                            <input type="range" name="profile_photo_offset_y" min="-60" max="60" step="0.5" value="<?= htmlspecialchars($profilePhotoOffsetYValue) ?>" class="h-2.5 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-brand-500 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-brand-500 [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-brand-500 [&::-moz-range-thumb]:shadow-md" data-profile-photo-offset-y data-default-value="<?= $defaultPhotoOffset ?>">
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Copiar desde ruta del sistema -->
+                            <details class="rounded-2xl border border-slate-200 bg-white">
+                                <summary class="cursor-pointer px-4 py-3 text-xs font-semibold text-slate-600 hover:text-brand-600">
+                                    Opciones avanzadas
+                                </summary>
+                                <div class="border-t border-slate-100 p-4">
+                                    <label class="flex flex-col gap-2">
+                                        <span class="text-xs font-medium text-slate-700">Copiar desde ruta del sistema</span>
+                                        <input type="text" name="profile_photo_copy_path" value="<?= htmlspecialchars($manualPhotoPathValue) ?>" placeholder="/ruta/al/archivo.png" class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 font-mono focus:border-brand-400 focus:ring-1 focus:ring-brand-400 focus:bg-white" data-profile-photo-manual>
+                                        <span class="text-xs text-slate-500">Ingresa la ruta completa de un archivo en este equipo</span>
+                                    </label>
+                                </div>
+                            </details>
                         </div>
-                        <label class="flex flex-col gap-2">
-                            <span class="font-medium text-slate-700">Copiar imagen desde una ruta del sistema</span>
-                            <input type="text" name="profile_photo_copy_path" value="<?= htmlspecialchars($manualPhotoPathValue) ?>" placeholder="/ruta/al/archivo.png" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400" data-profile-photo-manual>
-                            <span class="text-xs text-slate-500">Opcional. Ingresa la ruta completa de un archivo existente en este equipo (se copiará a la carpeta de pacientes).</span>
-                        </label>
                     </div>
                 </div>
                 <label class="flex flex-col gap-2 text-sm text-slate-600 md:col-span-2 lg:col-span-4">
