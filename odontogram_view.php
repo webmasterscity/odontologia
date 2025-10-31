@@ -454,7 +454,7 @@ $renderToothCard = static function (
                         pointer-events="none"
                         fill="none"
                         stroke="#1D4ED8"
-                        stroke-width="3"
+                        stroke-width="4"
                         stroke-linecap="round"
                         stroke-linejoin="round"
                         clip-path="url(#<?= htmlspecialchars($clipSafeRingId) ?>)"
@@ -466,7 +466,7 @@ $renderToothCard = static function (
                         pointer-events="none"
                         fill="none"
                         stroke="#1D4ED8"
-                        stroke-width="3"
+                        stroke-width="4"
                         stroke-linecap="round"
                         stroke-linejoin="round"
                         clip-path="url(#<?= htmlspecialchars($clipSafeCenterId) ?>)"
@@ -508,7 +508,7 @@ $renderToothCard = static function (
                         pointer-events="none"
                         fill="none"
                         stroke="#1D4ED8"
-                        stroke-width="3"
+                        stroke-width="4"
                         stroke-linecap="round"
                         stroke-linejoin="round"
                         clip-path="url(#<?= htmlspecialchars($symbolClipId) ?>)"
@@ -967,16 +967,16 @@ require __DIR__ . '/templates/header.php';
         <svg class="sr-only">
             <defs>
                 <symbol id="mark-dot" overflow="visible">
-                    <circle cx="0" cy="0" r="6"></circle>
+                    <circle cx="0" cy="0" r="10"></circle>
                 </symbol>
                 <symbol id="mark-x" overflow="visible">
-                    <path d="M-8 -8 L 8 8 M-8 8 L 8 -8"></path>
+                    <path d="M-18 -18 L 18 18 M-18 18 L 18 -18"></path>
                 </symbol>
                 <symbol id="mark-vert" overflow="visible">
-                    <path d="M0 -8 L 0 8"></path>
+                    <path d="M0 -18 L 0 18"></path>
                 </symbol>
                 <symbol id="mark-horz" overflow="visible">
-                    <path d="M-10 0 L 10 0"></path>
+                    <path d="M-20 0 L 20 0"></path>
                 </symbol>
             </defs>
         </svg>

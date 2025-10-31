@@ -1,7 +1,7 @@
 :root {
     color-scheme: light;
     --odontogram-blue: #1d4ed8;
-    --odontogram-red: #b91c1c;
+    --odontogram-red: #FF0000;
     --odontogram-surface-bg: rgba(241, 245, 249, 0.9);
     --odontogram-surface-border: rgba(148, 163, 184, 0.55);
 }
@@ -507,8 +507,8 @@
 }
 
 .tooth-cell.fill-red {
-    background: rgba(185, 28, 28, 0.6);
-    fill: rgba(185, 28, 28, 0.6);
+    background: rgba(255, 0, 0, 0.6);
+    fill: rgba(255, 0, 0, 0.6);
 }
 
 .tooth-cell.has-mark {

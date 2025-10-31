@@ -117,7 +117,7 @@ function setupOdontogram() {
     const allowedColors = ['blue', 'red'];
     const strokePalette = {
         blue: '#1D4ED8',
-        red: '#B91C1C',
+        red: '#FF0000',
     };
     const symbolRefs = {
         dot: '#mark-dot',
@@ -711,7 +711,7 @@ function setupOdontogram() {
         if (needsHalo) {
             const halo = document.createElementNS(svgNS, 'use');
             halo.setAttribute('stroke', '#ffffff');
-            halo.setAttribute('stroke-width', '5');
+            halo.setAttribute('stroke-width', '6');
             halo.setAttribute('stroke-linecap', 'round');
             halo.setAttribute('fill', 'none');
             halo.setAttribute('href', symbolHref);
@@ -721,9 +721,10 @@ function setupOdontogram() {
 
         const use = document.createElementNS(svgNS, 'use');
         use.setAttribute('stroke', stroke);
-        use.setAttribute('stroke-width', '3');
+        use.setAttribute('stroke-width', '4');
         use.setAttribute('stroke-linecap', 'round');
-        use.setAttribute('fill', 'none');
+        // El punto debe ser relleno, los demás símbolos solo contorno
+        use.setAttribute('fill', markType === 'dot' ? stroke : 'none');
         use.setAttribute('href', symbolHref);
         use.setAttributeNS(xlinkNS, 'href', symbolHref);
         group.appendChild(use);
