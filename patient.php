@@ -86,6 +86,39 @@ $formatDateTime = static function (?string $value, string $default = '—'): str
     return date('d/m/Y H:i', $timestamp);
 };
 
+$formatStudyDate = static function (?string $value): ?string {
+    if ($value === null) {
+        return null;
+    }
+    $trimmed = trim((string) $value);
+    if ($trimmed === '') {
+        return null;
+    }
+    try {
+        return (new DateTimeImmutable($trimmed))->format('d/m/Y');
+    } catch (Throwable $exception) {
+        $timestamp = strtotime($trimmed);
+        if ($timestamp === false) {
+            return $trimmed;
+        }
+        return date('d/m/Y', $timestamp);
+    }
+};
+
+$formatStudySize = static function (?int $bytes): ?string {
+    if ($bytes === null || $bytes <= 0) {
+        return null;
+    }
+    if ($bytes >= 1048576) {
+        return number_format($bytes / 1048576, 2) . ' MB';
+    }
+    if ($bytes >= 1024) {
+        return number_format($bytes / 1024, 1) . ' KB';
+    }
+
+    return $bytes . ' B';
+};
+
 /**
  * Capitalize the first character of a given value while trimming surrounding whitespace.
  */
@@ -1075,6 +1108,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: patient.php?id=' . $patientId . '#actividades');
         exit;
     }
+
+    if ($action === 'delete_odontogram') {
+        $snapshotId = (int) post('snapshot_id');
+        if ($snapshotId > 0) {
+            $stmt = $pdo->prepare('DELETE FROM odontogram_snapshots WHERE id = :id AND patient_id = :patient_id');
+            $stmt->execute([':id' => $snapshotId, ':patient_id' => $patientId]);
+            $messages[] = 'Odontograma eliminado correctamente.';
+        }
+        header('Location: patient.php?id=' . $patientId . '#historial-odontogramas');
+        exit;
+    }
 }
 
 $profileStmt = $pdo->prepare('SELECT * FROM clinical_profiles WHERE patient_id = :id');
@@ -1112,6 +1156,10 @@ $visits = $visitsStmt->fetchAll(PDO::FETCH_ASSOC);
 $activitiesStmt = $pdo->prepare('SELECT * FROM treatment_activities WHERE patient_id = :id ORDER BY date(activity_date) DESC, id DESC');
 $activitiesStmt->execute([':id' => $patientId]);
 $activities = $activitiesStmt->fetchAll(PDO::FETCH_ASSOC);
+
+$patientStudies = getPatientStudies($pdo, $patientId);
+$totalPatientStudies = count($patientStudies);
+$latestPatientStudy = $patientStudies[0] ?? null;
 
 $odontogramSearchQuery = isset($_GET['odontogram_query']) ? trim((string) $_GET['odontogram_query']) : '';
 $pdo->prepare('DELETE FROM odontogram_snapshots WHERE patient_id = :patient_id AND is_blank = 1')
@@ -1562,6 +1610,57 @@ if (!empty($patient['registered_at'])) {
                             </div>
                         </div>
 
+                        <?php
+                        $latestStudyDateLabel = null;
+                        $latestStudyTypeLabel = null;
+                        if ($latestPatientStudy) {
+                            $latestStudyDateLabel = $formatStudyDate($latestPatientStudy['captured_at'] ?? null);
+                            if ($latestStudyDateLabel === null) {
+                                $latestStudyDateLabel = $formatStudyDate($latestPatientStudy['created_at'] ?? null);
+                            }
+                            $latestStudyTypeLabel = trim((string) ($latestPatientStudy['study_type'] ?? ''));
+                        }
+                        ?>
+                        <div class="rounded-xl border border-purple-100 bg-white/85 p-3 shadow-sm">
+                            <div class="flex items-center gap-3">
+                                <div class="flex h-10 w-10 items-center justify-center rounded-full bg-purple-100 text-purple-700 font-bold text-lg shrink-0">
+                                    <?= $totalPatientStudies ?>
+                                </div>
+                                <div class="space-y-0.5">
+                                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Estudios paraclínicos</p>
+                                    <?php if ($totalPatientStudies > 0): ?>
+                                        <p class="text-sm font-bold text-slate-700">
+                                            <?= $totalPatientStudies === 1 ? '1 estudio cargado' : $totalPatientStudies . ' estudios cargados' ?>
+                                        </p>
+                                    <?php else: ?>
+                                        <p class="text-sm font-bold text-slate-700">Sin estudios registrados</p>
+                                    <?php endif; ?>
+                                    <?php if ($latestStudyDateLabel): ?>
+                                        <p class="text-xs text-slate-500">
+                                            Último: <?= htmlspecialchars($latestStudyDateLabel) ?>
+                                            <?php if ($latestStudyTypeLabel !== ''): ?>
+                                                · <?= htmlspecialchars($latestStudyTypeLabel) ?>
+                                            <?php endif; ?>
+                                        </p>
+                                    <?php elseif ($latestStudyTypeLabel !== ''): ?>
+                                        <p class="text-xs text-slate-500">
+                                            Último registro: <?= htmlspecialchars($latestStudyTypeLabel) ?>
+                                        </p>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                            <?php if ($totalPatientStudies > 0): ?>
+                                <div class="mt-2">
+                                    <a class="inline-flex items-center gap-1 text-xs font-semibold text-purple-600 hover:text-purple-500 hover:underline transition" href="patient_history.php?id=<?= $patientId ?>#studies">
+                                        Ver todos
+                                        <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                        </svg>
+                                    </a>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+
                         <?php if ($lastVisit): ?>
                             <div class="rounded-xl bg-white/80 p-3 border border-green-100">
                                 <p class="text-xs font-semibold text-green-700 uppercase mb-2 flex items-center gap-1">
@@ -1915,9 +2014,21 @@ if (!empty($patient['registered_at'])) {
                                 <?php endif; ?>
                             </a>
                         </div>
-                        <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold <?= htmlspecialchars($badgeClasses) ?>">
-                            <?= htmlspecialchars($badgeLabel) ?>
-                        </span>
+                        <div class="flex items-center gap-2">
+                            <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold <?= htmlspecialchars($badgeClasses) ?>">
+                                <?= htmlspecialchars($badgeLabel) ?>
+                            </span>
+                            <form method="post" class="inline" onsubmit="return confirm('¿Estás segura de eliminar este odontograma? Esta acción no se puede deshacer.');">
+                                <input type="hidden" name="action" value="delete_odontogram">
+                                <input type="hidden" name="snapshot_id" value="<?= (int) $snapshot['id'] ?>">
+                                <button type="submit" class="inline-flex items-center justify-center gap-1.5 rounded-full border-2 border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-600 shadow-sm transition hover:bg-rose-50 hover:border-rose-300 hover:-translate-y-0.5" title="Eliminar odontograma" onclick="event.stopPropagation();">
+                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                    </svg>
+                                    <span>Eliminar</span>
+                                </button>
+                            </form>
+                        </div>
                     </summary>
                     <div class="mt-3 space-y-3 text-sm text-slate-600">
                         <?php if ($isFirstSnapshot): ?>
@@ -2152,6 +2263,84 @@ if (!empty($patient['registered_at'])) {
                         <dd class="text-slate-600"><?= $profile['consent_notes'] ? nl2br(htmlspecialchars($profile['consent_notes'])) : '—' ?></dd>
                     </div>
                 </dl>
+            </div>
+            <div class="rounded-2xl border border-slate-200/80 bg-white p-4">
+                <div class="mb-3 flex items-center justify-between gap-2">
+                    <h3 class="flex items-center gap-2 rounded-lg border-l-4 border-indigo-400 bg-indigo-50/60 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-indigo-700 shadow-sm">
+                        <span class="h-1.5 w-1.5 rounded-full bg-indigo-400"></span>
+                        Estudios paraclínicos
+                    </h3>
+                    <a class="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 transition hover:text-indigo-500 hover:underline" href="patient_history.php?id=<?= $patientId ?>#studies">
+                        Gestionar
+                        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                    </a>
+                </div>
+                <?php if ($patientStudies): ?>
+                    <?php $patientStudiesPreview = array_slice($patientStudies, 0, 3); ?>
+                    <ul class="space-y-3 text-sm text-slate-600">
+                        <?php foreach ($patientStudiesPreview as $study): ?>
+                            <?php
+                            $studyTitle = trim((string) ($study['title'] ?? ''));
+                            if ($studyTitle === '') {
+                                $studyTitle = 'Estudio sin título';
+                            }
+                            $studyType = trim((string) ($study['study_type'] ?? ''));
+                            $capturedLabel = $formatStudyDate($study['captured_at'] ?? null);
+                            if ($capturedLabel === null) {
+                                $capturedLabel = $formatStudyDate($study['created_at'] ?? null);
+                            }
+                            $uploadedBy = trim((string) ($study['uploaded_by'] ?? ''));
+                            $filePath = trim((string) ($study['file_path'] ?? ''));
+                            $sizeLabel = $formatStudySize(isset($study['file_size']) ? (int) $study['file_size'] : null);
+                            $notes = trim((string) ($study['notes'] ?? ''));
+                            ?>
+                            <li class="rounded-2xl border border-indigo-100 bg-indigo-50/40 p-3 shadow-inner">
+                                <div class="flex flex-col gap-2">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <span class="text-sm font-semibold text-slate-800"><?= htmlspecialchars($studyTitle) ?></span>
+                                        <?php if ($studyType !== ''): ?>
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-3 py-1 text-[12px] font-semibold text-indigo-700"><?= htmlspecialchars($studyType) ?></span>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                                        <?php if ($capturedLabel): ?>
+                                            <span>Fecha: <?= htmlspecialchars($capturedLabel) ?></span>
+                                        <?php endif; ?>
+                                        <?php if ($uploadedBy !== ''): ?>
+                                            <span>Registrado por: <?= htmlspecialchars($uploadedBy) ?></span>
+                                        <?php endif; ?>
+                                        <?php if ($sizeLabel): ?>
+                                            <span>Tamaño: <?= htmlspecialchars($sizeLabel) ?></span>
+                                        <?php endif; ?>
+                                    </div>
+                                    <?php if ($notes !== ''): ?>
+                                        <div class="text-xs text-slate-600">
+                                            <span class="font-semibold text-slate-700">Notas:</span>
+                                            <p class="mt-1 max-h-20 overflow-auto rounded border border-slate-200 bg-slate-50 p-2 text-xs">
+                                                <?= nl2br(htmlspecialchars($notes)) ?>
+                                            </p>
+                                        </div>
+                                    <?php endif; ?>
+                                    <?php if ($filePath !== ''): ?>
+                                        <a href="<?= htmlspecialchars($filePath) ?>" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 transition hover:text-indigo-500">
+                                            Ver archivo
+                                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 3h4a1 1 0 011 1v4m-9 9l10-10M5 13v6a2 2 0 002 2h6"></path>
+                                            </svg>
+                                        </a>
+                                    <?php endif; ?>
+                                </div>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                    <?php if ($totalPatientStudies > count($patientStudiesPreview)): ?>
+                        <p class="mt-2 text-xs text-slate-500">Se muestran los últimos <?= count($patientStudiesPreview) ?> de <?= $totalPatientStudies ?> estudios.</p>
+                    <?php endif; ?>
+                <?php else: ?>
+                    <p class="text-xs text-slate-500">No se han registrado estudios paraclínicos.</p>
+                <?php endif; ?>
             </div>
         </div>
     <?php endif; ?>

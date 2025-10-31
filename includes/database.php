@@ -161,7 +161,26 @@ function bootstrapSchema(PDO $pdo): void
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY(patient_id) REFERENCES patients(id) ON DELETE CASCADE,
             FOREIGN KEY(visit_id) REFERENCES visits(id) ON DELETE SET NULL
-        )'
+        )',
+
+        // Paraclinical studies uploaded per patient.
+        'CREATE TABLE IF NOT EXISTS patient_studies (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            patient_id INTEGER NOT NULL,
+            title TEXT,
+            study_type TEXT,
+            captured_at TEXT,
+            notes TEXT,
+            original_filename TEXT,
+            file_path TEXT NOT NULL,
+            mime_type TEXT,
+            file_size INTEGER,
+            uploaded_by TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(patient_id) REFERENCES patients(id) ON DELETE CASCADE
+        )',
+        'CREATE INDEX IF NOT EXISTS patient_studies_patient_id_idx ON patient_studies(patient_id)',
+        'CREATE INDEX IF NOT EXISTS patient_studies_captured_at_idx ON patient_studies(captured_at)'
     ];
 
     foreach ($schemaStatements as $sql) {
@@ -329,6 +348,47 @@ function ensureSchemaUpgrades(PDO $pdo): void
         );
         $pdo->exec('CREATE INDEX IF NOT EXISTS odontogram_snapshots_patient_id_idx ON odontogram_snapshots(patient_id)');
         $pdo->exec('CREATE INDEX IF NOT EXISTS odontogram_snapshots_created_at_idx ON odontogram_snapshots(created_at)');
+    }
+
+    $studyColumns = tableColumns($pdo, 'patient_studies');
+    if ($studyColumns === []) {
+        $pdo->exec(
+            'CREATE TABLE IF NOT EXISTS patient_studies (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                patient_id INTEGER NOT NULL,
+                title TEXT,
+                study_type TEXT,
+                captured_at TEXT,
+                notes TEXT,
+                original_filename TEXT,
+                file_path TEXT NOT NULL,
+                mime_type TEXT,
+                file_size INTEGER,
+                uploaded_by TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(patient_id) REFERENCES patients(id) ON DELETE CASCADE
+            )'
+        );
+        $pdo->exec('CREATE INDEX IF NOT EXISTS patient_studies_patient_id_idx ON patient_studies(patient_id)');
+        $pdo->exec('CREATE INDEX IF NOT EXISTS patient_studies_captured_at_idx ON patient_studies(captured_at)');
+    } else {
+        if (!isset($studyColumns['original_filename'])) {
+            $pdo->exec('ALTER TABLE patient_studies ADD COLUMN original_filename TEXT');
+        }
+        if (!isset($studyColumns['mime_type'])) {
+            $pdo->exec('ALTER TABLE patient_studies ADD COLUMN mime_type TEXT');
+        }
+        if (!isset($studyColumns['file_size'])) {
+            $pdo->exec('ALTER TABLE patient_studies ADD COLUMN file_size INTEGER');
+        }
+        if (!isset($studyColumns['uploaded_by'])) {
+            $pdo->exec('ALTER TABLE patient_studies ADD COLUMN uploaded_by TEXT');
+        }
+        if (!isset($studyColumns['created_at'])) {
+            $pdo->exec('ALTER TABLE patient_studies ADD COLUMN created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP');
+        }
+        $pdo->exec('CREATE INDEX IF NOT EXISTS patient_studies_patient_id_idx ON patient_studies(patient_id)');
+        $pdo->exec('CREATE INDEX IF NOT EXISTS patient_studies_captured_at_idx ON patient_studies(captured_at)');
     }
 }
 
@@ -507,6 +567,146 @@ function clearOdontogramEntries(PDO $pdo, int $patientId): void
 }
 
 /**
+ * Returns all paraclinical studies for the given patient, most recent first.
+ *
+ * @return array<int,array<string,mixed>>
+ */
+function getPatientStudies(PDO $pdo, int $patientId): array
+{
+    $stmt = $pdo->prepare(
+        'SELECT * FROM patient_studies
+         WHERE patient_id = :patient_id
+         ORDER BY
+            CASE WHEN captured_at IS NOT NULL THEN captured_at ELSE created_at END DESC,
+            id DESC'
+    );
+    $stmt->execute([':patient_id' => $patientId]);
+
+    return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+}
+
+/**
+ * Retrieves a single paraclinical study belonging to the patient.
+ *
+ * @return array<string,mixed>|null
+ */
+function findPatientStudy(PDO $pdo, int $patientId, int $studyId): ?array
+{
+    $stmt = $pdo->prepare(
+        'SELECT * FROM patient_studies WHERE id = :id AND patient_id = :patient_id LIMIT 1'
+    );
+    $stmt->execute([
+        ':id' => $studyId,
+        ':patient_id' => $patientId,
+    ]);
+    $record = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    return $record !== false ? $record : null;
+}
+
+/**
+ * Persists a new paraclinical study record.
+ */
+function insertPatientStudy(PDO $pdo, array $data): int
+{
+    $columns = array_keys($data);
+    $placeholders = array_map(fn($col) => ':' . $col, $columns);
+    $sql = sprintf(
+        'INSERT INTO patient_studies (%s) VALUES (%s)',
+        implode(', ', $columns),
+        implode(', ', $placeholders)
+    );
+    $stmt = $pdo->prepare($sql);
+    foreach ($data as $key => $value) {
+        $stmt->bindValue(':' . $key, $value);
+    }
+    $stmt->execute();
+
+    return (int) $pdo->lastInsertId();
+}
+
+/**
+ * Updates an existing paraclinical study record.
+ */
+function updatePatientStudy(PDO $pdo, int $patientId, int $studyId, array $data): bool
+{
+    $allowedColumns = [
+        'title',
+        'study_type',
+        'captured_at',
+        'notes',
+        'uploaded_by',
+    ];
+    $setClauses = [];
+    $params = [
+        ':id' => $studyId,
+        ':patient_id' => $patientId,
+    ];
+
+    foreach ($allowedColumns as $column) {
+        if (array_key_exists($column, $data)) {
+            $setClauses[] = $column . ' = :' . $column;
+            $params[':' . $column] = $data[$column];
+        }
+    }
+
+    if (!$setClauses) {
+        return false;
+    }
+
+    $sql = 'UPDATE patient_studies SET ' . implode(', ', $setClauses) . ' WHERE id = :id AND patient_id = :patient_id';
+    $stmt = $pdo->prepare($sql);
+    foreach ($params as $param => $value) {
+        if ($param === ':id' || $param === ':patient_id') {
+            $stmt->bindValue($param, (int) $value, PDO::PARAM_INT);
+        } elseif ($value === null) {
+            $stmt->bindValue($param, null, PDO::PARAM_NULL);
+        } else {
+            $stmt->bindValue($param, $value);
+        }
+    }
+
+    $stmt->execute();
+    if ($stmt->rowCount() > 0) {
+        return true;
+    }
+
+    $checkStmt = $pdo->prepare(
+        'SELECT COUNT(*) FROM patient_studies WHERE id = :id AND patient_id = :patient_id'
+    );
+    $checkStmt->execute([
+        ':id' => $studyId,
+        ':patient_id' => $patientId,
+    ]);
+
+    return (int) $checkStmt->fetchColumn() > 0;
+}
+
+/**
+ * Removes a paraclinical study record.
+ */
+function deletePatientStudy(PDO $pdo, int $patientId, int $studyId): bool
+{
+    $stmt = $pdo->prepare(
+        'DELETE FROM patient_studies WHERE id = :id AND patient_id = :patient_id'
+    );
+    $stmt->execute([
+        ':id' => $studyId,
+        ':patient_id' => $patientId,
+    ]);
+
+    return $stmt->rowCount() > 0;
+}
+
+/**
+ * Returns the maximum number of studies allowed per patient.
+ */
+function getPatientStudyLimit(): int
+{
+    return 60;
+}
+
+/**
  * Small helper to safely read a value from $_POST with optional default.
  */
 function post(string $key, $default = null)
@@ -593,4 +793,41 @@ function normalizePaymentMethodValue($value): ?string
     $firstChar = substr($trimmed, 0, 1);
     $rest = substr($trimmed, 1);
     return strtoupper($firstChar) . $rest;
+}
+
+/**
+ * Ensures PHP session is active for CSRF protection helpers.
+ */
+function ensureSessionStarted(): void
+{
+    if (session_status() !== PHP_SESSION_ACTIVE) {
+        session_start();
+    }
+}
+
+/**
+ * Returns a reusable CSRF token stored in the session.
+ */
+function getCsrfToken(): string
+{
+    ensureSessionStarted();
+    if (!isset($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+
+    return $_SESSION['csrf_token'];
+}
+
+/**
+ * Verifies the provided token against the session token.
+ */
+function verifyCsrfToken(?string $token): bool
+{
+    ensureSessionStarted();
+    $stored = $_SESSION['csrf_token'] ?? '';
+    if (!is_string($stored) || $stored === '') {
+        return false;
+    }
+
+    return is_string($token) && hash_equals($stored, $token);
 }

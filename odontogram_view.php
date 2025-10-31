@@ -54,6 +54,21 @@ $profilePhotoStyle = sprintf(
     $profilePhotoZoom
 );
 
+// Manejar eliminación de odontograma
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = isset($_POST['action']) ? trim((string) $_POST['action']) : '';
+
+    if ($action === 'delete_odontogram') {
+        $snapshotIdToDelete = isset($_POST['snapshot_id']) ? (int) $_POST['snapshot_id'] : 0;
+        if ($snapshotIdToDelete > 0 && $snapshotIdToDelete === $snapshotId) {
+            $deleteStmt = $pdo->prepare('DELETE FROM odontogram_snapshots WHERE id = :id AND patient_id = :patient_id');
+            $deleteStmt->execute([':id' => $snapshotIdToDelete, ':patient_id' => $patientId]);
+            header('Location: patient.php?id=' . $patientId . '#historial-odontogramas');
+            exit;
+        }
+    }
+}
+
 $snapshotStmt = $pdo->prepare('SELECT id, payload, is_blank, created_at FROM odontogram_snapshots WHERE patient_id = :patient_id AND id = :snapshot_id');
 $snapshotStmt->execute([
     ':patient_id' => $patientId,
@@ -751,6 +766,16 @@ require __DIR__ . '/templates/header.php';
             <a href="patient.php?id=<?= $patientId ?>#odontograma" class="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50">
                 ← Volver al paciente
             </a>
+            <form method="post" class="inline" onsubmit="return confirm('¿Estás segura de eliminar este odontograma? Esta acción no se puede deshacer.');">
+                <input type="hidden" name="action" value="delete_odontogram">
+                <input type="hidden" name="snapshot_id" value="<?= (int) $snapshotId ?>">
+                <button type="submit" class="inline-flex items-center justify-center gap-1.5 rounded-full border-2 border-rose-200 bg-white px-4 py-2 text-sm font-semibold text-rose-600 shadow-sm transition hover:bg-rose-50 hover:border-rose-300 hover:-translate-y-0.5">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                    </svg>
+                    Eliminar odontograma
+                </button>
+            </form>
         </div>
     </div>
     <div class="grid gap-6 lg:grid-cols-[minmax(0,280px)_1fr_minmax(0,320px)]">
