@@ -705,6 +705,64 @@ function setupOdontogram() {
         group.setAttribute('pointer-events', 'none');
         group.setAttribute('fill', 'none');
 
+        // Caso especial: X completa en botón circular
+        if (markType === 'x' && shape === 'circle') {
+            // Buscar el grupo full sin clip-path
+            const toothCards = Array.from(form.querySelectorAll('.tooth-card'));
+            let fullGroup = null;
+            for (const card of toothCards) {
+                if (card.dataset.tooth === toothCode) {
+                    const fullGroupId = card.dataset.symbolGroupFull;
+                    if (fullGroupId) {
+                        fullGroup = document.getElementById(fullGroupId);
+                    }
+                    break;
+                }
+            }
+
+            // Si encontramos el grupo full, limpiar símbolos anteriores de TODAS las superficies
+            if (fullGroup) {
+                const oldGroups = Array.from(fullGroup.querySelectorAll(`[data-tooth="${toothCode}"]`));
+                oldGroups.forEach(oldGroup => oldGroup.remove());
+            }
+
+            // Usar el grupo full si existe, sino usar el symbolGroup original
+            const targetGroup = fullGroup || symbolGroup;
+
+            // Calcular dimensiones de la X: 115% del radio externo
+            const cx = geometry.cx;
+            const cy = geometry.cy;
+            const L = geometry.outerRadius * 1.15;
+
+            // Crear las dos líneas de la X sin transform (coordenadas absolutas)
+            group.removeAttribute('transform');
+
+            const needsHalo = Boolean(fillColor && allowedColors.includes(fillColor));
+
+            if (needsHalo) {
+                const haloPath = document.createElementNS(svgNS, 'path');
+                const d = `M${cx - L} ${cy - L} L${cx + L} ${cy + L} M${cx + L} ${cy - L} L${cx - L} ${cy + L}`;
+                haloPath.setAttribute('d', d);
+                haloPath.setAttribute('stroke', '#ffffff');
+                haloPath.setAttribute('stroke-width', '4');
+                haloPath.setAttribute('stroke-linecap', 'round');
+                haloPath.setAttribute('fill', 'none');
+                group.appendChild(haloPath);
+            }
+
+            const xPath = document.createElementNS(svgNS, 'path');
+            const d = `M${cx - L} ${cy - L} L${cx + L} ${cy + L} M${cx + L} ${cy - L} L${cx - L} ${cy + L}`;
+            xPath.setAttribute('d', d);
+            xPath.setAttribute('stroke', stroke);
+            xPath.setAttribute('stroke-width', '2');
+            xPath.setAttribute('stroke-linecap', 'round');
+            xPath.setAttribute('fill', 'none');
+            group.appendChild(xPath);
+
+            targetGroup.appendChild(group);
+            return group;
+        }
+
         const symbolHref = symbolRefs[markType];
         const needsHalo = Boolean(fillColor && allowedColors.includes(fillColor));
 

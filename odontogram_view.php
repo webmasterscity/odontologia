@@ -316,6 +316,7 @@ $renderToothCard = static function (
         data-tooth="<?= htmlspecialchars($code) ?>"
         data-symbol-group-ring="<?= htmlspecialchars($symbolRingGroupId) ?>"
         data-symbol-group-center="<?= htmlspecialchars($symbolCenterGroupId) ?>"
+        data-symbol-group-full="tooth-symbols-full-<?= htmlspecialchars($uniqueSuffix) ?>"
         data-tooth-kind="<?= $isDeciduous ? 'deciduous' : 'permanent' ?>"
         data-shape="<?= htmlspecialchars($shape) ?>"
     >
@@ -334,7 +335,7 @@ $renderToothCard = static function (
                             <path fill-rule="evenodd" d="M50,50 m-44,0 a44,44 0 1,0 88,0 a44,44 0 1,0 -88,0 M50,50 m-25.5,0 a25.5,25.5 0 1,1 51,0 a25.5,25.5 0 1,1 -51,0"></path>
                         </clipPath>
                         <clipPath id="<?= htmlspecialchars($clipSafeCenterId) ?>" clipPathUnits="userSpaceOnUse">
-                            <circle cx="50" cy="50" r="19.5"></circle>
+                            <circle cx="50" cy="50" r="25.5"></circle>
                         </clipPath>
                     </defs>
                     <g class="tooth-grid__selections" id="<?= htmlspecialchars($clipId . '-selections') ?>" clip-path="url(#<?= htmlspecialchars($clipOuterId) ?>)">
@@ -474,6 +475,17 @@ $renderToothCard = static function (
                         stroke-linecap="round"
                         stroke-linejoin="round"
                         clip-path="url(#<?= htmlspecialchars($clipSafeCenterId) ?>)"
+                    ></g>
+                    <g
+                        id="tooth-symbols-full-<?= htmlspecialchars($uniqueSuffix) ?>"
+                        class="tooth-symbol-layer tooth-symbol-layer--full"
+                        aria-hidden="false"
+                        pointer-events="none"
+                        fill="none"
+                        stroke="#1D4ED8"
+                        stroke-width="4"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
                     ></g>
                 </svg>
             </div>
@@ -974,7 +986,7 @@ require __DIR__ . '/templates/header.php';
                     <circle cx="0" cy="0" r="10"></circle>
                 </symbol>
                 <symbol id="mark-x" overflow="visible">
-                    <path d="M-18 -18 L 18 18 M-18 18 L 18 -18"></path>
+                    <path d="M-500000 -500000 L 500000 500000 M-500000 500000 L 500000 -500000"></path>
                 </symbol>
                 <symbol id="mark-vert" overflow="visible">
                     <path d="M0 -18 L 0 18"></path>
