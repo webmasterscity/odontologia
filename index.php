@@ -70,8 +70,21 @@ $search = trim($_GET['search'] ?? '');
 $searchSql = '';
 $params = [];
 if ($search !== '') {
-    $searchSql = 'WHERE p.full_name LIKE :term OR p.document_id LIKE :term OR p.phone_primary LIKE :term';
-    $params[':term'] = '%' . $search . '%';
+    // Función para normalizar texto eliminando acentos
+    $normalizeField = "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(LOWER(%s), 'á', 'a'), 'é', 'e'), 'í', 'i'), 'ó', 'o'), 'ú', 'u'), 'ñ', 'n'), 'ü', 'u'), 'à', 'a'), 'è', 'e'), 'ì', 'i')";
+
+    $normalizedFullName = sprintf($normalizeField, 'p.full_name');
+    $normalizedPreferredName = sprintf($normalizeField, 'p.preferred_name');
+
+    $searchSql = "WHERE $normalizedFullName LIKE :term OR $normalizedPreferredName LIKE :term OR p.document_id LIKE :term OR p.phone_primary LIKE :term";
+
+    // Normalizar el término de búsqueda
+    $normalizedSearch = str_replace(
+        ['á', 'é', 'í', 'ó', 'ú', 'ñ', 'ü', 'à', 'è', 'ì', 'Á', 'É', 'Í', 'Ó', 'Ú', 'Ñ', 'Ü'],
+        ['a', 'e', 'i', 'o', 'u', 'n', 'u', 'a', 'e', 'i', 'a', 'e', 'i', 'o', 'u', 'n', 'u'],
+        strtolower($search)
+    );
+    $params[':term'] = '%' . $normalizedSearch . '%';
 }
 
 $patientStmt = $pdo->prepare(
@@ -273,7 +286,7 @@ require __DIR__ . '/templates/header.php';
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
             <form method="get" class="flex w-full max-w-md items-center gap-2 rounded-full border border-slate-200 bg-slate-50/60 px-4 py-1.5 text-sm shadow-inner focus-within:border-brand-300 focus-within:bg-white sm:py-2">
                 <label for="search" class="sr-only">Buscar paciente</label>
-                <input id="search" type="search" name="search" placeholder="Buscar por nombre, cédula o teléfono" value="<?= htmlspecialchars($search) ?>" class="flex-1 border-0 bg-transparent py-1 text-sm text-slate-700 placeholder:text-slate-400 focus:ring-0" />
+                <input id="search" type="search" name="search" placeholder="Buscar por nombre, cédula o teléfono" value="<?= htmlspecialchars($search) ?>" class="flex-1 border-0 bg-transparent py-1 text-sm text-slate-700 placeholder:text-slate-400 focus:ring-0 capitalize" />
                 <button type="submit" class="inline-flex items-center rounded-full bg-brand-600 px-4 py-1.5 text-sm font-semibold text-white shadow-soft transition hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500">
                     Buscar
                 </button>
@@ -283,10 +296,14 @@ require __DIR__ . '/templates/header.php';
 
     <?php if (empty($patients)): ?>
         <p class="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center text-sm text-slate-500">
-            No hay pacientes registrados todavía.
+            <?php if ($search !== ''): ?>
+                No se encontraron pacientes con el criterio de búsqueda "<?= htmlspecialchars(ucfirst($search)) ?>".
+            <?php else: ?>
+                No hay pacientes registrados todavía.
+            <?php endif; ?>
         </p>
     <?php else: ?>
-        <div class="mt-6 overflow-hidden rounded-2xl border border-slate-200/70 shadow-sm">
+        <div class="mt-6 overflow-y-auto rounded-2xl border border-slate-200/70 shadow-sm" style="max-height: 600px;">
             <table class="min-w-full divide-y divide-slate-200 text-sm">
                 <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                     <tr>

@@ -1999,7 +1999,7 @@ if (!empty($patient['registered_at'])) {
     </div>
 
     <?php if ($filteredSnapshots): ?>
-        <div class="space-y-4">
+        <div class="space-y-4 overflow-y-auto" style="max-height: 600px;">
             <?php foreach ($filteredSnapshots as $snapshot): ?>
                 <?php
                     $teethEntries = isset($snapshot['payload']['teeth']) && is_array($snapshot['payload']['teeth'])
