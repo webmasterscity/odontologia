@@ -405,7 +405,7 @@ require __DIR__ . '/templates/header.php';
 
     <form method="post" enctype="multipart/form-data" class="space-y-6" data-capitalize-initial-form>
         <?php
-        $genders = ['Femenino', 'Masculino', 'No binario', 'Prefiere no indicarlo'];
+        $genders = ['Femenino', 'Masculino', 'Prefiere no indicarlo'];
         $maritalStatuses = ['Soltero(a)', 'Casado(a)', 'Unión estable', 'Divorciado(a)', 'Viudo(a)', 'Prefiere no indicarlo'];
         ?>
         <fieldset class="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4 sm:p-6">

@@ -576,9 +576,7 @@ function getPatientStudies(PDO $pdo, int $patientId): array
     $stmt = $pdo->prepare(
         'SELECT * FROM patient_studies
          WHERE patient_id = :patient_id
-         ORDER BY
-            CASE WHEN captured_at IS NOT NULL THEN captured_at ELSE created_at END DESC,
-            id DESC'
+         ORDER BY id DESC'
     );
     $stmt->execute([':patient_id' => $patientId]);
 

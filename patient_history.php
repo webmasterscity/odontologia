@@ -457,7 +457,7 @@ require __DIR__ . '/templates/header.php';
                         </svg>
                         <span class="font-semibold text-slate-700">Título del estudio</span>
                     </div>
-                    <input type="text" name="title" class="rounded-xl border-2 border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-700 transition focus:border-brand-400 focus:bg-white focus:ring-2 focus:ring-brand-100" placeholder="Ej. Radiografía panorámica" <?= $studyLimitReached ? 'disabled' : '' ?>>
+                    <input type="text" name="title" class="rounded-xl border-2 border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-700 transition focus:border-brand-400 focus:bg-white focus:ring-2 focus:ring-brand-100" placeholder="Ej. Radiografía panorámica" <?= $studyLimitReached ? 'disabled' : '' ?> data-capitalize-initial>
                 </label>
 
                 <label class="flex flex-col gap-2.5 text-sm text-slate-600">
@@ -467,7 +467,7 @@ require __DIR__ . '/templates/header.php';
                         </svg>
                         <span class="font-semibold text-slate-700">Tipo</span>
                     </div>
-                    <input type="text" name="study_type" class="rounded-xl border-2 border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-700 transition focus:border-brand-400 focus:bg-white focus:ring-2 focus:ring-brand-100" placeholder="Radiografía, laboratorio..." <?= $studyLimitReached ? 'disabled' : '' ?>>
+                    <input type="text" name="study_type" class="rounded-xl border-2 border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-700 transition focus:border-brand-400 focus:bg-white focus:ring-2 focus:ring-brand-100" placeholder="Radiografía, laboratorio..." <?= $studyLimitReached ? 'disabled' : '' ?> data-capitalize-initial>
                 </label>
 
                 <label class="flex flex-col gap-2.5 text-sm text-slate-600">
@@ -487,7 +487,7 @@ require __DIR__ . '/templates/header.php';
                         </svg>
                         <span class="font-semibold text-slate-700">Registrado por</span>
                     </div>
-                    <input type="text" name="uploaded_by" class="rounded-xl border-2 border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-700 transition focus:border-brand-400 focus:bg-white focus:ring-2 focus:ring-brand-100" placeholder="Nombre del responsable" <?= $studyLimitReached ? 'disabled' : '' ?>>
+                    <input type="text" name="uploaded_by" class="rounded-xl border-2 border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-700 transition focus:border-brand-400 focus:bg-white focus:ring-2 focus:ring-brand-100" placeholder="Nombre del responsable" <?= $studyLimitReached ? 'disabled' : '' ?> data-capitalize-initial>
                 </label>
 
                 <label class="sm:col-span-2 flex flex-col gap-2.5 text-sm text-slate-600">
@@ -497,7 +497,7 @@ require __DIR__ . '/templates/header.php';
                         </svg>
                         <span class="font-semibold text-slate-700">Notas</span>
                     </div>
-                    <textarea name="notes" rows="2" class="rounded-xl border-2 border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-700 transition focus:border-brand-400 focus:bg-white focus:ring-2 focus:ring-brand-100" placeholder="Observaciones relevantes" <?= $studyLimitReached ? 'disabled' : '' ?>></textarea>
+                    <textarea name="notes" rows="2" class="rounded-xl border-2 border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-700 transition focus:border-brand-400 focus:bg-white focus:ring-2 focus:ring-brand-100" placeholder="Observaciones relevantes" <?= $studyLimitReached ? 'disabled' : '' ?> data-capitalize-initial></textarea>
                 </label>
 
                 <div class="sm:col-span-2 space-y-3">
@@ -693,11 +693,11 @@ require __DIR__ . '/templates/header.php';
                                     <div class="grid gap-3 sm:grid-cols-2">
                                         <label class="flex flex-col gap-1">
                                             <span class="text-xs font-semibold uppercase tracking-wide text-slate-700">Título</span>
-                                            <input type="text" name="title" value="<?= htmlspecialchars((string) ($study['title'] ?? '')) ?>" class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
+                                            <input type="text" name="title" value="<?= htmlspecialchars((string) ($study['title'] ?? '')) ?>" class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400" data-capitalize-initial>
                                         </label>
                                         <label class="flex flex-col gap-1">
                                             <span class="text-xs font-semibold uppercase tracking-wide text-slate-700">Tipo</span>
-                                            <input type="text" name="study_type" value="<?= htmlspecialchars((string) ($study['study_type'] ?? '')) ?>" class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
+                                            <input type="text" name="study_type" value="<?= htmlspecialchars((string) ($study['study_type'] ?? '')) ?>" class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400" data-capitalize-initial>
                                         </label>
                                         <label class="flex flex-col gap-1">
                                             <span class="text-xs font-semibold uppercase tracking-wide text-slate-700">Fecha del estudio</span>
@@ -705,12 +705,12 @@ require __DIR__ . '/templates/header.php';
                                         </label>
                                         <label class="flex flex-col gap-1">
                                             <span class="text-xs font-semibold uppercase tracking-wide text-slate-700">Registrado por</span>
-                                            <input type="text" name="uploaded_by" value="<?= htmlspecialchars($uploadedByValue) ?>" class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
+                                            <input type="text" name="uploaded_by" value="<?= htmlspecialchars($uploadedByValue) ?>" class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400" data-capitalize-initial>
                                         </label>
                                     </div>
                                     <label class="flex flex-col gap-1">
                                         <span class="text-xs font-semibold uppercase tracking-wide text-slate-700">Notas</span>
-                                        <textarea name="notes" rows="3" class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"><?= htmlspecialchars($notesValue) ?></textarea>
+                                        <textarea name="notes" rows="3" class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400" data-capitalize-initial><?= htmlspecialchars($notesValue) ?></textarea>
                                     </label>
                                     <div class="flex flex-wrap items-center gap-3">
                                         <button type="submit" class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-soft transition hover:-translate-y-0.5 hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500">
@@ -955,6 +955,56 @@ require __DIR__ . '/templates/header.php';
                 setState(button, panel, false);
             });
         }
+    });
+})();
+
+(function () {
+    const capitalizeInitialValue = function (value) {
+        if (typeof value !== 'string' || value === '') {
+            return '';
+        }
+        const leadingMatch = value.match(/^\s*/);
+        const leadingWhitespace = leadingMatch ? leadingMatch[0] : '';
+        const withoutLeading = value.slice(leadingWhitespace.length);
+        if (withoutLeading === '') {
+            return leadingWhitespace;
+        }
+        const firstChar = withoutLeading.charAt(0).toLocaleUpperCase('es-ES');
+        return leadingWhitespace + firstChar + withoutLeading.slice(1);
+    };
+
+    const fields = document.querySelectorAll('[data-capitalize-initial]');
+    if (!fields.length) {
+        return;
+    }
+
+    fields.forEach((field) => {
+        const applyCapitalization = () => {
+            const selectionStart = field.selectionStart;
+            const selectionEnd = field.selectionEnd;
+            const newValue = capitalizeInitialValue(field.value || '');
+            if (field.value !== newValue) {
+                field.value = newValue;
+                if (typeof selectionStart === 'number' && typeof selectionEnd === 'number') {
+                    field.selectionStart = selectionStart;
+                    field.selectionEnd = selectionEnd;
+                }
+            }
+        };
+
+        field.addEventListener('input', () => {
+            const trimmed = (field.value || '').trimStart();
+            if (trimmed.length === 0) {
+                return;
+            }
+            const firstChar = trimmed.charAt(0);
+            if (firstChar !== firstChar.toLocaleUpperCase('es-ES')) {
+                applyCapitalization();
+            }
+        });
+        field.addEventListener('blur', applyCapitalization);
+        field.addEventListener('change', applyCapitalization);
+        applyCapitalization();
     });
 })();
 

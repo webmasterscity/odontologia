@@ -732,3 +732,310 @@ h4 {
     padding: 0.4rem 0.75rem !important;
     font-size: 0.78rem !important;
 }
+
+/* ========================================
+   ESTILOS MODERNOS PARA SCROLLBARS
+   ======================================== */
+
+/* Scrollbar personalizado para todos los elementos con scroll */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+}
+
+/* Estilos específicos para WebKit (Chrome, Safari, Edge) */
+*::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(148, 163, 184, 0.4), rgba(100, 116, 139, 0.5));
+    border-radius: 10px;
+    transition: background 0.3s ease;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(59, 130, 246, 0.6), rgba(37, 99, 235, 0.7));
+}
+
+/* Scrollbar especial para el listado de pacientes */
+.overflow-y-auto::-webkit-scrollbar {
+    width: 10px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track {
+    background: rgba(241, 245, 249, 0.6);
+    border-radius: 12px;
+    margin: 8px 0;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(59, 130, 246, 0.5), rgba(37, 99, 235, 0.6));
+    border-radius: 12px;
+    border: 2px solid rgba(241, 245, 249, 0.6);
+    transition: all 0.3s ease;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(59, 130, 246, 0.8), rgba(37, 99, 235, 0.9));
+    border-color: rgba(219, 234, 254, 0.8);
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
+}
+
+/* Scrollbar para Firefox en el listado de pacientes */
+.overflow-y-auto {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(59, 130, 246, 0.5) rgba(241, 245, 249, 0.6);
+}
+
+/* Scrollbar para áreas de texto y campos de entrada */
+textarea::-webkit-scrollbar,
+.overflow-auto::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+textarea::-webkit-scrollbar-track,
+.overflow-auto::-webkit-scrollbar-track {
+    background: rgba(248, 250, 252, 0.8);
+    border-radius: 8px;
+}
+
+textarea::-webkit-scrollbar-thumb,
+.overflow-auto::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(148, 163, 184, 0.5), rgba(100, 116, 139, 0.6));
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+textarea::-webkit-scrollbar-thumb:hover,
+.overflow-auto::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(59, 130, 246, 0.7), rgba(37, 99, 235, 0.8));
+    box-shadow: 0 0 6px rgba(59, 130, 246, 0.3);
+}
+
+/* Scrollbar para el contenedor de estudios paraclínicos */
+.space-y-5::-webkit-scrollbar,
+.grid.gap-4::-webkit-scrollbar {
+    width: 10px;
+    height: 8px;
+}
+
+.space-y-5::-webkit-scrollbar-track,
+.grid.gap-4::-webkit-scrollbar-track {
+    background: rgba(241, 245, 249, 0.5);
+    border-radius: 10px;
+    margin: 6px 0;
+}
+
+.space-y-5::-webkit-scrollbar-thumb,
+.grid.gap-4::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(99, 102, 241, 0.5), rgba(79, 70, 229, 0.6));
+    border-radius: 10px;
+    border: 2px solid rgba(241, 245, 249, 0.5);
+    transition: all 0.3s ease;
+}
+
+.space-y-5::-webkit-scrollbar-thumb:hover,
+.grid.gap-4::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(99, 102, 241, 0.8), rgba(79, 70, 229, 0.9));
+    border-color: rgba(224, 231, 255, 0.8);
+    box-shadow: 0 0 8px rgba(99, 102, 241, 0.4);
+}
+
+/* Scrollbar vertical específico para lista de estudios paraclínicos */
+.space-y-5 {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(99, 102, 241, 0.5) rgba(241, 245, 249, 0.5);
+}
+
+ul.grid::-webkit-scrollbar,
+ul.space-y-5::-webkit-scrollbar {
+    width: 10px;
+}
+
+ul.grid::-webkit-scrollbar-track,
+ul.space-y-5::-webkit-scrollbar-track {
+    background: rgba(241, 245, 249, 0.6);
+    border-radius: 12px;
+    margin: 8px 0;
+}
+
+ul.grid::-webkit-scrollbar-thumb,
+ul.space-y-5::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(99, 102, 241, 0.6), rgba(79, 70, 229, 0.7));
+    border-radius: 12px;
+    border: 2px solid rgba(241, 245, 249, 0.6);
+    transition: all 0.3s ease;
+}
+
+ul.grid::-webkit-scrollbar-thumb:hover,
+ul.space-y-5::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(99, 102, 241, 0.85), rgba(79, 70, 229, 0.95));
+    border-color: rgba(224, 231, 255, 0.8);
+    box-shadow: 0 0 10px rgba(99, 102, 241, 0.5);
+}
+
+/* Animación suave al hacer scroll */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Mejora visual para elementos con scroll horizontal */
+.overflow-x-auto::-webkit-scrollbar {
+    height: 8px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-track {
+    background: rgba(241, 245, 249, 0.6);
+    border-radius: 10px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb {
+    background: linear-gradient(90deg, rgba(59, 130, 246, 0.5), rgba(37, 99, 235, 0.6));
+    border-radius: 10px;
+    transition: all 0.3s ease;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(90deg, rgba(59, 130, 246, 0.8), rgba(37, 99, 235, 0.9));
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
+}
+
+/* ========================================
+   SCROLLBARS PARA NOTAS DE ESTUDIOS PARACLÍNICOS
+   ======================================== */
+
+/* Scrollbar para las notas de cada estudio con scroll vertical y horizontal */
+.max-h-20.overflow-auto::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.max-h-20.overflow-auto::-webkit-scrollbar-track {
+    background: rgba(248, 250, 252, 0.9);
+    border-radius: 8px;
+}
+
+.max-h-20.overflow-auto::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.6), rgba(79, 70, 229, 0.7));
+    border-radius: 8px;
+    border: 2px solid rgba(248, 250, 252, 0.5);
+    transition: all 0.3s ease;
+}
+
+.max-h-20.overflow-auto::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.85), rgba(79, 70, 229, 0.95));
+    border-color: rgba(224, 231, 255, 0.6);
+    box-shadow: 0 0 8px rgba(99, 102, 241, 0.5);
+}
+
+/* Para Firefox */
+.max-h-20.overflow-auto {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(99, 102, 241, 0.6) rgba(248, 250, 252, 0.9);
+}
+
+/* Scrollbar para el contenedor de la lista de estudios */
+ul.grid.gap-4::-webkit-scrollbar,
+ul.sm\\:grid-cols-2::-webkit-scrollbar {
+    width: 10px;
+}
+
+ul.grid.gap-4::-webkit-scrollbar-track,
+ul.sm\\:grid-cols-2::-webkit-scrollbar-track {
+    background: rgba(241, 245, 249, 0.6);
+    border-radius: 12px;
+    margin: 8px 0;
+}
+
+ul.grid.gap-4::-webkit-scrollbar-thumb,
+ul.sm\\:grid-cols-2::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(99, 102, 241, 0.6), rgba(79, 70, 229, 0.7));
+    border-radius: 12px;
+    border: 2px solid rgba(241, 245, 249, 0.6);
+    transition: all 0.3s ease;
+}
+
+ul.grid.gap-4::-webkit-scrollbar-thumb:hover,
+ul.sm\\:grid-cols-2::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(99, 102, 241, 0.85), rgba(79, 70, 229, 0.95));
+    border-color: rgba(224, 231, 255, 0.8);
+    box-shadow: 0 0 10px rgba(99, 102, 241, 0.5);
+}
+/* SCROLLBARS PARA EVOLUCIÓN POR VISITA */
+.visits-list-scrollable {
+    max-height: 756px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.visits-list-scrollable::-webkit-scrollbar {
+    width: 10px;
+}
+
+.visits-list-scrollable::-webkit-scrollbar-track {
+    background: rgba(241, 245, 249, 0.6);
+    border-radius: 12px;
+    margin: 8px 0;
+}
+
+.visits-list-scrollable::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(16, 185, 129, 0.5), rgba(5, 150, 105, 0.6));
+    border-radius: 12px;
+    border: 2px solid rgba(241, 245, 249, 0.6);
+    transition: all 0.3s ease;
+}
+
+.visits-list-scrollable::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(16, 185, 129, 0.8), rgba(5, 150, 105, 0.9));
+    border-color: rgba(209, 250, 229, 0.8);
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+}
+
+/* Firefox */
+.visits-list-scrollable {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(16, 185, 129, 0.6) rgba(241, 245, 249, 0.6);
+}
+
+/* SCROLLBARS PARA TABLA DE ACTIVIDADES Y PAGOS */
+.activities-table-scrollable {
+    max-height: 590px;
+    overflow-y: auto;
+}
+
+.activities-table-scrollable::-webkit-scrollbar {
+    width: 10px;
+}
+
+.activities-table-scrollable::-webkit-scrollbar-track {
+    background: rgba(241, 245, 249, 0.6);
+    border-radius: 12px;
+    margin: 8px 0;
+}
+
+.activities-table-scrollable::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(139, 92, 246, 0.5), rgba(124, 58, 237, 0.6));
+    border-radius: 12px;
+    border: 2px solid rgba(241, 245, 249, 0.6);
+    transition: all 0.3s ease;
+}
+
+.activities-table-scrollable::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(139, 92, 246, 0.8), rgba(124, 58, 237, 0.9));
+    border-color: rgba(237, 233, 254, 0.8);
+    box-shadow: 0 0 8px rgba(139, 92, 246, 0.4);
+}
+
+/* Firefox */
+.activities-table-scrollable {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(139, 92, 246, 0.6) rgba(241, 245, 249, 0.6);
+}
