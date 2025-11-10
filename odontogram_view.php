@@ -928,7 +928,7 @@ require __DIR__ . '/templates/header.php';
                 <?php if (!empty($patient['address'])): ?>
                     <div class="rounded-xl border border-blue-100 bg-white/80 p-3 shadow-sm">
                         <dt class="font-semibold text-blue-700 text-xs uppercase tracking-wide mb-1">Dirección</dt>
-                        <dd class="text-slate-700 text-sm leading-relaxed"><?= htmlspecialchars($patient['address']) ?></dd>
+                        <dd class="text-slate-700 text-sm leading-relaxed prevent-overflow"><?= htmlspecialchars($patient['address']) ?></dd>
                     </div>
                 <?php endif; ?>
                 <div class="rounded-xl border border-slate-200 bg-white/80 p-3 shadow-sm">

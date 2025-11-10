@@ -1039,3 +1039,138 @@ ul.sm\\:grid-cols-2::-webkit-scrollbar-thumb:hover {
     scrollbar-width: thin;
     scrollbar-color: rgba(139, 92, 246, 0.6) rgba(241, 245, 249, 0.6);
 }
+
+/* SCROLLBARS PARA TABLA DE FINANZAS */
+.finances-table-scrollable {
+    max-height: 530px;
+    overflow-y: auto;
+}
+
+.finances-table-scrollable::-webkit-scrollbar {
+    width: 10px;
+}
+
+.finances-table-scrollable::-webkit-scrollbar-track {
+    background: rgba(241, 245, 249, 0.6);
+    border-radius: 12px;
+    margin: 8px 0;
+}
+
+.finances-table-scrollable::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(59, 130, 246, 0.5), rgba(37, 99, 235, 0.6));
+    border-radius: 12px;
+    border: 2px solid rgba(241, 245, 249, 0.6);
+    transition: all 0.3s ease;
+}
+
+.finances-table-scrollable::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(59, 130, 246, 0.8), rgba(37, 99, 235, 0.9));
+    border-color: rgba(219, 234, 254, 0.8);
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
+}
+
+/* Firefox */
+.finances-table-scrollable {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(59, 130, 246, 0.6) rgba(241, 245, 249, 0.6);
+}
+
+/* PREVENCIÓN DE DESBORDAMIENTO DE TEXTO GLOBAL */
+.prevent-overflow {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    hyphens: auto;
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+/* MASONRY LAYOUT PARA HISTORIA CLÍNICA */
+.historia-clinica-masonry {
+    column-count: 1;
+    column-gap: 1.25rem; /* 20px = gap-5 */
+}
+
+@media (min-width: 1024px) {
+    .historia-clinica-masonry {
+        column-count: 2;
+    }
+}
+
+.historia-clinica-masonry > * {
+    break-inside: avoid;
+    margin-bottom: 1.25rem; /* 20px = gap-5 */
+}
+
+/* SCROLLBARS PARA CAMPOS DE TEXTO EN HISTORIA CLÍNICA */
+.historia-clinica-text-scrollable {
+    max-height: 150px;
+    overflow-y: auto;
+    overflow-x: auto;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.historia-clinica-text-scrollable::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.historia-clinica-text-scrollable::-webkit-scrollbar-track {
+    background: rgba(241, 245, 249, 0.6);
+    border-radius: 10px;
+    margin: 4px 0;
+}
+
+.historia-clinica-text-scrollable::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(139, 92, 246, 0.4), rgba(124, 58, 237, 0.5));
+    border-radius: 10px;
+    border: 2px solid rgba(241, 245, 249, 0.6);
+    transition: all 0.3s ease;
+}
+
+.historia-clinica-text-scrollable::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(139, 92, 246, 0.7), rgba(124, 58, 237, 0.8));
+    border-color: rgba(237, 233, 254, 0.8);
+}
+
+/* Firefox */
+.historia-clinica-text-scrollable {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(139, 92, 246, 0.5) rgba(241, 245, 249, 0.6);
+}
+
+/* SCROLLBARS PARA LISTA DE ESTUDIOS PARACLÍNICOS */
+.estudios-list-scrollable {
+    max-height: 420px;
+    overflow-y: auto;
+}
+
+.estudios-list-scrollable::-webkit-scrollbar {
+    width: 10px;
+}
+
+.estudios-list-scrollable::-webkit-scrollbar-track {
+    background: rgba(241, 245, 249, 0.6);
+    border-radius: 12px;
+    margin: 8px 0;
+}
+
+.estudios-list-scrollable::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(99, 102, 241, 0.5), rgba(79, 70, 229, 0.6));
+    border-radius: 12px;
+    border: 2px solid rgba(241, 245, 249, 0.6);
+    transition: all 0.3s ease;
+}
+
+.estudios-list-scrollable::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(99, 102, 241, 0.8), rgba(79, 70, 229, 0.9));
+    border-color: rgba(224, 231, 255, 0.8);
+    box-shadow: 0 0 8px rgba(99, 102, 241, 0.4);
+}
+
+/* Firefox */
+.estudios-list-scrollable {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(99, 102, 241, 0.6) rgba(241, 245, 249, 0.6);
+}

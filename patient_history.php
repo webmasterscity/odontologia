@@ -630,7 +630,7 @@ require __DIR__ . '/templates/header.php';
                                                         </svg>
                                                         <div class="flex-1 min-w-0 max-w-full">
                                                             <span class="font-medium text-slate-700">Notas:</span>
-                                                            <div class="mt-1 max-h-20 max-w-full overflow-auto break-all rounded border border-slate-200 bg-white p-2 text-xs">
+                                                            <div class="prevent-overflow mt-1 max-h-20 max-w-full overflow-auto break-all rounded border border-slate-200 bg-white p-2 text-xs">
                                                                 <?= nl2br(htmlspecialchars($notesText)) ?>
                                                             </div>
                                                         </div>
@@ -1089,6 +1089,217 @@ require __DIR__ . '/templates/header.php';
             saveButton.textContent = defaultLabel;
         }
     });
+})();
+
+// ========================================
+// AUTOGUARDADO DE HISTORIA CLÍNICA
+// ========================================
+(function() {
+    const form = document.getElementById('patientProfileForm');
+    if (!form) return;
+
+    const patientId = <?= json_encode($patientId) ?>;
+    const storageKey = `clinical_history_draft_${patientId}`;
+    const AUTOSAVE_DELAY = 1000; // 1 segundo después de dejar de escribir
+    let autosaveTimeout = null;
+    let hasUnsavedChanges = false;
+    let isSubmitting = false;
+
+    // Crear indicador visual de autoguardado
+    const indicator = document.createElement('div');
+    indicator.id = 'autosave-indicator';
+    indicator.style.cssText = `
+        position: fixed;
+        top: 80px;
+        right: 20px;
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        z-index: 1000;
+        display: none;
+        transition: all 0.3s ease;
+    `;
+    document.body.appendChild(indicator);
+
+    function showIndicator(message, type = 'info') {
+        const colors = {
+            info: { bg: '#3b82f6', text: '#ffffff' },
+            success: { bg: '#10b981', text: '#ffffff' },
+            warning: { bg: '#f59e0b', text: '#ffffff' }
+        };
+        const color = colors[type] || colors.info;
+        indicator.style.backgroundColor = color.bg;
+        indicator.style.color = color.text;
+        indicator.textContent = message;
+        indicator.style.display = 'block';
+
+        setTimeout(() => {
+            indicator.style.display = 'none';
+        }, 3000);
+    }
+
+    // Guardar datos en localStorage
+    function saveToLocalStorage() {
+        const formData = {};
+        const inputs = form.querySelectorAll('input, textarea, select');
+
+        inputs.forEach(input => {
+            if (!input.name) return;
+
+            if (input.type === 'checkbox') {
+                formData[input.name] = input.checked;
+            } else if (input.type === 'radio') {
+                if (input.checked) {
+                    formData[input.name] = input.value;
+                }
+            } else if (input.type !== 'file') {
+                formData[input.name] = input.value;
+            }
+        });
+
+        try {
+            localStorage.setItem(storageKey, JSON.stringify({
+                data: formData,
+                timestamp: new Date().toISOString()
+            }));
+            hasUnsavedChanges = false;
+            if (!isSubmitting) {
+                showIndicator('✓ Datos guardados automáticamente', 'success');
+            }
+        } catch (error) {
+            console.error('Error al guardar en localStorage:', error);
+        }
+    }
+
+    // Recuperar datos de localStorage
+    function loadFromLocalStorage() {
+        try {
+            const saved = localStorage.getItem(storageKey);
+            if (!saved) return false;
+
+            const { data, timestamp } = JSON.parse(saved);
+            const savedDate = new Date(timestamp);
+            const now = new Date();
+            const hoursDiff = (now - savedDate) / (1000 * 60 * 60);
+
+            // Si los datos tienen más de 24 horas, no los cargar
+            if (hoursDiff > 24) {
+                localStorage.removeItem(storageKey);
+                return false;
+            }
+
+            // Cargar los datos en el formulario
+            Object.keys(data).forEach(name => {
+                const elements = form.querySelectorAll(`[name="${name}"]`);
+
+                elements.forEach(element => {
+                    if (element.type === 'checkbox') {
+                        element.checked = data[name];
+                    } else if (element.type === 'radio') {
+                        if (element.value === data[name]) {
+                            element.checked = true;
+                        }
+                    } else if (element.type !== 'file') {
+                        element.value = data[name];
+                    }
+                });
+            });
+
+            // No mostrar mensaje al recuperar datos automáticamente
+            return true;
+        } catch (error) {
+            console.error('Error al cargar desde localStorage:', error);
+            return false;
+        }
+    }
+
+    // Limpiar localStorage después de guardar exitosamente
+    function clearLocalStorage() {
+        try {
+            localStorage.removeItem(storageKey);
+            console.log('Borrador eliminado después de guardar exitosamente');
+        } catch (error) {
+            console.error('Error al limpiar localStorage:', error);
+        }
+    }
+
+    // Configurar autoguardado
+    function scheduleAutosave() {
+        if (isSubmitting) return; // No autoguardar si se está enviando el formulario
+
+        hasUnsavedChanges = true;
+
+        if (autosaveTimeout) {
+            clearTimeout(autosaveTimeout);
+        }
+
+        autosaveTimeout = setTimeout(() => {
+            if (hasUnsavedChanges && !isSubmitting) {
+                saveToLocalStorage();
+            }
+        }, AUTOSAVE_DELAY);
+    }
+
+    // Escuchar cambios en todos los campos del formulario
+    const inputs = form.querySelectorAll('input, textarea, select');
+    inputs.forEach(input => {
+        if (input.type !== 'file') {
+            input.addEventListener('input', scheduleAutosave);
+            input.addEventListener('change', scheduleAutosave);
+        }
+    });
+
+    // Capturar clicks en botones de submit para cancelar autoguardado INMEDIATAMENTE
+    const submitButtons = form.querySelectorAll('button[type="submit"]');
+    submitButtons.forEach(button => {
+        button.addEventListener('mousedown', function() {
+            isSubmitting = true;
+            hasUnsavedChanges = false;
+            if (autosaveTimeout) {
+                clearTimeout(autosaveTimeout);
+                autosaveTimeout = null;
+            }
+            // Limpiar localStorage INMEDIATAMENTE para evitar recuperación al recargar
+            clearLocalStorage();
+        });
+    });
+
+    // Limpiar localStorage cuando se envía el formulario exitosamente
+    form.addEventListener('submit', function(e) {
+        // Establecer bandera INMEDIATAMENTE antes de cualquier otra cosa
+        isSubmitting = true;
+        hasUnsavedChanges = false;
+
+        // Cancelar cualquier autoguardado pendiente
+        if (autosaveTimeout) {
+            clearTimeout(autosaveTimeout);
+            autosaveTimeout = null;
+        }
+
+        showIndicator('✓ Datos guardados exitosamente', 'success');
+
+        // Esperar un poco para asegurarse de que el formulario se envíe
+        setTimeout(() => {
+            clearLocalStorage();
+        }, 500);
+    });
+
+    // Recuperar datos al cargar la página
+    window.addEventListener('DOMContentLoaded', () => {
+        loadFromLocalStorage();
+    });
+
+    // Advertir antes de cerrar si hay cambios no guardados
+    window.addEventListener('beforeunload', (e) => {
+        if (hasUnsavedChanges) {
+            // Guardar antes de salir
+            saveToLocalStorage();
+        }
+    });
+
+    console.log('✓ Autoguardado de historia clínica activado');
 })();
 </script>
 

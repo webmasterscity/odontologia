@@ -505,7 +505,7 @@ require __DIR__ . '/templates/header.php';
                 Aún no hay movimientos registrados en este mes.
             </div>
         <?php else: ?>
-            <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
+            <div class="finances-table-scrollable overflow-x-auto">
                 <table class="min-w-full divide-y divide-slate-200 text-sm">
                     <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                         <tr>
@@ -541,9 +541,9 @@ require __DIR__ . '/templates/header.php';
                                         <span class="inline-flex w-max items-center rounded-full px-2 py-0.5 text-xs font-semibold <?= $entry['type'] === 'income' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700' ?>">
                                             <?= htmlspecialchars($typeLabel) ?>
                                         </span>
-                                        <p class="font-medium text-slate-900"><?= htmlspecialchars($entry['description']) ?></p>
+                                        <p class="font-medium text-slate-900 prevent-overflow"><?= htmlspecialchars($entry['description']) ?></p>
                                         <?php if ($entry['notes']): ?>
-                                            <p class="text-xs text-slate-500"><?= nl2br(htmlspecialchars($entry['notes'])) ?></p>
+                                            <p class="text-xs text-slate-500 prevent-overflow"><?= nl2br(htmlspecialchars($entry['notes'])) ?></p>
                                         <?php endif; ?>
                                         <?php if ($isActivity && $entry['patient_id']): ?>
                                             <p class="text-xs text-brand-600">

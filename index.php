@@ -419,7 +419,7 @@ require __DIR__ . '/templates/header.php';
                     <div class="space-y-1">
                         <p class="text-sm font-semibold text-slate-900"><?= htmlspecialchars($appointment['full_name']) ?></p>
                         <?php if (!empty($appointment['plan'])): ?>
-                            <p class="text-sm text-slate-600"><?= nl2br(htmlspecialchars($appointment['plan'])) ?></p>
+                            <p class="text-sm text-slate-600 prevent-overflow"><?= nl2br(htmlspecialchars($appointment['plan'])) ?></p>
                         <?php endif; ?>
                     </div>
                 </li>
