@@ -396,53 +396,97 @@ require __DIR__ . '/templates/header.php';
             </div>
         </fieldset>
 
-        <fieldset class="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4 sm:p-6">
-            <legend class="px-3 text-xs font-semibold uppercase tracking-wide text-brand-700">Consentimiento informado</legend>
+        <fieldset class="rounded-2xl border border-slate-200/80 bg-gradient-to-br from-white to-slate-50/60 p-6 sm:p-8 shadow-sm">
+            <legend class="px-4 text-sm font-bold uppercase tracking-wider text-brand-700 bg-white rounded-lg border border-brand-200/50 shadow-sm">Consentimiento Informado</legend>
 
-            <div class="mt-4 rounded-xl bg-white p-4 text-sm text-slate-700 leading-relaxed border border-slate-200">
-                <p class="mb-3">Declaro y manifiesto en pleno uso de mis facultades mentales, libre y espontáneamente, lo siguiente: He sido informado(a) y comprendo la necesidad de ser atendido(a) por el odontólogo tratante. He sido informado(a) y comprendo la opción de tratamiento presentado en mi condición particular, explicándome en forma detallada en que consiste y como se llevará a cabo dichos procedimientos.</p>
-                <p class="mb-3">Acepto la realización de pruebas diagnósticas necesarias para mi tratamiento, incluyendo la realización de estudios radiográficos, interconsultas médico/odontológicas en general con los fines proyectados para conocer el estado de mi salud.</p>
-                <p class="mb-3">Autorizo al odontólogo tratante y su equipo de trabajo, para obtener fotografías videos y/o registro gráfico bajo los principios bioéticos.</p>
-            </div>
-
-            <div class="mt-4 grid gap-4 md:grid-cols-2">
-                <label class="flex items-center gap-2 text-sm text-slate-600">
-                    <input type="checkbox" name="consent_signed" value="1" <?= !empty($profile['consent_signed']) ? 'checked' : '' ?> class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
-                    <span>Consentimiento firmado</span>
-                </label>
-                <label class="flex flex-col gap-2 text-sm text-slate-600">
-                    <span class="font-medium text-slate-700">Fecha de firma</span>
-                    <input type="date" name="consent_signed_at" value="<?= htmlspecialchars($profile['consent_signed_at'] ?? '') ?>" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
-                </label>
-            </div>
-
-            <div class="mt-4 grid gap-4 md:grid-cols-2">
-                <div class="flex flex-col gap-2">
-                    <label class="text-sm font-medium text-slate-700">Firma del paciente:</label>
-                    <div class="relative">
-                        <canvas id="signature-canvas" class="w-full border-2 border-slate-300 rounded-xl bg-white cursor-crosshair" style="height: 200px; touch-action: none;"></canvas>
-                        <button type="button" id="clear-signature" class="absolute top-2 right-2 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 shadow-sm">Limpiar</button>
-                    </div>
-                    <input type="hidden" name="consent_signature" id="signature-data" value="<?= htmlspecialchars($profile['consent_signature'] ?? '') ?>">
-                </div>
-
-                <div class="flex flex-col gap-2">
-                    <label class="flex flex-col gap-2 text-sm text-slate-600">
-                        <span class="font-medium text-slate-700">C.I.:</span>
-                        <input type="text" name="consent_ci" value="<?= htmlspecialchars($profile['consent_ci'] ?? '') ?>" placeholder="V-12345678" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
-                    </label>
-                    <?php if (!empty($profile['consent_signature'])): ?>
-                        <div class="mt-2">
-                            <span class="text-xs font-medium text-slate-500">Firma guardada:</span>
-                            <img src="<?= htmlspecialchars($profile['consent_signature']) ?>" alt="Firma guardada" class="mt-1 border border-slate-200 rounded-lg bg-white" style="max-height: 150px;">
+            <!-- Main consent content: text + signature together -->
+            <div class="mt-6 grid gap-5 lg:grid-cols-[1fr,auto]">
+                <!-- Left column: Text + additional fields -->
+                <div class="space-y-3">
+                    <!-- Consent text -->
+                    <div class="rounded-2xl bg-gradient-to-br from-slate-50 to-white px-4 pt-3 pb-3 border-2 border-slate-200/80 shadow-sm">
+                        <div class="space-y-2.5 text-base text-slate-700 leading-normal">
+                            <p class="text-justify mb-0">
+                                <span class="font-semibold text-slate-800">Declaro y manifiesto</span> en pleno uso de mis facultades mentales, libre y espontáneamente, lo siguiente: He sido informado(a) y comprendo la necesidad de ser atendido(a) por el odontólogo tratante. He sido informado(a) y comprendo la opción de tratamiento presentado en mi condición particular, explicándome en forma detallada en que consiste y como se llevará a cabo dichos procedimientos.
+                            </p>
+                            <p class="text-justify mb-0">
+                                <span class="font-semibold text-slate-800">Acepto</span> la realización de pruebas diagnósticas necesarias para mi tratamiento, incluyendo la realización de estudios radiográficos, interconsultas médico/odontológicas en general con los fines proyectados para conocer el estado de mi salud.
+                            </p>
+                            <p class="text-justify mb-0">
+                                <span class="font-semibold text-slate-800">Autorizo</span> al odontólogo tratante y su equipo de trabajo, para obtener fotografías videos y/o registro gráfico bajo los principios bioéticos.
+                            </p>
                         </div>
-                    <?php endif; ?>
+                    </div>
+
+                    <!-- Fields below text -->
+                    <div class="grid gap-3 sm:grid-cols-2">
+                        <label class="flex items-center gap-3 px-4 py-3 text-sm rounded-xl bg-white border-2 border-slate-200/80 shadow-sm cursor-pointer hover:border-brand-300 hover:bg-brand-50/30 transition-all duration-200">
+                            <input type="checkbox" name="consent_signed" value="1" <?= !empty($profile['consent_signed']) ? 'checked' : '' ?> class="h-5 w-5 rounded border-slate-300 text-brand-600 focus:ring-brand-500 cursor-pointer">
+                            <span class="font-semibold text-slate-700">Consentimiento firmado</span>
+                        </label>
+
+                        <label class="flex flex-col gap-2 px-4 py-3 rounded-xl bg-white border-2 border-slate-200/80 shadow-sm">
+                            <span class="text-xs font-bold text-slate-600 uppercase tracking-wide">Fecha de Firma</span>
+                            <input type="date" name="consent_signed_at" value="<?= htmlspecialchars($profile['consent_signed_at'] ?? '') ?>" class="rounded-lg border-2 border-slate-300 bg-white px-3 py-2 text-slate-800 font-medium shadow-inner focus:border-brand-400 focus:ring-2 focus:ring-brand-400/20 transition-all duration-200">
+                        </label>
+                    </div>
+
+                    <div class="rounded-2xl bg-white px-4 py-3 border-2 border-slate-200/80 shadow-sm">
+                        <label class="flex flex-col gap-2">
+                            <span class="text-xs font-bold text-slate-700 uppercase tracking-wide">Cédula de Identidad</span>
+                            <input type="text" name="consent_ci" value="<?= htmlspecialchars($profile['consent_ci'] ?? '') ?>" placeholder="V-12.345.678" class="rounded-xl border-2 border-slate-300 bg-white px-4 py-2.5 text-slate-800 font-medium shadow-inner focus:border-brand-400 focus:ring-2 focus:ring-brand-400/20 transition-all duration-200">
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Right column: Signature -->
+                <div class="flex flex-col gap-3 lg:w-96">
+                    <div class="rounded-2xl bg-white p-4 border-2 border-brand-200/80 shadow-md">
+                        <label class="text-sm font-bold text-brand-700 uppercase tracking-wide mb-2 block">Firma del Paciente</label>
+
+                        <?php if (!empty($profile['consent_signature'])): ?>
+                            <!-- Mostrar firma guardada -->
+                            <div id="saved-signature-display">
+                                <div class="p-3 rounded-xl bg-green-50 border border-green-200">
+                                    <span class="text-xs font-semibold text-green-700 uppercase tracking-wide block mb-2">✓ Firma guardada</span>
+                                    <img src="<?= htmlspecialchars($profile['consent_signature']) ?>" alt="Firma guardada" class="w-full border border-green-200 rounded-lg bg-white shadow-sm" style="max-height: 340px; object-fit: contain;">
+                                </div>
+                                <button type="button" id="change-signature-btn" class="mt-3 w-full px-4 py-2.5 text-sm font-bold text-brand-700 bg-white border-2 border-brand-300 rounded-xl hover:bg-brand-50 hover:border-brand-400 shadow-sm transition-all duration-200">
+                                    Cambiar firma
+                                </button>
+                            </div>
+
+                            <!-- Canvas oculto inicialmente -->
+                            <div id="signature-canvas-wrapper" class="hidden">
+                                <div class="relative">
+                                    <canvas id="signature-canvas" class="w-full border-2 border-brand-300 rounded-xl bg-gradient-to-br from-white to-slate-50/30 cursor-crosshair shadow-inner" style="height: 300px; touch-action: none;"></canvas>
+                                    <button type="button" id="clear-signature" class="absolute top-2 right-2 px-3 py-1.5 text-xs font-bold text-brand-700 bg-white border-2 border-brand-300 rounded-lg hover:bg-brand-50 hover:border-brand-400 shadow-md transition-all duration-200">
+                                        Limpiar
+                                    </button>
+                                </div>
+                                <button type="button" id="cancel-change-btn" class="mt-3 w-full px-4 py-2.5 text-sm font-semibold text-slate-600 bg-white border-2 border-slate-300 rounded-xl hover:bg-slate-50 shadow-sm transition-all duration-200">
+                                    Cancelar
+                                </button>
+                            </div>
+                        <?php else: ?>
+                            <!-- Mostrar canvas si no hay firma -->
+                            <div class="relative">
+                                <canvas id="signature-canvas" class="w-full border-2 border-brand-300 rounded-xl bg-gradient-to-br from-white to-slate-50/30 cursor-crosshair shadow-inner" style="height: 400px; touch-action: none;"></canvas>
+                                <button type="button" id="clear-signature" class="absolute top-2 right-2 px-3 py-1.5 text-xs font-bold text-brand-700 bg-white border-2 border-brand-300 rounded-lg hover:bg-brand-50 hover:border-brand-400 shadow-md transition-all duration-200">
+                                    Limpiar
+                                </button>
+                            </div>
+                        <?php endif; ?>
+
+                        <input type="hidden" name="consent_signature" id="signature-data" value="<?= htmlspecialchars($profile['consent_signature'] ?? '') ?>">
+                    </div>
                 </div>
             </div>
 
-            <label class="mt-4 flex flex-col gap-2 text-sm text-slate-600">
-                <span class="font-medium text-slate-700">Observaciones / condiciones especiales</span>
-                <textarea name="consent_notes" rows="2" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"><?= htmlspecialchars($profile['consent_notes'] ?? '') ?></textarea>
+            <!-- Observaciones -->
+            <label class="mt-5 flex flex-col gap-3 px-5 py-4 rounded-xl bg-white border-2 border-slate-200/80 shadow-sm">
+                <span class="text-xs font-bold text-slate-600 uppercase tracking-wide">Observaciones / Condiciones Especiales</span>
+                <textarea name="consent_notes" rows="3" class="rounded-lg border-2 border-slate-300 bg-white px-4 py-3 text-slate-800 leading-relaxed shadow-inner focus:border-brand-400 focus:ring-2 focus:ring-brand-400/20 transition-all duration-200" placeholder="Agregue aquí cualquier observación o condición especial..."><?= htmlspecialchars($profile['consent_notes'] ?? '') ?></textarea>
             </label>
         </fieldset>
 
@@ -1439,7 +1483,42 @@ require __DIR__ . '/templates/header.php';
     canvas.addEventListener('touchcancel', stopDrawing);
 
     // Botón limpiar
-    clearBtn.addEventListener('click', clearSignature);
+    if (clearBtn) {
+        clearBtn.addEventListener('click', clearSignature);
+    }
+
+    // Botones para cambiar firma (cuando hay firma guardada)
+    const changeSignatureBtn = document.getElementById('change-signature-btn');
+    const cancelChangeBtn = document.getElementById('cancel-change-btn');
+    const savedSignatureDisplay = document.getElementById('saved-signature-display');
+    const signatureCanvasWrapper = document.getElementById('signature-canvas-wrapper');
+
+    if (changeSignatureBtn && savedSignatureDisplay && signatureCanvasWrapper) {
+        // Mostrar canvas para cambiar firma
+        changeSignatureBtn.addEventListener('click', function() {
+            savedSignatureDisplay.classList.add('hidden');
+            signatureCanvasWrapper.classList.remove('hidden');
+            // Limpiar el canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Reajustar tamaño
+            resizeCanvas();
+        });
+
+        // Cancelar y volver a mostrar firma guardada
+        cancelChangeBtn.addEventListener('click', function() {
+            signatureCanvasWrapper.classList.add('hidden');
+            savedSignatureDisplay.classList.remove('hidden');
+            // Restaurar firma guardada en el canvas
+            if (signatureData.value) {
+                const img = new Image();
+                img.onload = function() {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                };
+                img.src = signatureData.value;
+            }
+        });
+    }
 
     console.log('✓ Firma digital inicializada');
 })();
