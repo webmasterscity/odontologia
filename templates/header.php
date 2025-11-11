@@ -46,7 +46,7 @@ $currentScript = basename($_SERVER['SCRIPT_NAME']);
             }
         };
     </script>
-    <link rel="stylesheet" href="<?= htmlspecialchars($assetPrefix) ?>/css/style.css?v=2.5">
+    <link rel="stylesheet" href="<?= htmlspecialchars($assetPrefix) ?>/css/style.css?v=2.6">
 </head>
 <body class="min-h-screen bg-slate-50 text-slate-800 antialiased flex flex-col">
 <header class="sticky top-0 z-40 border-b border-slate-200 bg-white/80 backdrop-blur">

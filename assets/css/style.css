@@ -1082,7 +1082,14 @@ ul.sm\\:grid-cols-2::-webkit-scrollbar-thumb:hover {
     word-break: break-word;
     hyphens: auto;
     max-width: 100%;
-    overflow-x: hidden;
+    overflow-x: auto;
+    white-space: pre-wrap;
+}
+
+/* Prevención global de overflow en todos los textos */
+p, dd, span, div, td, th, li {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
 /* MASONRY LAYOUT PARA HISTORIA CLÍNICA */
@@ -1109,6 +1116,8 @@ ul.sm\\:grid-cols-2::-webkit-scrollbar-thumb:hover {
     overflow-x: auto;
     word-wrap: break-word;
     overflow-wrap: break-word;
+    word-break: break-word;
+    hyphens: auto;
 }
 
 .historia-clinica-text-scrollable::-webkit-scrollbar {

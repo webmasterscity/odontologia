@@ -2273,20 +2273,37 @@ if (!empty($patient['registered_at'])) {
                     <span class="h-1.5 w-1.5 rounded-full bg-amber-400"></span>
                     Consentimiento informado
                 </h3>
-                <dl class="space-y-3 text-sm text-slate-600">
-                    <div class="border-b border-slate-200/60 pb-2">
-                        <dt class="mb-1 text-xs font-semibold text-slate-700">Estado</dt>
-                        <dd class="text-slate-600"><?= !empty($profile['consent_signed']) ? 'Firmado' : 'Pendiente' ?></dd>
+                <div class="flex gap-4">
+                    <!-- Columna izquierda: Información del consentimiento -->
+                    <dl class="flex-1 space-y-3 text-sm text-slate-600">
+                        <div class="border-b border-slate-200/60 pb-2">
+                            <dt class="mb-1 text-xs font-semibold text-slate-700">Estado</dt>
+                            <dd class="text-slate-600"><?= !empty($profile['consent_signed']) ? 'Firmado' : 'Pendiente' ?></dd>
+                        </div>
+                        <div class="border-b border-slate-200/60 pb-2">
+                            <dt class="mb-1 text-xs font-semibold text-slate-700">Fecha de firma</dt>
+                            <dd class="text-slate-600"><?= $profile['consent_signed_at'] ? htmlspecialchars($profile['consent_signed_at']) : '—' ?></dd>
+                        </div>
+                        <div class="border-b border-slate-200/60 pb-2">
+                            <dt class="mb-1 text-xs font-semibold text-slate-700">Cédula de Identidad</dt>
+                            <dd class="text-slate-600"><?= !empty($profile['consent_ci']) ? htmlspecialchars($profile['consent_ci']) : '—' ?></dd>
+                        </div>
+                        <div class="border-b border-slate-200/60 pb-2">
+                            <dt class="mb-1 text-xs font-semibold text-slate-700">Observaciones</dt>
+                            <dd class="historia-clinica-text-scrollable text-slate-600"><?= $profile['consent_notes'] ? nl2br(htmlspecialchars($profile['consent_notes'])) : '—' ?></dd>
+                        </div>
+                    </dl>
+
+                    <!-- Columna derecha: Firma digital -->
+                    <?php if (!empty($profile['consent_signature'])): ?>
+                    <div class="flex-shrink-0">
+                        <div class="text-xs font-semibold text-slate-700 mb-2">Firma del Paciente</div>
+                        <div class="rounded-lg border-2 border-slate-200 bg-slate-50 p-2">
+                            <img src="<?= htmlspecialchars($profile['consent_signature']) ?>" alt="Firma del paciente" class="max-h-24 w-auto" style="max-width: 200px;">
+                        </div>
                     </div>
-                    <div class="border-b border-slate-200/60 pb-2">
-                        <dt class="mb-1 text-xs font-semibold text-slate-700">Fecha de firma</dt>
-                        <dd class="text-slate-600"><?= $profile['consent_signed_at'] ? htmlspecialchars($profile['consent_signed_at']) : '—' ?></dd>
-                    </div>
-                    <div class="border-b border-slate-200/60 pb-2">
-                        <dt class="mb-1 text-xs font-semibold text-slate-700">Observaciones</dt>
-                        <dd class="historia-clinica-text-scrollable text-slate-600"><?= $profile['consent_notes'] ? nl2br(htmlspecialchars($profile['consent_notes'])) : '—' ?></dd>
-                    </div>
-                </dl>
+                    <?php endif; ?>
+                </div>
             </div>
             <div class="rounded-2xl border border-slate-200/80 bg-white p-4">
                 <div class="mb-3 flex items-center justify-between gap-2">

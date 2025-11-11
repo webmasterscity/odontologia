@@ -434,7 +434,7 @@ require __DIR__ . '/templates/header.php';
                     <div class="rounded-2xl bg-white px-4 py-3 border-2 border-slate-200/80 shadow-sm">
                         <label class="flex flex-col gap-2">
                             <span class="text-xs font-bold text-slate-700 uppercase tracking-wide">Cédula de Identidad</span>
-                            <input type="text" name="consent_ci" value="<?= htmlspecialchars($profile['consent_ci'] ?? '') ?>" placeholder="V-12.345.678" class="rounded-xl border-2 border-slate-300 bg-white px-4 py-2.5 text-slate-800 font-medium shadow-inner focus:border-brand-400 focus:ring-2 focus:ring-brand-400/20 transition-all duration-200">
+                            <input type="text" name="consent_ci" value="<?= htmlspecialchars($patient['document_id'] ?? '') ?>" readonly class="rounded-xl border-2 border-slate-200 bg-slate-50 px-4 py-2.5 text-slate-700 font-medium shadow-inner cursor-not-allowed">
                         </label>
                     </div>
                 </div>
@@ -459,7 +459,7 @@ require __DIR__ . '/templates/header.php';
                             <!-- Canvas oculto inicialmente -->
                             <div id="signature-canvas-wrapper" class="hidden">
                                 <div class="relative">
-                                    <canvas id="signature-canvas" class="w-full border-2 border-brand-300 rounded-xl bg-gradient-to-br from-white to-slate-50/30 cursor-crosshair shadow-inner" style="height: 300px; touch-action: none;"></canvas>
+                                    <canvas id="signature-canvas" class="w-full border-2 border-brand-300 rounded-xl bg-gradient-to-br from-white to-slate-50/30 cursor-crosshair shadow-inner" style="height: 385px; touch-action: none;"></canvas>
                                     <button type="button" id="clear-signature" class="absolute top-2 right-2 px-3 py-1.5 text-xs font-bold text-brand-700 bg-white border-2 border-brand-300 rounded-lg hover:bg-brand-50 hover:border-brand-400 shadow-md transition-all duration-200">
                                         Limpiar
                                     </button>
@@ -1226,6 +1226,9 @@ require __DIR__ . '/templates/header.php';
         inputs.forEach(input => {
             if (!input.name) return;
 
+            // Excluir campos que se manejan por separado del autoguardado
+            if (input.name === 'consent_signature' || input.name === 'consent_ci') return;
+
             if (input.type === 'checkbox') {
                 formData[input.name] = input.checked;
             } else if (input.type === 'radio') {
@@ -1270,6 +1273,9 @@ require __DIR__ . '/templates/header.php';
 
             // Cargar los datos en el formulario
             Object.keys(data).forEach(name => {
+                // Excluir campos que se manejan por separado del autoguardado
+                if (name === 'consent_signature' || name === 'consent_ci') return;
+
                 const elements = form.querySelectorAll(`[name="${name}"]`);
 
                 elements.forEach(element => {
