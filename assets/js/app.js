@@ -744,7 +744,7 @@ function setupOdontogram() {
                 const d = `M${cx - L} ${cy - L} L${cx + L} ${cy + L} M${cx + L} ${cy - L} L${cx - L} ${cy + L}`;
                 haloPath.setAttribute('d', d);
                 haloPath.setAttribute('stroke', '#ffffff');
-                haloPath.setAttribute('stroke-width', '12');
+                haloPath.setAttribute('stroke-width', '6');
                 haloPath.setAttribute('stroke-linecap', 'round');
                 haloPath.setAttribute('fill', 'none');
                 group.appendChild(haloPath);
@@ -754,7 +754,7 @@ function setupOdontogram() {
             const d = `M${cx - L} ${cy - L} L${cx + L} ${cy + L} M${cx + L} ${cy - L} L${cx - L} ${cy + L}`;
             xPath.setAttribute('d', d);
             xPath.setAttribute('stroke', stroke);
-            xPath.setAttribute('stroke-width', '8');
+            xPath.setAttribute('stroke-width', '4');
             xPath.setAttribute('stroke-linecap', 'round');
             xPath.setAttribute('fill', 'none');
             group.appendChild(xPath);
@@ -775,7 +775,12 @@ function setupOdontogram() {
             const halo = document.createElementNS(svgNS, 'use');
             halo.setAttribute('stroke', '#ffffff');
             // El halo de la equis debe ser más grueso para mantener la proporción
-            halo.setAttribute('stroke-width', markType === 'x' ? '12' : '6');
+            // Circular: 6, Cuadrado: 12
+            if (markType === 'x') {
+                halo.setAttribute('stroke-width', shape === 'circle' ? '6' : '12');
+            } else {
+                halo.setAttribute('stroke-width', '6');
+            }
             halo.setAttribute('stroke-linecap', 'round');
             halo.setAttribute('fill', 'none');
             halo.setAttribute('href', symbolHref);
@@ -786,7 +791,12 @@ function setupOdontogram() {
         const use = document.createElementNS(svgNS, 'use');
         use.setAttribute('stroke', stroke);
         // La equis (x) debe ser más gruesa que los demás símbolos
-        use.setAttribute('stroke-width', markType === 'x' ? '8' : '4');
+        // Circular: 4, Cuadrado: 8
+        if (markType === 'x') {
+            use.setAttribute('stroke-width', shape === 'circle' ? '4' : '8');
+        } else {
+            use.setAttribute('stroke-width', '4');
+        }
         use.setAttribute('stroke-linecap', 'round');
         // El punto debe ser relleno, los demás símbolos solo contorno
         use.setAttribute('fill', markType === 'dot' ? stroke : 'none');
