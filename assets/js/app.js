@@ -763,6 +763,18 @@ function setupOdontogram() {
             return group;
         }
 
+        // Caso especial: X solo en centro para botón cuadrado
+        if (markType === 'x' && shape === 'square') {
+            // Forzar que la X solo se dibuje en el centro
+            group.setAttribute('data-zone', 'center');
+            group.setAttribute('data-sector', 'center');
+
+            // Posicionar en el centro
+            group.setAttribute('transform', formatTranslate(geometry.cx, geometry.cy));
+            group.setAttribute('data-x', String(geometry.cx));
+            group.setAttribute('data-y', String(geometry.cy));
+        }
+
         // Seleccionar el símbolo correcto según la forma (círculo o cuadrado)
         let symbolHref = symbolRefs[markType];
         if (shape === 'circle' && markType !== 'x') {
@@ -1755,10 +1767,35 @@ function setupOdontogram() {
                         return;
                     }
                     const markColor = allowedColors.includes(currentColor) ? currentColor : 'blue';
-                    const nextState = existingState ? { ...existingState } : { color: '', mark: '', markColor: '' };
-                    const sameMark = existingState
-                        && existingState.mark === currentMarkType
-                        && (existingState.markColor || '') === markColor;
+
+                    // Si es X en botón cuadrado, forzar que se marque solo en el centro
+                    let targetSurface = surface;
+                    let targetCell = cell;
+                    let targetSymbolGroup = symbolGroup;
+                    let targetSymbolZone = symbolZone;
+                    let targetAnchorPosition = anchorPosition;
+                    let targetCellKey = cellKey;
+
+                    if (currentMarkType === 'x' && cellShape === 'square') {
+                        // Buscar la celda del centro del mismo diente
+                        const centerKey = makeCellKey(toothCode, 'center');
+                        const centerContext = cellLookup.get(centerKey);
+
+                        if (centerContext) {
+                            targetSurface = 'center';
+                            targetCell = centerContext.cell;
+                            targetSymbolGroup = centerContext.symbolGroup;
+                            targetSymbolZone = 'center';
+                            targetAnchorPosition = centerContext.anchorPosition;
+                            targetCellKey = centerKey;
+                        }
+                    }
+
+                    const existingStateTarget = getCellState(diagram, toothCode, targetSurface);
+                    const nextState = existingStateTarget ? { ...existingStateTarget } : { color: '', mark: '', markColor: '' };
+                    const sameMark = existingStateTarget
+                        && existingStateTarget.mark === currentMarkType
+                        && (existingStateTarget.markColor || '') === markColor;
 
                     if (sameMark) {
                         nextState.mark = '';
@@ -1768,20 +1805,20 @@ function setupOdontogram() {
                         nextState.markColor = markColor;
                     }
 
-                    setCellState(diagram, toothCode, surface, nextState);
-                    const updatedState = getCellState(diagram, toothCode, surface);
+                    setCellState(diagram, toothCode, targetSurface, nextState);
+                    const updatedState = getCellState(diagram, toothCode, targetSurface);
                     const symbolElement = applyStateToCell({
-                        cell,
+                        cell: targetCell,
                         cellState: updatedState,
-                        symbolGroup,
-                        surface,
-                        anchorPosition,
-                        symbolZone,
+                        symbolGroup: targetSymbolGroup,
+                        surface: targetSurface,
+                        anchorPosition: targetAnchorPosition,
+                        symbolZone: targetSymbolZone,
                         diagram,
                         toothCode,
                     });
-                    if (cellKey) {
-                        syncSymbolElement(cellKey, symbolElement);
+                    if (targetCellKey) {
+                        syncSymbolElement(targetCellKey, symbolElement);
                     }
                     markDirtyForDiagram(diagram);
                     refreshMetadataBadge(toothCode);
