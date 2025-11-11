@@ -133,10 +133,10 @@ function setupOdontogram() {
         horizontal: 'horz',
     };
     const sectorAngles = {
-        upper_right: 315,
-        upper_left: 225,
-        lower_left: 135,
-        lower_right: 45,
+        upper_right: 270,   // ARRIBA (norte) - cardinal
+        upper_left: 180,    // IZQUIERDA (oeste) - cardinal
+        lower_left: 90,     // ABAJO (sur) - cardinal
+        lower_right: 0,     // DERECHA (este) - cardinal
     };
     const geometry = {
         cx: 50,
@@ -150,10 +150,10 @@ function setupOdontogram() {
     const ringAnchorRadius = (safeOuterRadius + safeInnerRadius) / 2;
     const safeCenterRadius = 19.5;
     const sectorAngleRanges = {
-        upper_right: [270, 360],
-        upper_left: [180, 270],
-        lower_left: [90, 180],
-        lower_right: [0, 90],
+        upper_right: [225, 315],   // ARRIBA (norte) - 90° centrados en 270°
+        upper_left: [135, 225],    // IZQUIERDA (oeste) - 90° centrados en 180°
+        lower_left: [45, 135],     // ABAJO (sur) - 90° centrados en 90°
+        lower_right: [315, 45],    // DERECHA (este) - 90° centrados en 0° (cruza 0°)
     };
     const squarePadding = geometry.padding;
     const squarePolygons = {
@@ -744,7 +744,7 @@ function setupOdontogram() {
                 const d = `M${cx - L} ${cy - L} L${cx + L} ${cy + L} M${cx + L} ${cy - L} L${cx - L} ${cy + L}`;
                 haloPath.setAttribute('d', d);
                 haloPath.setAttribute('stroke', '#ffffff');
-                haloPath.setAttribute('stroke-width', '4');
+                haloPath.setAttribute('stroke-width', '12');
                 haloPath.setAttribute('stroke-linecap', 'round');
                 haloPath.setAttribute('fill', 'none');
                 group.appendChild(haloPath);
@@ -754,7 +754,7 @@ function setupOdontogram() {
             const d = `M${cx - L} ${cy - L} L${cx + L} ${cy + L} M${cx + L} ${cy - L} L${cx - L} ${cy + L}`;
             xPath.setAttribute('d', d);
             xPath.setAttribute('stroke', stroke);
-            xPath.setAttribute('stroke-width', '2');
+            xPath.setAttribute('stroke-width', '8');
             xPath.setAttribute('stroke-linecap', 'round');
             xPath.setAttribute('fill', 'none');
             group.appendChild(xPath);
@@ -763,13 +763,19 @@ function setupOdontogram() {
             return group;
         }
 
-        const symbolHref = symbolRefs[markType];
+        // Seleccionar el símbolo correcto según la forma (círculo o cuadrado)
+        let symbolHref = symbolRefs[markType];
+        if (shape === 'circle' && markType !== 'x') {
+            // Para botones circulares, usar símbolos rotados
+            symbolHref = symbolHref + '-circle';
+        }
         const needsHalo = Boolean(fillColor && allowedColors.includes(fillColor));
 
         if (needsHalo) {
             const halo = document.createElementNS(svgNS, 'use');
             halo.setAttribute('stroke', '#ffffff');
-            halo.setAttribute('stroke-width', '6');
+            // El halo de la equis debe ser más grueso para mantener la proporción
+            halo.setAttribute('stroke-width', markType === 'x' ? '12' : '6');
             halo.setAttribute('stroke-linecap', 'round');
             halo.setAttribute('fill', 'none');
             halo.setAttribute('href', symbolHref);
@@ -779,7 +785,8 @@ function setupOdontogram() {
 
         const use = document.createElementNS(svgNS, 'use');
         use.setAttribute('stroke', stroke);
-        use.setAttribute('stroke-width', '4');
+        // La equis (x) debe ser más gruesa que los demás símbolos
+        use.setAttribute('stroke-width', markType === 'x' ? '8' : '4');
         use.setAttribute('stroke-linecap', 'round');
         // El punto debe ser relleno, los demás símbolos solo contorno
         use.setAttribute('fill', markType === 'dot' ? stroke : 'none');

@@ -313,11 +313,11 @@ $renderToothCard = static function (
         'bottom' => ['x' => 50, 'y' => 82],
     ];
     static $deciduousSymbolCenters = [
-        'upper_left' => ['x' => 32, 'y' => 32],
-        'upper_right' => ['x' => 68, 'y' => 32],
-        'center' => ['x' => 50, 'y' => 50],
-        'lower_right' => ['x' => 68, 'y' => 68],
-        'lower_left' => ['x' => 32, 'y' => 68],
+        'upper_left' => ['x' => 15.25, 'y' => 50],    // IZQUIERDA (oeste) - cardinal
+        'upper_right' => ['x' => 50, 'y' => 15.25],   // ARRIBA (norte) - cardinal
+        'center' => ['x' => 50, 'y' => 50],           // CENTRO
+        'lower_right' => ['x' => 84.75, 'y' => 50],   // DERECHA (este) - cardinal
+        'lower_left' => ['x' => 50, 'y' => 84.75],    // ABAJO (sur) - cardinal
     ];
     $clipId = 'tooth-clip-' . (++$clipCounter);
     $sanitizedCode = preg_replace('/[^a-zA-Z0-9_-]/', '', $code);
@@ -407,7 +407,7 @@ $renderToothCard = static function (
                                         aria-label="<?= htmlspecialchars($surfaceLabel) ?>"
                                         data-symbol-x="<?= htmlspecialchars((string) ($symbolCenters[$surface]['x'] ?? 50)) ?>"
                                         data-symbol-y="<?= htmlspecialchars((string) ($symbolCenters[$surface]['y'] ?? 50)) ?>"
-                                        d="M50 3 A47 47 0 0 0 3 50 L27.5 50 A22.5 22.5 0 0 1 50 27.5 Z"
+                                        d="M16.8 83.2 A47 47 0 0 1 16.8 16.8 L34.1 34.1 A22.5 22.5 0 0 0 34.1 65.9 Z"
                                         fill="transparent"
                                     ></path>
                                 <?php elseif ($surface === 'upper_right'): ?>
@@ -424,7 +424,7 @@ $renderToothCard = static function (
                                         aria-label="<?= htmlspecialchars($surfaceLabel) ?>"
                                         data-symbol-x="<?= htmlspecialchars((string) ($symbolCenters[$surface]['x'] ?? 50)) ?>"
                                         data-symbol-y="<?= htmlspecialchars((string) ($symbolCenters[$surface]['y'] ?? 50)) ?>"
-                                        d="M50 3 A47 47 0 0 1 97 50 L72.5 50 A22.5 22.5 0 0 1 50 27.5 Z"
+                                        d="M16.8 16.8 A47 47 0 0 1 83.2 16.8 L65.9 34.1 A22.5 22.5 0 0 0 34.1 34.1 Z"
                                         fill="transparent"
                                     ></path>
                                 <?php elseif ($surface === 'lower_right'): ?>
@@ -441,7 +441,7 @@ $renderToothCard = static function (
                                         aria-label="<?= htmlspecialchars($surfaceLabel) ?>"
                                         data-symbol-x="<?= htmlspecialchars((string) ($symbolCenters[$surface]['x'] ?? 50)) ?>"
                                         data-symbol-y="<?= htmlspecialchars((string) ($symbolCenters[$surface]['y'] ?? 50)) ?>"
-                                        d="M97 50 A47 47 0 0 1 50 97 L50 72.5 A22.5 22.5 0 0 1 72.5 50 Z"
+                                        d="M83.2 16.8 A47 47 0 0 1 83.2 83.2 L65.9 65.9 A22.5 22.5 0 0 0 65.9 34.1 Z"
                                         fill="transparent"
                                     ></path>
                                 <?php elseif ($surface === 'lower_left'): ?>
@@ -458,7 +458,7 @@ $renderToothCard = static function (
                                         aria-label="<?= htmlspecialchars($surfaceLabel) ?>"
                                         data-symbol-x="<?= htmlspecialchars((string) ($symbolCenters[$surface]['x'] ?? 50)) ?>"
                                         data-symbol-y="<?= htmlspecialchars((string) ($symbolCenters[$surface]['y'] ?? 50)) ?>"
-                                        d="M50 97 A47 47 0 0 1 3 50 L27.5 50 A22.5 22.5 0 0 1 50 72.5 Z"
+                                        d="M83.2 83.2 A47 47 0 0 1 16.8 83.2 L34.1 65.9 A22.5 22.5 0 0 0 65.9 65.9 Z"
                                         fill="transparent"
                                     ></path>
                                 <?php endif; ?>
@@ -491,8 +491,8 @@ $renderToothCard = static function (
                     <g class="tooth-grid__overlay" id="<?= htmlspecialchars($clipId . '-overlay') ?>" aria-hidden="true">
                         <circle cx="50" cy="50" r="47" fill="none"></circle>
                         <circle cx="50" cy="50" r="22.5" fill="none"></circle>
-                        <path d="M50 3 L50 27.5 M50 72.5 L50 97" fill="none"></path>
-                        <path d="M3 50 L27.5 50 M72.5 50 L97 50" fill="none"></path>
+                        <path d="M16.8 16.8 L34.1 34.1 M65.9 65.9 L83.2 83.2" fill="none"></path>
+                        <path d="M83.2 16.8 L65.9 34.1 M34.1 65.9 L16.8 83.2" fill="none"></path>
                     </g>
                     <g
                         id="<?= htmlspecialchars($symbolRingGroupId) ?>"
@@ -745,6 +745,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = 'El formato del odontograma no es válido.';
         } else {
             $snapshotOriginId = (int) post('snapshot_origin_id', '0');
+            $snapshotOnly = (string) post('snapshot_only', '0') === '1';
             $diagramData = $decodedPayload['odontodiagrama'] ?? [];
             if (!is_array($diagramData)) {
                 $diagramData = [];
@@ -1929,8 +1930,9 @@ if (!empty($patient['registered_at'])) {
         >
             <defs>
                 <symbol id="mark-x" overflow="visible">
-                    <path d="M-500000 -500000 L 500000 500000 M-500000 500000 L 500000 -500000"></path>
+                    <path d="M-500000 -500000 L 500000 500000 M-500000 500000 L 500000 -500000" stroke-width="8"></path>
                 </symbol>
+                <!-- Símbolos para botones cuadrados (sin rotación) -->
                 <symbol id="mark-dot" overflow="visible">
                     <circle cx="0" cy="0" r="10"></circle>
                 </symbol>
@@ -1939,6 +1941,16 @@ if (!empty($patient['registered_at'])) {
                 </symbol>
                 <symbol id="mark-horz" overflow="visible">
                     <path d="M-20 0 L 20 0"></path>
+                </symbol>
+                <!-- Símbolos para botones circulares (más pequeños, centrados en cada superficie) -->
+                <symbol id="mark-dot-circle" overflow="visible">
+                    <circle cx="0" cy="0" r="7"></circle>
+                </symbol>
+                <symbol id="mark-vert-circle" overflow="visible">
+                    <path d="M0 -18 L 0 18"></path>
+                </symbol>
+                <symbol id="mark-horz-circle" overflow="visible">
+                    <path d="M-18 0 L 18 0"></path>
                 </symbol>
             </defs>
         </svg>
