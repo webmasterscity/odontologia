@@ -1562,7 +1562,7 @@ if (!empty($patient['registered_at'])) {
                     <div class="space-y-3 text-sm <?= $hasAlert ? 'text-amber-800' : 'text-emerald-800' ?>">
                         <p class="leading-relaxed font-medium prevent-overflow"><?= $hasAlert ? nl2br(htmlspecialchars((string) $alertText)) : 'Sin alertas registradas.' ?></p>
                         <div class="inline-flex items-center gap-2 rounded-xl bg-white/90 px-4 py-2.5 text-sm font-bold shadow-sm <?= $hasAlert ? 'text-amber-700' : 'text-emerald-700' ?>">
-                            Saldo pendiente: Bs <?= number_format(max($totalBalance, 0), 2, ',', '.') ?>
+                            Saldo pendiente: $ <?= number_format(max($totalBalance, 0), 2, ',', '.') ?>
                         </div>
                     </div>
                 </div>
@@ -1725,7 +1725,7 @@ if (!empty($patient['registered_at'])) {
                                 <div class="flex items-center justify-between">
                                     <div>
                                         <p class="text-sm font-bold text-slate-700">
-                                            Bs <?= number_format((float)($lastActivity['payment'] ?? 0), 2, ',', '.') ?>
+                                            $ <?= number_format((float)($lastActivity['payment'] ?? 0), 2, ',', '.') ?>
                                         </p>
                                         <p class="text-xs text-slate-600">
                                             <?= date('d/m/Y', strtotime($lastActivity['activity_date'])) ?>
@@ -2779,15 +2779,15 @@ if (!empty($patient['registered_at'])) {
             </label>
             <div class="grid gap-3 sm:grid-cols-3">
                 <label class="flex flex-col gap-2 text-sm text-slate-600">
-                    <span class="font-medium text-slate-700">Honorarios (Bs)</span>
+                    <span class="font-medium text-slate-700">Honorarios ($)</span>
                     <input type="number" step="0.01" min="0" name="fee" value="<?= htmlspecialchars((string) post('fee', '')) ?>" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400" inputmode="decimal">
                 </label>
                 <label class="flex flex-col gap-2 text-sm text-slate-600">
-                    <span class="font-medium text-slate-700">Abono (Bs)</span>
+                    <span class="font-medium text-slate-700">Abono ($)</span>
                     <input type="number" step="0.01" min="0" name="payment" value="<?= htmlspecialchars((string) post('payment', '')) ?>" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400" inputmode="decimal">
                 </label>
                 <label class="flex flex-col gap-2 text-sm text-slate-600">
-                    <span class="font-medium text-slate-700">Resta (Bs)</span>
+                    <span class="font-medium text-slate-700">Resta ($)</span>
                     <input type="number" step="0.01" min="0" name="balance" value="<?= htmlspecialchars((string) post('balance', $latestOutstanding > 0 ? number_format($latestOutstanding, 2, '.', '') : '')) ?>" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400" inputmode="decimal" readonly aria-readonly="true">
                 </label>
             </div>

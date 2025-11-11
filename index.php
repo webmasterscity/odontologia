@@ -255,7 +255,7 @@ require __DIR__ . '/templates/header.php';
             <span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand-50 text-lg">💳</span>
         </div>
         <?php $pendingBalanceDisplay = $pendingBalance > 0 ? -$pendingBalance : 0.0; ?>
-        <p class="mt-4 text-3xl font-semibold text-slate-900">Bs <?= number_format($pendingBalanceDisplay, 2, ',', '.') ?></p>
+        <p class="mt-4 text-3xl font-semibold text-slate-900">$ <?= number_format($pendingBalanceDisplay, 2, ',', '.') ?></p>
         <p class="mt-2 text-xs uppercase tracking-wide text-slate-400">Cuentas por cobrar</p>
     </a>
     <a href="finances.php" class="group block rounded-2xl bg-white p-6 shadow-sm shadow-slate-200/70 ring-1 ring-slate-200/70 transition duration-200 hover:-translate-y-1 hover:shadow-lg hover:ring-brand-300 cursor-pointer">
@@ -263,9 +263,9 @@ require __DIR__ . '/templates/header.php';
             <p class="text-sm font-medium text-slate-500">Finanzas <?= htmlspecialchars(ucfirst($currentMonthLabel) . ' ' . date('Y')) ?></p>
             <span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand-50 text-lg">💰</span>
         </div>
-        <p class="mt-4 text-3xl font-semibold text-slate-900">Bs <?= number_format($monthlyFinance['net'], 2, ',', '.') ?></p>
+        <p class="mt-4 text-3xl font-semibold text-slate-900">$ <?= number_format($monthlyFinance['net'], 2, ',', '.') ?></p>
         <p class="mt-2 text-xs uppercase tracking-wide text-slate-400">Balance neto mensual</p>
-        <p class="mt-2 text-xs text-slate-400">Ingresos: Bs <?= number_format($monthlyFinance['income'], 2, ',', '.') ?> · Gastos: Bs <?= number_format($monthlyFinance['expense'], 2, ',', '.') ?></p>
+        <p class="mt-2 text-xs text-slate-400">Ingresos: $ <?= number_format($monthlyFinance['income'], 2, ',', '.') ?> · Gastos: $ <?= number_format($monthlyFinance['expense'], 2, ',', '.') ?></p>
     </a>
     <a href="#citas" class="group block rounded-2xl bg-white p-6 shadow-sm shadow-slate-200/70 ring-1 ring-slate-200/70 transition duration-200 hover:-translate-y-1 hover:shadow-lg hover:ring-brand-300 cursor-pointer">
         <div class="flex items-center justify-between">

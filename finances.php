@@ -403,20 +403,20 @@ require __DIR__ . '/templates/header.php';
     <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <div class="rounded-2xl bg-white p-6 shadow-sm shadow-slate-200/70 ring-1 ring-emerald-100">
             <p class="text-sm font-medium text-emerald-600 uppercase tracking-wide">Ingresos del mes</p>
-            <p class="mt-3 text-3xl font-semibold text-slate-900">Bs <?= $formatCurrency($periodTotals['income']) ?></p>
+            <p class="mt-3 text-3xl font-semibold text-slate-900">$ <?= $formatCurrency($periodTotals['income']) ?></p>
             <p class="mt-2 text-xs text-slate-400">Pagos, tratamientos y otros ingresos registrados.</p>
             <?php if ($activityIncomeTotal > 0): ?>
-                <p class="mt-1 text-xs text-emerald-600/80">Incluye Bs <?= $formatCurrency($activityIncomeTotal) ?> registrados automáticamente desde el control de pagos.</p>
+                <p class="mt-1 text-xs text-emerald-600/80">Incluye $ <?= $formatCurrency($activityIncomeTotal) ?> registrados automáticamente desde el control de pagos.</p>
             <?php endif; ?>
         </div>
         <div class="rounded-2xl bg-white p-6 shadow-sm shadow-slate-200/70 ring-1 ring-rose-100">
             <p class="text-sm font-medium text-rose-600 uppercase tracking-wide">Gastos del mes</p>
-            <p class="mt-3 text-3xl font-semibold text-slate-900">Bs <?= $formatCurrency($periodTotals['expense']) ?></p>
+            <p class="mt-3 text-3xl font-semibold text-slate-900">$ <?= $formatCurrency($periodTotals['expense']) ?></p>
             <p class="mt-2 text-xs text-slate-400">Compras de insumos, inversiones y otros egresos.</p>
         </div>
         <div class="rounded-2xl bg-white p-6 shadow-sm shadow-slate-200/70 ring-1 <?= $periodNet >= 0 ? 'ring-emerald-100' : 'ring-rose-100' ?>">
             <p class="text-sm font-medium <?= $periodNet >= 0 ? 'text-emerald-600' : 'text-rose-600' ?> uppercase tracking-wide">Balance del mes</p>
-            <p class="mt-3 text-3xl font-semibold text-slate-900">Bs <?= $formatCurrency($periodNet) ?></p>
+            <p class="mt-3 text-3xl font-semibold text-slate-900">$ <?= $formatCurrency($periodNet) ?></p>
             <p class="mt-2 text-xs text-slate-400">Resultado neto (ingresos menos gastos).</p>
         </div>
     </div>
@@ -462,7 +462,7 @@ require __DIR__ . '/templates/header.php';
                     <input type="text" name="category" placeholder="Ej. Tratamientos, Insumos" value="<?= htmlspecialchars($formCategory) ?>" class="mt-1 rounded-xl border-slate-300 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500" data-capitalize-first>
                 </label>
                 <label class="flex flex-col text-sm font-medium text-slate-600">
-                    Monto (Bs)
+                    Monto ($)
                     <input type="number" name="amount" min="0" step="0.01" value="<?= htmlspecialchars($formAmount) ?>" class="mt-1 rounded-xl border-slate-300 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500" required>
                 </label>
             </div>
@@ -565,7 +565,7 @@ require __DIR__ . '/templates/header.php';
                                     <?= $entry['payment_method'] ? htmlspecialchars($entry['payment_method']) : '—' ?>
                                 </td>
                                 <td class="px-4 py-3 align-top text-right font-semibold <?= $entry['type'] === 'income' ? 'text-emerald-600' : 'text-rose-600' ?>">
-                                    <?= $entry['type'] === 'expense' ? '-' : '+' ?> Bs <?= $formatCurrency((float) $entry['amount']) ?>
+                                    <?= $entry['type'] === 'expense' ? '-' : '+' ?> $ <?= $formatCurrency((float) $entry['amount']) ?>
                                 </td>
                                 <td class="px-4 py-3 align-top text-center">
                                     <?php if ($isManual): ?>
