@@ -82,6 +82,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'consent_signed' => postCheckbox('consent_signed'),
         'consent_signed_at' => null,
         'consent_notes' => trim((string) post('consent_notes')) ?: null,
+        'consent_signature' => trim((string) post('consent_signature')) ?: null,
+        'consent_ci' => trim((string) post('consent_ci')) ?: null,
         'antecedent_cardiovascular' => postCheckbox('antecedent_cardiovascular'),
         'antecedent_respiratory' => postCheckbox('antecedent_respiratory'),
         'antecedent_gastrointestinal' => postCheckbox('antecedent_gastrointestinal'),
@@ -396,6 +398,13 @@ require __DIR__ . '/templates/header.php';
 
         <fieldset class="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4 sm:p-6">
             <legend class="px-3 text-xs font-semibold uppercase tracking-wide text-brand-700">Consentimiento informado</legend>
+
+            <div class="mt-4 rounded-xl bg-white p-4 text-sm text-slate-700 leading-relaxed border border-slate-200">
+                <p class="mb-3">Declaro y manifiesto en pleno uso de mis facultades mentales, libre y espontáneamente, lo siguiente: He sido informado(a) y comprendo la necesidad de ser atendido(a) por el odontólogo tratante. He sido informado(a) y comprendo la opción de tratamiento presentado en mi condición particular, explicándome en forma detallada en que consiste y como se llevará a cabo dichos procedimientos.</p>
+                <p class="mb-3">Acepto la realización de pruebas diagnósticas necesarias para mi tratamiento, incluyendo la realización de estudios radiográficos, interconsultas médico/odontológicas en general con los fines proyectados para conocer el estado de mi salud.</p>
+                <p class="mb-3">Autorizo al odontólogo tratante y su equipo de trabajo, para obtener fotografías videos y/o registro gráfico bajo los principios bioéticos.</p>
+            </div>
+
             <div class="mt-4 grid gap-4 md:grid-cols-2">
                 <label class="flex items-center gap-2 text-sm text-slate-600">
                     <input type="checkbox" name="consent_signed" value="1" <?= !empty($profile['consent_signed']) ? 'checked' : '' ?> class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
@@ -406,6 +415,31 @@ require __DIR__ . '/templates/header.php';
                     <input type="date" name="consent_signed_at" value="<?= htmlspecialchars($profile['consent_signed_at'] ?? '') ?>" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
                 </label>
             </div>
+
+            <div class="mt-4 grid gap-4 md:grid-cols-2">
+                <div class="flex flex-col gap-2">
+                    <label class="text-sm font-medium text-slate-700">Firma del paciente:</label>
+                    <div class="relative">
+                        <canvas id="signature-canvas" class="w-full border-2 border-slate-300 rounded-xl bg-white cursor-crosshair" style="height: 200px; touch-action: none;"></canvas>
+                        <button type="button" id="clear-signature" class="absolute top-2 right-2 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 shadow-sm">Limpiar</button>
+                    </div>
+                    <input type="hidden" name="consent_signature" id="signature-data" value="<?= htmlspecialchars($profile['consent_signature'] ?? '') ?>">
+                </div>
+
+                <div class="flex flex-col gap-2">
+                    <label class="flex flex-col gap-2 text-sm text-slate-600">
+                        <span class="font-medium text-slate-700">C.I.:</span>
+                        <input type="text" name="consent_ci" value="<?= htmlspecialchars($profile['consent_ci'] ?? '') ?>" placeholder="V-12345678" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400">
+                    </label>
+                    <?php if (!empty($profile['consent_signature'])): ?>
+                        <div class="mt-2">
+                            <span class="text-xs font-medium text-slate-500">Firma guardada:</span>
+                            <img src="<?= htmlspecialchars($profile['consent_signature']) ?>" alt="Firma guardada" class="mt-1 border border-slate-200 rounded-lg bg-white" style="max-height: 150px;">
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+
             <label class="mt-4 flex flex-col gap-2 text-sm text-slate-600">
                 <span class="font-medium text-slate-700">Observaciones / condiciones especiales</span>
                 <textarea name="consent_notes" rows="2" class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 shadow-inner focus:border-brand-400 focus:ring-brand-400"><?= htmlspecialchars($profile['consent_notes'] ?? '') ?></textarea>
@@ -1300,6 +1334,114 @@ require __DIR__ . '/templates/header.php';
     });
 
     console.log('✓ Autoguardado de historia clínica activado');
+})();
+
+// Firma digital en el canvas
+(function() {
+    const canvas = document.getElementById('signature-canvas');
+    const clearBtn = document.getElementById('clear-signature');
+    const signatureData = document.getElementById('signature-data');
+
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    let isDrawing = false;
+    let lastX = 0;
+    let lastY = 0;
+
+    // Ajustar el tamaño del canvas al tamaño real
+    function resizeCanvas() {
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = rect.width;
+        canvas.height = rect.height;
+
+        // Si hay una firma guardada, cargarla
+        if (signatureData.value) {
+            const img = new Image();
+            img.onload = function() {
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            };
+            img.src = signatureData.value;
+        }
+    }
+
+    // Configurar el canvas
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    // Configurar estilo de dibujo
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // Obtener coordenadas relativas al canvas
+    function getCoordinates(e) {
+        const rect = canvas.getBoundingClientRect();
+        const touch = e.touches ? e.touches[0] : e;
+        return {
+            x: touch.clientX - rect.left,
+            y: touch.clientY - rect.top
+        };
+    }
+
+    // Iniciar dibujo
+    function startDrawing(e) {
+        e.preventDefault();
+        isDrawing = true;
+        const coords = getCoordinates(e);
+        lastX = coords.x;
+        lastY = coords.y;
+    }
+
+    // Dibujar
+    function draw(e) {
+        if (!isDrawing) return;
+        e.preventDefault();
+
+        const coords = getCoordinates(e);
+
+        ctx.beginPath();
+        ctx.moveTo(lastX, lastY);
+        ctx.lineTo(coords.x, coords.y);
+        ctx.stroke();
+
+        lastX = coords.x;
+        lastY = coords.y;
+    }
+
+    // Finalizar dibujo
+    function stopDrawing(e) {
+        if (!isDrawing) return;
+        e.preventDefault();
+        isDrawing = false;
+
+        // Guardar la firma como base64
+        signatureData.value = canvas.toDataURL('image/png');
+    }
+
+    // Limpiar firma
+    function clearSignature() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        signatureData.value = '';
+    }
+
+    // Eventos para mouse
+    canvas.addEventListener('mousedown', startDrawing);
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('mouseup', stopDrawing);
+    canvas.addEventListener('mouseout', stopDrawing);
+
+    // Eventos para touch (móviles y tablets)
+    canvas.addEventListener('touchstart', startDrawing);
+    canvas.addEventListener('touchmove', draw);
+    canvas.addEventListener('touchend', stopDrawing);
+    canvas.addEventListener('touchcancel', stopDrawing);
+
+    // Botón limpiar
+    clearBtn.addEventListener('click', clearSignature);
+
+    console.log('✓ Firma digital inicializada');
 })();
 </script>
 
