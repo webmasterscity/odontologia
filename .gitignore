@@ -1,2 +1,3 @@
 # Capturas de pantalla de Playwright
 .playwright-mcp/
+data/clinic.sqlite
