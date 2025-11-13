@@ -5,6 +5,12 @@ require_once __DIR__ . '/includes/database.php';
 
 $pdo = db();
 $patientId = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+// Ruta base dinámica: dirname de SCRIPT_NAME (por ejemplo '/odontologia'),
+// que nos permite construir redirecciones correctas aunque la app esté en un subdirectorio.
+$basePath = dirname($_SERVER['SCRIPT_NAME']);
+if ($basePath === '/' || $basePath === '\\') {
+    $basePath = '';
+}
 if ($patientId <= 0) {
     http_response_code(400);
     echo 'Identificador de paciente inválido.';
@@ -910,9 +916,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     $pdo->commit();
                     $messages[] = 'Odontograma guardado correctamente.';
-                    $redirectUrl = '/patient.php?id=' . $patientId . '#odontograma';
+                    $redirectUrl = ($basePath ?: '') . '/patient.php?id=' . $patientId . '#odontograma';
                     if ($savedSnapshotId !== null) {
-                        $redirectUrl = '/odontogram_view.php?patient_id=' . $patientId . '&snapshot_id=' . $savedSnapshotId . '#odontograma-guardado';
+                        $redirectUrl = ($basePath ?: '') . '/odontogram_view.php?patient_id=' . $patientId . '&snapshot_id=' . $savedSnapshotId . '#odontograma-guardado';
                     }
                     header('Location: ' . $redirectUrl);
                     exit;
@@ -1532,6 +1538,17 @@ if (!empty($patient['registered_at'])) {
                             </div>
                         <?php endif; ?>
                     </div>
+                        <div class="mt-3 flex items-center justify-center gap-2">
+                            <button id="capture-photo-btn" type="button" class="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                                📸 Tomar foto
+                            </button>
+                            <?php if ($hasProfilePhoto): ?>
+                                <form method="post" class="inline" onsubmit="return confirm('¿Eliminar la foto de perfil?');">
+                                    <input type="hidden" name="action" value="remove_profile_photo">
+                                    <button type="submit" class="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-600 shadow-sm hover:bg-rose-50">Eliminar foto</button>
+                                </form>
+                            <?php endif; ?>
+                        </div>
                     <div class="space-y-1.5 text-sm">
                         <p class="text-lg font-bold text-slate-900"><?= htmlspecialchars($patient['full_name'] ?? '') ?></p>
                         <?php if (!empty($patient['preferred_name'])): ?>
@@ -1896,6 +1913,113 @@ if (!empty($patient['registered_at'])) {
         </div>
     </div>
 </section>
+
+<!-- Camera modal for taking patient photo -->
+<div id="camera-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 p-4">
+    <div class="w-full max-w-md rounded-2xl bg-white p-4 shadow-lg">
+        <h3 class="mb-3 text-lg font-semibold">Tomar foto del paciente</h3>
+        <div class="aspect-video bg-slate-100 mb-3 flex items-center justify-center">
+            <video id="camera-video" autoplay playsinline class="w-full h-full object-cover"></video>
+            <canvas id="camera-canvas" class="hidden"></canvas>
+        </div>
+        <div class="flex items-center justify-between gap-2">
+            <button id="camera-capture" class="inline-flex items-center gap-2 rounded-full bg-brand-600 px-4 py-2 text-sm font-semibold text-white">Capturar</button>
+            <button id="camera-save" class="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hidden">Guardar</button>
+            <button id="camera-cancel" class="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold">Cancelar</button>
+        </div>
+        <p id="camera-error" class="mt-3 text-xs text-rose-600 hidden"></p>
+    </div>
+</div>
+
+<script>
+(function () {
+    var captureBtn = document.getElementById('capture-photo-btn');
+    if (!captureBtn) return;
+    var modal = document.getElementById('camera-modal');
+    var video = document.getElementById('camera-video');
+    var canvas = document.getElementById('camera-canvas');
+    var capture = document.getElementById('camera-capture');
+    var save = document.getElementById('camera-save');
+    var cancel = document.getElementById('camera-cancel');
+    var errorEl = document.getElementById('camera-error');
+    var stream = null;
+
+    function openModal() {
+        modal.classList.remove('hidden');
+        errorEl.classList.add('hidden');
+        save.classList.add('hidden');
+        canvas.classList.add('hidden');
+        video.classList.remove('hidden');
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(function (s) {
+                stream = s;
+                video.srcObject = stream;
+                video.play();
+            })
+            .catch(function (err) {
+                errorEl.textContent = 'No se pudo acceder a la cámara: ' + (err && err.message ? err.message : err);
+                errorEl.classList.remove('hidden');
+            });
+    }
+
+    function closeModal() {
+        modal.classList.add('hidden');
+        if (stream) {
+            stream.getTracks().forEach(function (t) { t.stop(); });
+            stream = null;
+        }
+    }
+
+    capture.addEventListener('click', function () {
+        var w = video.videoWidth;
+        var h = video.videoHeight;
+        if (!w || !h) return;
+        canvas.width = w;
+        canvas.height = h;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, w, h);
+        canvas.classList.remove('hidden');
+        video.classList.add('hidden');
+        save.classList.remove('hidden');
+    });
+
+    cancel.addEventListener('click', function () {
+        closeModal();
+    });
+
+    save.addEventListener('click', function () {
+        var dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+        var fd = new FormData();
+        fd.append('patient_id', <?= (int) $patientId ?>);
+        fd.append('photo', dataUrl);
+        var endpoint = '<?= htmlspecialchars(($basePath ?: '') . '/patient_photo_capture.php') ?>';
+        fetch(endpoint, {
+            method: 'POST',
+            body: fd,
+        }).then(function (res) { return res.json(); })
+        .then(function (json) {
+            if (json && json.success) {
+                // update image on the page or reload
+                var img = document.querySelector('img[alt^="Foto del paciente"]');
+                if (img) {
+                    img.src = json.path + '?_=' + Date.now();
+                }
+                closeModal();
+            } else {
+                errorEl.textContent = (json && json.error) ? json.error : 'Error al subir la foto';
+                errorEl.classList.remove('hidden');
+            }
+        }).catch(function (err) {
+            errorEl.textContent = 'Error de red: ' + (err && err.message ? err.message : err);
+            errorEl.classList.remove('hidden');
+        });
+    });
+
+    captureBtn.addEventListener('click', function () {
+        openModal();
+    });
+})();
+</script>
 
 <section class="rounded-3xl bg-white/95 p-6 shadow-sm shadow-slate-200/60 ring-1 ring-slate-200/70 sm:p-8 space-y-6" id="odontograma">
     <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">

@@ -51,7 +51,11 @@ $currentScript = basename($_SERVER['SCRIPT_NAME']);
 <body class="min-h-screen bg-slate-50 text-slate-800 antialiased flex flex-col">
 <header class="sticky top-0 z-40 border-b border-slate-200 bg-white/80 backdrop-blur">
     <div class="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8 md:flex-row md:items-center md:justify-between">
+<<<<<<< HEAD
         <a href="index.php" class="flex items-center gap-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60 rounded-2xl">
+=======
+    <a href="<?= htmlspecialchars(($basePath ?: '') . '/index.php') ?>" class="flex items-center gap-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60 rounded-2xl no-underline hover:no-underline">
+>>>>>>> wip/backup-andrea-20251113121656
             <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-brand-500 to-brand-600 text-2xl text-white shadow-soft ring-1 ring-inset ring-brand-300/60">🦷</span>
             <div class="space-y-0.5">
                 <h1 class="text-xl font-semibold text-slate-900">Consultorio Odontológico</h1>
