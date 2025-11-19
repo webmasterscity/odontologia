@@ -548,22 +548,22 @@ $renderOdontogramSection = static function (
     $odontogramStatuses
 ): void {
     ?>
-    <fieldset class="space-y-6 rounded-2xl border border-slate-200/80 bg-white/90 p-4 sm:p-6 shadow-sm" data-odontogram-section="<?= htmlspecialchars($diagramKey) ?>">
-        <legend class="px-3">
-            <span class="odontogram-ordinal-badge odontogram-ordinal-badge--mini inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold uppercase text-amber-900">
+    <fieldset class="space-y-2 rounded-2xl border border-slate-200/80 bg-white/90 p-3 sm:p-5 shadow-sm" data-odontogram-section="<?= htmlspecialchars($diagramKey) ?>">
+        <legend class="px-2">
+            <span class="odontogram-ordinal-badge odontogram-ordinal-badge--mini inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-semibold uppercase text-amber-900">
                 <span class="odontogram-ordinal-badge__spark" aria-hidden="true"></span>
                 <?= htmlspecialchars($title) ?>
             </span>
         </legend>
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
             <p class="text-sm text-slate-500"><?= htmlspecialchars($summary) ?></p>
         </div>
         <div
-            class="odontogram-wrapper space-y-6"
+            class="odontogram-wrapper space-y-3"
             data-diagram="<?= htmlspecialchars($diagramKey) ?>"
             data-locked="false"
         >
-            <div class="odontogram-toolbar flex flex-wrap items-center justify-between gap-6 rounded-2xl border border-slate-200/80 bg-white/95 p-4 shadow-sm">
+            <div class="odontogram-toolbar flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200/80 bg-white/95 p-3 shadow-sm">
                 <div class="toolbar-group color-group flex items-center gap-3" role="radiogroup" aria-label="Seleccionar color">
                     <span class="toolbar-label text-xs font-semibold uppercase tracking-wide text-slate-500">Color</span>
                     <button type="button" class="tool-button color-option is-active" data-color="blue" aria-pressed="true">
@@ -609,9 +609,9 @@ $renderOdontogramSection = static function (
                     </button>
                 </div>
             </div>
-            <div class="odontogram-board space-y-10">
+            <div class="odontogram-board space-y-4">
                 <!-- Maxilar superior e inferior -->
-                <div class="space-y-10">
+                <div class="space-y-4">
                     <?php for ($i = 0; $i < 2; $i++): ?>
                         <?php $group = $odontogramGroups[$i]; ?>
                         <div class="odontogram-arch<?= $group['is_deciduous'] ? ' odontogram-arch--deciduous' : '' ?>">
@@ -628,8 +628,8 @@ $renderOdontogramSection = static function (
                 </div>
 
                 <!-- Dentición temporal con panel lateral en el espacio blanco -->
-                <div class="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_280px]">
-                    <div class="space-y-10">
+                <div class="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_280px]">
+                    <div class="space-y-4">
                         <?php for ($i = 2; $i < 4; $i++): ?>
                             <?php $group = $odontogramGroups[$i]; ?>
                             <div class="odontogram-arch<?= $group['is_deciduous'] ? ' odontogram-arch--deciduous' : '' ?>">
@@ -965,7 +965,7 @@ require __DIR__ . '/templates/header.php';
     <p class="text-sm text-slate-500">Al guardar, se actualizará este odontograma registrado sin modificar el odontograma principal del paciente.</p>
 </section>
 
-<section id="odontograma-guardado" class="rounded-3xl bg-white/95 p-6 shadow-sm shadow-slate-200/60 ring-1 ring-slate-200/70 sm:p-8 space-y-6">
+<section id="odontograma-guardado" class="rounded-3xl bg-white/95 p-3 shadow-sm shadow-slate-200/60 ring-1 ring-slate-200/70 sm:p-5 space-y-2">
     <?php
         $odontogramStatusesJson = json_encode($odontogramStatuses, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         if ($odontogramStatusesJson === false) {
@@ -975,7 +975,7 @@ require __DIR__ . '/templates/header.php';
     <form
         method="post"
         action="patient.php?id=<?= $patientId ?>#odontograma"
-        class="space-y-6"
+        class="space-y-2"
         data-odontogram-form
         data-odontogram-statuses="<?= htmlspecialchars($odontogramStatusesJson, ENT_QUOTES) ?>"
         data-odontogram-default-status="<?= htmlspecialchars($defaultOdontogramStatus) ?>"
@@ -1028,7 +1028,7 @@ require __DIR__ . '/templates/header.php';
             );
         ?>
 
-        <div class="flex justify-end gap-3">
+        <div class="flex justify-end gap-3 pt-2">
             <a href="patient.php?id=<?= $patientId ?>#odontograma" class="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50">
                 Cancelar
             </a>
@@ -1038,5 +1038,35 @@ require __DIR__ . '/templates/header.php';
         </div>
     </form>
 </section>
+
+<script>
+// Ajustar scroll para mostrar el título del odontograma al cargar la página
+(function() {
+    if (window.location.hash === '#odontograma-guardado') {
+        // Esperar a que la página cargue completamente
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                const section = document.getElementById('odontograma-guardado');
+                if (section) {
+                    // Usar scrollIntoView para posicionar el título en la parte superior
+                    section.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start',
+                        inline: 'nearest'
+                    });
+
+                    // Ajustar un poco más para que el título quede mejor posicionado
+                    setTimeout(function() {
+                        window.scrollBy({
+                            top: -80,
+                            behavior: 'smooth'
+                        });
+                    }, 300);
+                }
+            }, 100);
+        });
+    }
+})();
+</script>
 
 <?php require __DIR__ . '/templates/footer.php'; ?>
