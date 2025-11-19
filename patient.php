@@ -2063,6 +2063,9 @@ if (!empty($patient['registered_at'])) {
                 <symbol id="mark-vert" overflow="visible">
                     <path d="M0 -46.6 L 0 46.6"></path>
                 </symbol>
+                <symbol id="mark-vert-square-lateral" overflow="visible">
+                    <path d="M0 -18 L 0 18"></path>
+                </symbol>
                 <symbol id="mark-horz" overflow="visible">
                     <path d="M-20 0 L 20 0"></path>
                 </symbol>
