@@ -775,6 +775,58 @@ function setupOdontogram() {
             group.setAttribute('data-y', String(geometry.cy));
         }
 
+        // Caso especial: Línea vertical completa en centro de botón circular
+        if (markType === 'vertical' && shape === 'circle' && symbolZone === 'center') {
+            // Buscar el grupo full sin clip-path
+            const toothCards = Array.from(form.querySelectorAll('.tooth-card'));
+            let fullGroup = null;
+            for (const card of toothCards) {
+                if (card.dataset.tooth === toothCode) {
+                    const fullGroupId = card.dataset.symbolGroupFull;
+                    if (fullGroupId) {
+                        fullGroup = document.getElementById(fullGroupId);
+                    }
+                    break;
+                }
+            }
+
+            // Usar el grupo full si existe (sin clip-path), sino usar el symbolGroup original
+            const targetGroup = fullGroup || symbolGroup;
+
+            // Usar el símbolo de línea vertical completa para el centro
+            const symbolHref = '#mark-vert-circle-center';
+
+            // Posicionar en el centro
+            group.setAttribute('transform', formatTranslate(geometry.cx, geometry.cy));
+            group.setAttribute('data-x', String(geometry.cx));
+            group.setAttribute('data-y', String(geometry.cy));
+
+            const needsHalo = Boolean(fillColor && allowedColors.includes(fillColor));
+
+            if (needsHalo) {
+                const halo = document.createElementNS(svgNS, 'use');
+                halo.setAttribute('stroke', '#ffffff');
+                halo.setAttribute('stroke-width', '6');
+                halo.setAttribute('stroke-linecap', 'round');
+                halo.setAttribute('fill', 'none');
+                halo.setAttribute('href', symbolHref);
+                halo.setAttributeNS(xlinkNS, 'href', symbolHref);
+                group.appendChild(halo);
+            }
+
+            const use = document.createElementNS(svgNS, 'use');
+            use.setAttribute('stroke', stroke);
+            use.setAttribute('stroke-width', '4');
+            use.setAttribute('stroke-linecap', 'round');
+            use.setAttribute('fill', 'none');
+            use.setAttribute('href', symbolHref);
+            use.setAttributeNS(xlinkNS, 'href', symbolHref);
+            group.appendChild(use);
+
+            targetGroup.appendChild(group);
+            return group;
+        }
+
         // Seleccionar el símbolo correcto según la forma (círculo o cuadrado)
         let symbolHref = symbolRefs[markType];
         if (shape === 'circle' && markType !== 'x') {

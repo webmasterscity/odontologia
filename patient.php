@@ -1937,7 +1937,7 @@ if (!empty($patient['registered_at'])) {
                     <circle cx="0" cy="0" r="10"></circle>
                 </symbol>
                 <symbol id="mark-vert" overflow="visible">
-                    <path d="M0 -18 L 0 18"></path>
+                    <path d="M0 -46.6 L 0 46.6"></path>
                 </symbol>
                 <symbol id="mark-horz" overflow="visible">
                     <path d="M-20 0 L 20 0"></path>
@@ -1948,6 +1948,9 @@ if (!empty($patient['registered_at'])) {
                 </symbol>
                 <symbol id="mark-vert-circle" overflow="visible">
                     <path d="M0 -18 L 0 18"></path>
+                </symbol>
+                <symbol id="mark-vert-circle-center" overflow="visible">
+                    <path d="M0 -47 L 0 47"></path>
                 </symbol>
                 <symbol id="mark-horz-circle" overflow="visible">
                     <path d="M-18 0 L 18 0"></path>

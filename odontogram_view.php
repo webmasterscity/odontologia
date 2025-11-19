@@ -549,7 +549,12 @@ $renderOdontogramSection = static function (
 ): void {
     ?>
     <fieldset class="space-y-6 rounded-2xl border border-slate-200/80 bg-white/90 p-4 sm:p-6 shadow-sm" data-odontogram-section="<?= htmlspecialchars($diagramKey) ?>">
-        <legend class="px-3 text-xs font-semibold uppercase tracking-wide text-brand-700"><?= htmlspecialchars($title) ?></legend>
+        <legend class="px-3">
+            <span class="odontogram-ordinal-badge odontogram-ordinal-badge--mini inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold uppercase text-amber-900">
+                <span class="odontogram-ordinal-badge__spark" aria-hidden="true"></span>
+                <?= htmlspecialchars($title) ?>
+            </span>
+        </legend>
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p class="text-sm text-slate-500"><?= htmlspecialchars($summary) ?></p>
         </div>
@@ -758,7 +763,8 @@ require __DIR__ . '/templates/header.php';
     <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div class="space-y-3">
             <div class="flex flex-wrap items-center gap-2">
-                <span class="inline-flex items-center rounded-full bg-brand-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-brand-700">
+                <span class="odontogram-ordinal-badge odontogram-ordinal-badge--mini inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold uppercase text-amber-900">
+                    <span class="odontogram-ordinal-badge__spark" aria-hidden="true"></span>
                     <?= htmlspecialchars($ordinalLabel) ?>
                 </span>
                 <?php if ($snapshotDate !== '—'): ?>
@@ -990,7 +996,7 @@ require __DIR__ . '/templates/header.php';
                     <circle cx="0" cy="0" r="10"></circle>
                 </symbol>
                 <symbol id="mark-vert" overflow="visible">
-                    <path d="M0 -18 L 0 18"></path>
+                    <path d="M0 -46.6 L 0 46.6"></path>
                 </symbol>
                 <symbol id="mark-horz" overflow="visible">
                     <path d="M-20 0 L 20 0"></path>
@@ -1001,6 +1007,9 @@ require __DIR__ . '/templates/header.php';
                 </symbol>
                 <symbol id="mark-vert-circle" overflow="visible">
                     <path d="M0 -18 L 0 18"></path>
+                </symbol>
+                <symbol id="mark-vert-circle-center" overflow="visible">
+                    <path d="M0 -47 L 0 47"></path>
                 </symbol>
                 <symbol id="mark-horz-circle" overflow="visible">
                     <path d="M-18 0 L 18 0"></path>
@@ -1021,7 +1030,7 @@ require __DIR__ . '/templates/header.php';
                 Cancelar
             </a>
             <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-full bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-soft transition hover:-translate-y-0.5 hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500">
-                Guardar cambios en odontograma
+                Guardar cambios editados
             </button>
         </div>
     </form>

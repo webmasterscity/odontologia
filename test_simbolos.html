@@ -90,6 +90,50 @@
         </p>
 
         <div class="grid">
+            <!-- Línea Vertical Circular - Centro -->
+            <div class="symbol-box" style="border-color: #4CAF50; background: #f0fff0;">
+                <h3>│ Línea Vertical (Centro Circular) ⭐</h3>
+                <div class="svg-container">
+                    <svg width="100" height="100" viewBox="0 0 100 100">
+                        <!-- Círculo de referencia (área del botón circular) -->
+                        <circle cx="50" cy="50" r="47" fill="#f0f0f0" stroke="#4CAF50" stroke-width="2"/>
+                        <defs>
+                            <symbol id="mark-vert-circle-center-test" overflow="visible">
+                                <path d="M0 -47 L 0 47"></path>
+                            </symbol>
+                        </defs>
+                        <use href="#mark-vert-circle-center-test" x="50" y="50" stroke="#1D4ED8" stroke-width="4" stroke-linecap="round"/>
+                    </svg>
+                </div>
+                <div class="info">
+                    <strong>Alto: 94 (TODO el botón circular)</strong><br>
+                    ✅ Solo cuando se marca el CENTRO<br>
+                    🎯 Cubre completamente el botón vertical
+                </div>
+            </div>
+
+            <!-- Línea Vertical Circular - Anillo -->
+            <div class="symbol-box">
+                <h3>│ Línea Vertical (Anillo Circular)</h3>
+                <div class="svg-container">
+                    <svg width="100" height="100" viewBox="0 0 100 100">
+                        <!-- Círculo de referencia -->
+                        <circle cx="50" cy="50" r="47" fill="none" stroke="#ccc" stroke-width="1"/>
+                        <defs>
+                            <symbol id="mark-vert-circle-ring-test" overflow="visible">
+                                <path d="M0 -18 L 0 18"></path>
+                            </symbol>
+                        </defs>
+                        <use href="#mark-vert-circle-ring-test" x="50" y="20" stroke="#1D4ED8" stroke-width="4" stroke-linecap="round"/>
+                    </svg>
+                </div>
+                <div class="info">
+                    <strong>Alto: 36 (normal)</strong><br>
+                    ℹ️ Cuando se marca el anillo exterior<br>
+                    (sin cambios)
+                </div>
+            </div>
+
             <!-- Punto (Dot) -->
             <div class="symbol-box">
                 <h3>⚫ Punto (Dot)</h3>
@@ -132,20 +176,23 @@
 
             <!-- Línea Vertical -->
             <div class="symbol-box">
-                <h3>│ Línea Vertical</h3>
+                <h3>│ Línea Vertical (Botones Cuadrados)</h3>
                 <div class="svg-container">
                     <svg width="100" height="100" viewBox="0 0 100 100">
+                        <!-- Rectángulo de referencia (área del botón cuadrado) -->
+                        <rect x="3.4" y="3.4" width="93.2" height="93.2" rx="8.2" fill="#f0f0f0" stroke="#ccc" stroke-width="1"/>
                         <defs>
                             <symbol id="mark-vert-new" overflow="visible">
-                                <path d="M0 -14 L 0 14"></path>
+                                <path d="M0 -46.6 L 0 46.6"></path>
                             </symbol>
                         </defs>
-                        <use href="#mark-vert-new" x="50" y="50" stroke="#1D4ED8" stroke-width="3" stroke-linecap="round"/>
+                        <use href="#mark-vert-new" x="50" y="50" stroke="#1D4ED8" stroke-width="4" stroke-linecap="round"/>
                     </svg>
                 </div>
                 <div class="info">
-                    <strong>Alto: 28</strong><br>
-                    (antes: 16 en ambos archivos)
+                    <strong>Alto: 93.2 (TODO el botón)</strong><br>
+                    (antes: 36 unidades)<br>
+                    ✅ Cubre completamente el botón vertical
                 </div>
             </div>
 
@@ -175,7 +222,7 @@
                 <ul style="line-height: 2;">
                     <li><strong>X:</strong> 12×12 a 16×16</li>
                     <li><strong>Punto:</strong> radio 2.8 a 6</li>
-                    <li><strong>Vertical:</strong> 16</li>
+                    <li><strong>Vertical:</strong> 36 unidades</li>
                     <li><strong>Horizontal:</strong> 20</li>
                 </ul>
                 <p style="margin-top: 15px; font-size: 13px; color: #666;">
@@ -187,23 +234,38 @@
                 <h2>✅ Tamaños Nuevos (Unificados)</h2>
                 <ul style="line-height: 2;">
                     <li><strong>X:</strong> 24×24 (patient.php), 28×28 (odontogram_view.php)</li>
-                    <li><strong>Punto:</strong> radio 5.5 (patient.php), 8 (odontogram_view.php)</li>
-                    <li><strong>Vertical:</strong> 28 (ambos)</li>
-                    <li><strong>Horizontal:</strong> 32 (ambos)</li>
+                    <li><strong>Punto:</strong> radio 10 (ambos)</li>
+                    <li><strong>Vertical (Cuadrados):</strong> 93.2 - ¡TODA la altura del botón!</li>
+                    <li><strong>Vertical (Circulares):</strong> 36 (sin cambios)</li>
+                    <li><strong>Horizontal:</strong> 40 (ambos)</li>
                 </ul>
                 <p style="margin-top: 15px; font-size: 13px; color: #666;">
-                    Los trazos ahora son más grandes y visibles, cubriendo mejor cada superficie sin exceder los límites del diente.
+                    ✨ <strong>NUEVO:</strong> La línea vertical ahora cubre completamente los botones cuadrados (dientes permanentes) de arriba a abajo, sin afectar los botones circulares.
                 </p>
             </div>
         </div>
 
         <div style="margin-top: 40px; padding: 20px; background: #fff3cd; border-radius: 8px; border-left: 4px solid #ffc107;">
-            <h3 style="margin-top: 0; color: #856404;">📋 Resumen de Cambios</h3>
+            <h3 style="margin-top: 0; color: #856404;">📋 Resumen de Cambios - Líneas Verticales Completas</h3>
             <ol style="line-height: 2; color: #856404;">
-                <li><strong>patient.php</strong> (líneas 1919-1930): Símbolos del odontograma principal actualizados</li>
-                <li><strong>odontogram_view.php</strong> (líneas 969-980): Símbolos de odontogramas guardados actualizados</li>
-                <li>Los trazos ahora cubren aproximadamente el 60-75% más de espacio</li>
-                <li>Se mantiene la geometría y funcionalidad sin dañar nada</li>
+                <li><strong>Botones Cuadrados (Permanentes):</strong>
+                    <ul>
+                        <li>patient.php (línea 1940): 36 → 93.2 unidades</li>
+                        <li>odontogram_view.php (línea 999): Mismo cambio</li>
+                        <li>✅ Cubre TODA la altura del botón cuadrado</li>
+                    </ul>
+                </li>
+                <li><strong>Botones Circulares (Temporales) - NUEVO:</strong>
+                    <ul>
+                        <li>patient.php (línea 1952-1953): Nuevo símbolo mark-vert-circle-center</li>
+                        <li>odontogram_view.php (línea 1011-1012): Mismo cambio</li>
+                        <li>assets/js/app.js (líneas 784-786): Lógica condicional</li>
+                        <li>🎯 Cuando se marca el CENTRO: 94 unidades (todo el botón)</li>
+                        <li>ℹ️ Cuando se marca el ANILLO: 36 unidades (sin cambios)</li>
+                    </ul>
+                </li>
+                <li>✅ Los demás símbolos (X, punto, horizontal) permanecen sin cambios</li>
+                <li>✅ Se mantiene la geometría y funcionalidad sin dañar nada</li>
             </ol>
         </div>
     </div>
