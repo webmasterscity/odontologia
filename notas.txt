@@ -1,0 +1,96 @@
+git rm --cached data/clinic.sqlite
+
+
+En la PC del cliente, abre PowerShell como administrador, ve al directorio raíz del proyecto y ejecuta:
+
+    Set-ExecutionPolicy -Scope Process Bypass
+    .\scripts\update_client.ps1 -Remote origin -Branch andrea
+    Ajusta -Branch si necesitas otro. Si solo quieres probar, agrega -DryRun para ver los pasos sin cambios reales.
+  - Tras la primera ejecución confirma que backups/ contenga la copia creada y revisa el log en logs/ por si hubo advertencias.
+  - Si en algún punto necesitas omitir temporalmente el git pull (por ejemplo, para repetir solo la migración luego de resolver un conflicto),
+    ejecuta .\scripts\update_client.ps1 -SkipGitPull.
+
+
+
+
+ Plan Seguro Para Actualizar Al Cliente
+
+  - 1. Respaldos obligatorios. En la máquina del cliente (actualmente en cc9a532...), copia data/clinic.sqlite a un fichero con fecha (cp data/
+    clinic.sqlite backups/clinic_cc9a532_20251112.db). Verifica que el backup abre con sqlite3 backups/... ".tables" antes de seguir.
+  - 2. Deja de versionar la base. En tu repo principal ya añadiste data/clinic.sqlite al .gitignore, pero en la máquina del cliente sigue
+    trackeada. Allí mismo corre git rm --cached data/clinic.sqlite y haz un commit, o al menos git update-index --skip-worktree data/
+    clinic.sqlite si prefieres un parche rápido. Así evitas que el siguiente pull trate de sobrescribir la base con otra versión binaria.
+  - 3. Trae el código nuevo sin tocar la base. Una vez la base no esté en el índice:
+
+    git fetch origin
+    git checkout cc9a532   # por si hay cambios locales sin commit
+    git pull --rebase origin andrea
+    Si había modificaciones en PHP/JS, resuélvelas normalmente; la base ya no estorbará porque Git la ignorará.
+  - 4. Aplica la migración de estructura sobre la base existente. Necesitas llevar el esquema viejo al nuevo (el que añade firma, CI, etc.). Usa
+    ALTER TABLE en lugar de reemplazar el archivo:
+
+    ALTER TABLE clinical_profiles ADD COLUMN consent_signature TEXT;
+    ALTER TABLE clinical_profiles ADD COLUMN consent_ci TEXT;
+    Colócalo en un script (migrate_signature.sql) y ejecútalo con sqlite3 data/clinic.sqlite < migrations/migrate_signature.sql. Si hay más
+    cambios posteriores a fdac4aa, encadénalos en ese mismo script (verifica commits posteriores por más columnas).
+  - 5. Verifica datos. Después del ALTER, abre la app y confirma que los pacientes existentes siguen visibles y que las columnas nuevas permiten
+    escribir (por ejemplo, crea un consentimiento de prueba, revisa que clinical_profiles.consent_signature no sea NULL).
+  - 6. Distribuye el procedimiento. Documenta para tu cliente:
+      1. Copia de seguridad.
+      2. git pull + composer/npm install si aplica.
+      3. Ejecutar sqlite3 data/clinic.sqlite < migrations/migrate_signature.sql.
+      4. Reinicio del servicio/web server.
+
+  Si necesitas que prepare el archivo de migración con todos los ALTER TABLE desde cc9a532 hasta la punta actual, dime y lo armamos para que
+  solo tenga que ejecutar un comando.
+
+
+
+
+
+
+
+
+
+
+Sí, ese flujo es totalmente viable. El proceso seguro sería:
+
+  1. Copia que te envía el cliente
+
+  - Pídele que ejecute el botón “Descargar respaldo (.sqlite)” o copie manualmente data/clinic.sqlite y te envíe ese archivo.
+  - Confirma que proviene de su commit actual (cc9a532…) y guárdalo con un nombre que identifique la fecha/cliente, p. ej.
+    clinic_cliente_20251112.sqlite.
+
+  2. Actualiza la estructura tú mismo
+
+  - Trabaja sobre una copia, nunca sobre el archivo original recibido.
+  - Desde tu terminal:
+
+    sqlite3 clinic_cliente_20251112.sqlite "ALTER TABLE clinical_profiles ADD COLUMN consent_signature TEXT;"
+    sqlite3 clinic_cliente_20251112.sqlite "ALTER TABLE clinical_profiles ADD COLUMN consent_ci TEXT;"
+  - Repite para cualquier otro cambio de esquema posterior (revisa commits por más columnas nuevas).
+  - Verifica que la estructura quedó correcta: sqlite3 clinic_cliente_20251112.sqlite ".schema clinical_profiles" y asegúrate de que los datos
+    siguen ahí (SELECT COUNT(*) FROM patients;).
+  - Opcional: ejecuta VACUUM; para compactar antes de enviarla de vuelta.
+
+  3. Se la devuelves al cliente
+
+  - Indícale que primero respalde su archivo actual (por ejemplo copiándolo a backups/clinic_pre_actualizacion.sqlite).
+  - Luego que sobrescriba data/clinic.sqlite con el que le enviaste y abra la app para confirmar que todos los pacientes/datos aparecen y las
+    vistas nuevas (firma) funcionan.
+
+  4. Limpieza en Git
+
+  - Una vez verificado que todo corre con la base migrada, sí:
+
+    git rm --cached data/clinic.sqlite
+    git commit -m "Dejar de versionar base local"
+    git pull --rebase origin andrea
+    Con eso, data/clinic.sqlite deja de formar parte del repositorio, así que futuros git pull no tocarán la base; solo necesitará correr
+    migraciones cuando haya cambios de esquema.
+
+  Si prefieres automatizar el paso 2, puedes usar el script scripts/update_client.ps1 que ya creamos: ejecútalo apuntando al archivo que te
+  envió (.\scripts\update_client.ps1 -DatabasePath .\clinic_cliente_20251112.sqlite -SkipGitPull). Este detecta si las columnas existen antes de
+  aplicar los ALTER, así evitas errores si vuelves a ejecutarlo.
+
+  Avísame si quieres que prepare un fichero .sql con todas las migraciones acumuladas para enviárselo junto a las instrucciones.
